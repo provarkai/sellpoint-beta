@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade SellPoint Beta</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page payment-page">
+  <main>
+    <header><div><h1>Upgrade SellPoint Beta</h1><p class="meta">Choose a plan, pay, then send payment proof to activate your account.</p></div><a class="button-link" href="index.html">Back to App</a></header>
+    <section class="plans upgrade-plans"><div><b>Starter</b><span>NGN 3,000/month</span><small>Unlimited orders, branded invoices, WhatsApp tools, product/service/digital delivery.</small><button onclick="selectPlan('Starter','NGN 3,000/month')">Choose Starter</button></div><div class="featured"><b>Pro</b><span>NGN 7,000/month</span><small>Everything in Starter plus AI credits, staff access, reports, priority support.</small><button onclick="selectPlan('Pro','NGN 7,000/month')">Choose Pro</button></div></section>
+    <section class="grid"><article><h2>SellPoint Payment Details</h2><div id="paymentDetails" class="invoice"></div><p class="actions"><button id="copyPayment">Copy Payment Details</button><a id="paymentLinkBtn" class="button-link" href="#" target="_blank">Open Payment Link</a></p></article><article><h2>Activation Message</h2><textarea id="activationMsg" rows="12" readonly></textarea><p class="actions"><button id="copyActivation">Copy Message</button><button id="sendActivation">Send WhatsApp</button></p></article></section>
+  </main>
+  <div id="toast"></div>
+  <script src="upgrade.js"></script>
+</body>
+</html>
