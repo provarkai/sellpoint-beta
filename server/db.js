@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const { orderLimitFor } = require("./pricing");
+const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -8,7 +9,11 @@ const pool = new Pool({
 
 const uid = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-class OrderError extends Error {}
+// Same class as validate.js's ValidationError - OrderError predates the
+// validate module and covers non-input errors too (order limit reached,
+// product not found), but both map to the same 400 response in
+// server/index.js, so there's no reason for them to be different classes.
+const OrderError = ValidationError;
 
 async function query(text, params) {
   return pool.query(text, params);
@@ -219,6 +224,9 @@ async function updateOwner(fields) {
 // --- Products / customers ------------------------------------------------
 
 async function createProduct(businessId, data) {
+  const name = requireString(data.name, "Product name");
+  const price = requireNumber(data.price, "Price", { min: 0 });
+  const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
   const id = uid("p");
   const { rows } = await query(
     `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note)
@@ -226,16 +234,16 @@ async function createProduct(businessId, data) {
     [
       id,
       businessId,
-      data.name,
-      Number(data.price) || 0,
-      Number(data.stock) || 0,
+      name,
+      price,
+      stock,
       data.category || "",
       data.type || "Product",
       data.deliveryLink || "",
       data.deliveryNote || "",
     ]
   );
-  await logEvent(businessId, "item_created", data.name);
+  await logEvent(businessId, "item_created", name);
   return toProductJson(rows[0]);
 }
 
@@ -244,14 +252,15 @@ async function deleteProduct(businessId, id) {
 }
 
 async function createCustomer(businessId, data) {
+  const name = requireString(data.name, "Customer name");
   const id = uid("c");
   const phone = String(data.phone || "").replace(/\D/g, "");
   await query(
     "INSERT INTO customers (id, business_id, name, phone, location) VALUES ($1,$2,$3,$4,$5)",
-    [id, businessId, data.name, phone, data.location || ""]
+    [id, businessId, name, phone, data.location || ""]
   );
-  await logEvent(businessId, "customer_created", data.name);
-  return toCustomerJson({ id, name: data.name, phone, location: data.location || "" });
+  await logEvent(businessId, "customer_created", name);
+  return toCustomerJson({ id, name, phone, location: data.location || "" });
 }
 
 async function deleteCustomer(businessId, id) {
@@ -273,7 +282,7 @@ async function createOrder(businessId, data) {
   ]);
   const product = productRows[0];
   if (!product) throw new OrderError("Product not found");
-  const qty = Number(data.qty) || 1;
+  const qty = requireNumber(data.qty ?? 1, "Quantity", { min: 1, integer: true });
   if (qty > product.stock) throw new OrderError("Not enough stock");
 
   await query("UPDATE products SET stock = $1 WHERE id = $2", [product.stock - qty, product.id]);
