@@ -91,7 +91,64 @@ Avoid over-familiar slang too — professional-friendly, like a good bank teller
 
 ---
 
-## 3. Visual Identity Brief
+## 3. Positioning Tension: Nigerian Roots, Global Execution
+
+SellPoint should resolve one deliberate tension: **feel unmistakably Nigerian
+in warmth, color confidence, and WhatsApp-native daily use — while being
+disciplined enough in typography, grid, and restraint to sit credibly next to
+Stripe, Shopify, or Block in a global pitch deck.** Same trajectory as
+Paystack, Flutterwave, and Moniepoint: Nigerian-first products that never
+looked like "African startups" — they looked like world-class companies that
+happened to start in Nigeria.
+
+### What "Nigerian feel" means here (specific, not costume)
+- **Warmth and directness**, not cold enterprise SaaS — the tone of a trusted
+  local business partner, not a Silicon Valley dashboard.
+- **Color with confidence** — Nigerian commerce (markets, Owambe events,
+  Afrobeats culture, shop signage) uses bold, saturated color without
+  apology. SellPoint's green + terracotta-orange should carry that same
+  confident energy, not be muted into generic fintech pastel.
+- **Built around WhatsApp and mobile-money culture** — receipts, invoices,
+  and reminders designed to be *forwarded in a chat thread*, not viewed on a
+  desktop marketing site. This is the actual daily reality of the user.
+- **Hustle-literate, not hustle-stereotyped** — speaks to ambition and grind
+  without poverty-tourism visual tropes.
+
+**Explicitly avoid**: Ankara/kente print textures, tribal mask iconography,
+continent-shaped logos, "sunset over savanna" imagery, pidgin-as-gimmick
+copywriting — anything that reads as "exotic" rather than *familiar to the
+person actually using it*. If a Nigerian seller would find it patronizing, cut it.
+
+### What "global brand" means here (specific, not generic SaaS polish)
+- **Type and layout discipline** that would hold up in a pitch deck next to
+  Stripe, Shopify, or Block — real grid systems, real hierarchy, no clip-art.
+- **A palette and logomark that travel** — should work identically on a phone
+  screen in Lagos and a laptop in London with zero re-explanation. No visual
+  element that only makes sense with local context.
+- **Currency- and language-agnostic architecture from day one** — pricing is
+  NGN-only today (`server/pricing.js`), but the identity system (numerals,
+  receipt layout, iconography) should be built assuming multi-currency
+  expansion, not painted into a corner.
+- **Restraint over decoration** — global-caliber brands earn trust through
+  consistency and clarity, not ornament. Every flourish should be functional
+  (a color that means "paid," not a color for its own sake).
+
+### Reference brands to study (how, not just what)
+- **Paystack** — proved a Nigerian product could look like a category leader
+  before Stripe ever acquired them; clean geometric mark, disciplined blue,
+  zero regional kitsch.
+- **Flutterwave** — bold orange used as a confident brand color, not a
+  "warning" color; scaled from Lagos to a pan-African, multi-market identity
+  without diluting itself.
+- **Moniepoint** — utilitarian trust-first design for the same kind of user
+  SellPoint serves (informal/small-business sellers), proving "for the
+  hustle" and "world-class" aren't in tension.
+- **PiggyVest** — playful but disciplined color system that still reads as
+  serious about money.
+
+---
+
+## 4. Visual Identity Brief
 
 ### Direction to explore
 Evolve — don't discard — the green/orange system already earning recognition
@@ -145,7 +202,7 @@ logomark, consistent iconography) rather than a monogram tile and system fonts.
 
 ---
 
-## 4. Messaging Deliverables to Produce
+## 5. Messaging Deliverables to Produce
 
 - **Tagline options** (evolve "AI business manager"): e.g. "Run your shop like
   a real business," "Every sale, tracked. Every customer, remembered."
@@ -161,44 +218,52 @@ logomark, consistent iconography) rather than a monogram tile and system fonts.
 
 ---
 
-## 5. Ready-to-use prompt block
+## 6. Ready-to-use prompt block
 
 Paste this directly into an AI design/branding tool to kick off concepts:
 
 > Design a brand identity for **SellPoint**, an AI-powered business
-> management app for small and informal sellers in Nigeria (WhatsApp
-> resellers, market traders, small shop owners, digital product sellers).
-> The product helps them track products, customers, and orders, generate
-> AI-written customer messages, and send professional invoices/receipts over
-> WhatsApp.
+> management app for small and informal sellers, built Nigeria-first with a
+> trajectory toward global markets — the same arc as Paystack, Flutterwave,
+> and Moniepoint. The product tracks products, customers, and orders, writes
+> AI customer messages, and sends invoices/receipts over WhatsApp.
 >
-> Brand personality: a sharp, capable, friendly helper — not a corporate
-> enterprise SaaS brand, not a flashy fintech startup, not a playful chatbot
-> mascot. Should feel trustworthy around money and comfortable inside a
-> WhatsApp chat bubble.
+> The brand must resolve one tension deliberately: **feel unmistakably
+> Nigerian in warmth, color confidence, and WhatsApp-native daily use — while
+> being disciplined enough in typography, grid, and restraint to sit
+> credibly next to Stripe, Shopify, or Block in a global pitch deck.** Local
+> authenticity in substance and tone; international rigor in execution. Do
+> not use Ankara/kente patterns, tribal iconography, continent shapes, or
+> "Africa rising" visual clichés — those read as costume, not culture, to
+> the actual target user.
 >
-> Evolve this existing palette rather than replace it: deep trustworthy green
-> `#147d64` as primary (already reads as "paid/verified" to users), warm
-> terracotta-orange `#d36b2c` as an energetic accent, dark ink `#13241e`,
-> soft off-white background `#f5f7f4`. Add a proper neutral scale and
-> semantic paid/pending/low-stock colors.
+> Evolve, don't discard, this working palette: deep trustworthy green
+> `#147d64` (already reads as "paid/verified" in-product) and a confident
+> terracotta-orange `#d36b2c` accent — used with the saturation and
+> confidence of Nigerian market/event branding, not muted into generic
+> fintech pastel. Add a documented neutral scale and semantic
+> paid/pending/low-stock states, in both light and dark mode.
 >
-> Design a logomark that works at 16px (favicon, WhatsApp avatar scale),
-> reproduces in a single color, and evokes reliable small-business commerce
-> (receipt, checkmark, or storefront motifs) — avoid map-pin/location
-> imagery, which misreads as a maps product. Pair it with a wordmark set in a
-> humanist/grotesque sans-serif with strong numeral and ₦ (Naira) support.
+> Logomark: must work at 16px (a seller may set it as their own WhatsApp
+> profile photo), reproduce in one color, and read as reliable commerce
+> infrastructure — receipt, checkmark, or storefront motifs, not a location
+> pin (misreads as maps) and not any local-pattern texture. Wordmark: a
+> humanist/grotesque sans with strong tabular numerals and multi-currency
+> symbol support (₦ today, built to add $/£/€ without redesign).
 >
-> Primary deliverable to mock up first: a **customer-facing invoice/receipt**
-> — this is where the brand is seen most often, forwarded seller-to-customer
-> over WhatsApp, and must make a one-person shop look established. Secondary:
-> the app dashboard sidebar/header, and the upgrade/paywall dialog.
+> Primary deliverable to mock first: the **customer-facing invoice/receipt**
+> forwarded seller-to-customer over WhatsApp — SellPoint's most frequent and
+> highest-leverage brand impression, and the moment it has to make a
+> one-person Lagos shop look like a business that could operate anywhere.
+> Secondary: the app dashboard, the upgrade/paywall dialog.
 >
-> Tone of voice: plain, warm, direct, money-literate. No SaaS jargon.
+> Voice: plain, warm, direct, money-literate — the tone of a sharp local
+> partner who also happens to be building something the rest of the world
+> will use. No SaaS jargon, no forced pidgin, no poverty-tourism imagery.
 
 ---
 
-## 6. Deliverables checklist
+## 7. Deliverables checklist
 
 - [ ] Logomark + wordmark (SVG, works at 16px and 512px)
 - [ ] Color tokens (light + dark mode, WCAG AA verified) — update `styles.css` `:root`
