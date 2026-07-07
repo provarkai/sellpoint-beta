@@ -122,30 +122,38 @@ monthly (2 months free).
 - Real Paystack checkout with webhook + verify-by-reference fallback.
 - Platform-admin panel (`backend.html`) listing all businesses/payments and
   editing SellPoint's own payout details.
+- **Server-side input validation** on product price/stock and order qty
+  (`server/validate.js`) — negative stock, non-numeric price, etc. now
+  reject with a 400 instead of silently coercing to 0.
+- **Automated tests + CI** — `server/__tests__/` (Node's built-in
+  `node:test`) covers validation, pricing tiers, and Paystack webhook
+  signature verification; `.github/workflows/ci.yml` runs `npm test` on
+  every push/PR to `master`.
 
 ## 9. Known gaps / not yet done
 
-1. **No automated tests** — no test framework, no CI (`.github/workflows`
-   doesn't exist). Every change is currently verified manually.
-2. **No server-side input validation** — price/stock/qty are coerced to
-   numbers but not range-checked (e.g. negative stock is possible).
-3. **No Postgres Row Level Security** — not a hard requirement today (the
+1. **No Postgres Row Level Security** — not a hard requirement today (the
    DB connection string never reaches the browser) but recommended
    defense-in-depth.
-4. **Staff invites** — `business_members.role = 'staff'` exists in the
+2. **Staff invites** — `business_members.role = 'staff'` exists in the
    schema but there's no invite UI or endpoint.
-5. **File uploads (logo, digital-product downloads) are base64 in
+3. **File uploads (logo, digital-product downloads) are base64 in
    Postgres**, not object storage — fine at small scale, will bloat the DB
    over time.
-6. **Single payment provider** — Paystack only; Flutterwave listed as a
+4. **Single payment provider** — Paystack only; Flutterwave listed as a
    good next add for redundancy/coverage.
-7. **No downloadable receipt PDF**, no customer-facing checkout page per
+5. **No downloadable receipt PDF**, no customer-facing checkout page per
    order.
-8. **No expiry-based downgrade notifications** before `plan_expires_at` lapses.
-9. **NGN-only, no i18n/multi-currency.**
-10. **Not deployed anywhere yet** — `HOSTING.md` documents Railway/Render as
-    the recommended path, but there's no evidence of an actual deployment
-    (no CI/CD, no recorded production URL).
+6. **No expiry-based downgrade notifications** before `plan_expires_at` lapses.
+7. **NGN-only, no i18n/multi-currency.**
+8. **Not deployed anywhere yet** — `HOSTING.md` documents Railway/Render as
+   the recommended path, but there's no evidence of an actual deployment
+   (no CI/CD-triggered deploy, no recorded production URL). CI now runs
+   tests on push, but nothing deploys yet.
+9. **Test coverage is unit-level only** — `server/__tests__/` covers pure
+   logic (validation, pricing, webhook signatures); `server/db.js` and the
+   `/api/*` routes have no integration tests yet since that requires a
+   real (or containerized) Postgres instance.
 
 ## 10. How to run it locally right now
 
@@ -173,26 +181,39 @@ Paystack checkout stays disabled (manual bank-transfer fallback only) until
 
 ## 11. Recommended next steps, in order
 
+**Done:**
+- ~~Add basic server-side validation on price/stock/qty~~ — done
+  (`server/validate.js`).
+- ~~Add automated tests + CI~~ — done (`server/__tests__/`,
+  `.github/workflows/ci.yml`).
+
 **Before adding features:**
 1. Deploy once (Railway or Render, per `HOSTING.md`) so there's a real URL
    to test against and register the Paystack webhook — right now all
    payment activation in "production" would silently rely on the
    verify-by-reference fallback, which only fires if the seller's browser
-   returns to `upgrade.html`.
-2. Add basic server-side validation on price/stock/qty (cheap, closes a
-   real correctness gap).
-3. Add a minimal smoke-test script (even just hitting `/api/pricing` and
-   `/api/config` after boot) so there's *something* to catch a broken
-   deploy — there is currently zero test coverage.
+   returns to `upgrade.html`. This is the last unfinished Slice One
+   priority-1/2/3 item, and it needs a Supabase project + Railway/Render
+   account (external credentials, not something done from the repo alone).
 
-**Then, in priority order (from `CLAUDE_HANDOFF.md`, still accurate):**
-4. Staff invites (schema-ready, no UI).
-5. Postgres Row Level Security as defense-in-depth.
-6. Move logo/digital-download uploads to Supabase Storage instead of base64.
-7. Downloadable receipt PDF + customer-facing checkout page per order.
-8. Expiry-based downgrade notifications before `plan_expires_at` lapses.
-9. Second payment provider (Flutterwave) for redundancy.
-10. Multi-currency/i18n if expanding beyond Nigeria.
+**Then, in priority order (from `CLAUDE.md`'s Slice One, still accurate):**
+2. Monitoring, analytics, error tracking (needs the deploy above first).
+3. Row Level Security as defense-in-depth.
+4. Role permissions + audit logs (prerequisite for staff invites).
+5. API versioning.
+6. MFA + device management.
+7. Offline-first architecture, background sync, local caching.
+8. Faster onboarding: guided setup, business templates, demo mode,
+   interactive walkthroughs.
+
+**Slice Two, once Slice One is solid:**
+9. Staff invites (schema-ready, no UI).
+10. Quotes, refunds, credit sales; expenses/cashbook/P&L.
+11. Move logo/digital-download uploads to Supabase Storage instead of base64.
+12. Downloadable receipt PDF + customer-facing checkout page per order.
+13. Expiry-based downgrade notifications before `plan_expires_at` lapses.
+14. Second payment provider (Flutterwave) for redundancy.
+15. Multi-currency/i18n if expanding beyond Nigeria.
 
 ## 12. Where to look for more detail
 

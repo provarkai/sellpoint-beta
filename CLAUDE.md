@@ -76,15 +76,22 @@ what most directly compounds retention or revenue.
 
 ### Priority order
 
-1. **Production deployment** (Railway/Render per `HOSTING.md`) — nothing
-   else is real until there's a public URL; also unblocks the Paystack
-   webhook, which today only activates plans via the browser-dependent
-   verify-by-reference fallback.
-2. **Server-side input validation** (price/stock/qty range checks) — cheap,
-   closes a live correctness gap (`DEVELOPMENT_RUNTHROUGH.md` §9.2).
-3. **Automated testing + CI/CD** — currently zero test coverage; add this
-   before the feature surface in Slices Two–Five multiplies the blast
-   radius of a regression.
+1. **Production deployment** (Railway/Render per `HOSTING.md`) — **not yet
+   done**; nothing else is real until there's a public URL. Also unblocks
+   the Paystack webhook, which today only activates plans via the
+   browser-dependent verify-by-reference fallback. Needs external
+   accounts/credentials (Supabase project, Railway/Render account), so
+   this is the one item in this slice that isn't a pure code change.
+2. **Server-side input validation** (price/stock/qty range checks) — ✅
+   done: `server/validate.js` + `server/db.js` reject negative stock,
+   non-numeric price, non-integer/zero qty, etc. with a 400 instead of
+   silently coercing.
+3. **Automated testing + CI/CD** — ✅ done: `server/__tests__/` (Node's
+   built-in `node:test`) covers validation, pricing tiers, and Paystack
+   webhook signature verification; `.github/workflows/ci.yml` runs
+   `npm test` on every push/PR. Still unit-level only — `server/db.js` and
+   the `/api/*` routes have no integration tests yet (needs a real/
+   containerized Postgres instance).
 4. **Monitoring, analytics, error tracking** — needed the moment real
    users hit the deployed instance.
 5. **Row Level Security** — defense-in-depth now that there's a production
