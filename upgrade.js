@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-let owner = { name: "SellPoint", provider: "Manual bank transfer", link: "", details: "Set payment details from backend.html" };
+let owner = { name: "SellersPoint", provider: "Manual bank transfer", link: "", details: "Set payment details from backend.html" };
 let pricing = {};
 let cycle = "monthly";
 let selectedPlan = null;
@@ -18,7 +18,7 @@ function planCardsHtml() {
 function render() {
   $("planCards").innerHTML = planCardsHtml();
   $("planCards").querySelectorAll("button[data-plan]").forEach((b) => (b.onclick = () => selectPlan(b.dataset.plan)));
-  $("paymentDetails").innerHTML = '<div class="row"><span>Account</span><b>' + (owner.name || "SellPoint") + '</b></div><div class="row"><span>Provider</span><b>' + owner.provider + '</b></div><div class="row"><span>Details</span><b>' + (owner.details || "Add payment details from backend.html").replace(/\n/g, "<br>") + '</b></div>';
+  $("paymentDetails").innerHTML = '<div class="row"><span>Account</span><b>' + (owner.name || "SellersPoint") + '</b></div><div class="row"><span>Provider</span><b>' + owner.provider + '</b></div><div class="row"><span>Details</span><b>' + (owner.details || "Add payment details from backend.html").replace(/\n/g, "<br>") + '</b></div>';
   $("paymentLinkBtn").href = owner.link || "#";
   $("paymentLinkBtn").style.pointerEvents = owner.link ? "auto" : "none";
   const tier = selectedPlan ? pricing[selectedPlan] : null;
@@ -26,7 +26,7 @@ function render() {
   const cycleLabel = cycle === "yearly" ? "year" : "month";
   $("selectedPlanMeta").textContent = tier ? tier.name + " - " + money(price) + "/" + cycleLabel : "Select a plan above.";
   $("payNow").disabled = !tier;
-  $("activationMsg").value = "Hello SellPoint, I paid for " + (tier ? tier.name : "a plan") + (tier ? " (" + money(price) + "/" + cycleLabel + ")" : "") + ".\n\nAccount name: " + (owner.name || "SellPoint") + "\nProvider: " + owner.provider + "\n\nPlease activate my SellPoint Beta account.";
+  $("activationMsg").value = "Hello SellersPoint, I paid for " + (tier ? tier.name : "a plan") + (tier ? " (" + money(price) + "/" + cycleLabel + ")" : "") + ".\n\nAccount name: " + (owner.name || "SellersPoint") + "\nProvider: " + owner.provider + "\n\nPlease activate my SellersPoint Beta account.";
 }
 
 function selectPlan(key) { selectedPlan = key; render(); }

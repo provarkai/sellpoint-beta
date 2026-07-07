@@ -1,6 +1,6 @@
-# Hosting SellPoint
+# Hosting SellersPoint
 
-SellPoint is a Node/Express server backed by Postgres (via Supabase) - it is
+SellersPoint is a Node/Express server backed by Postgres (via Supabase) - it is
 **not** static HTML anymore. Static-site hosts (Netlify/Vercel/GitHub Pages
 drag-and-drop, etc.) can't run the `/api/*` server, so they're not an option
 here; you need a host that runs a persistent Node process. Postgres and Auth

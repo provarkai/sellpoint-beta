@@ -1,4 +1,4 @@
--- SellPoint multi-tenant schema (Postgres / Supabase).
+-- SellersPoint multi-tenant schema (Postgres / Supabase).
 -- Safe to re-run: every statement is idempotent.
 
 create extension if not exists pgcrypto;
@@ -91,13 +91,22 @@ create table if not exists payments (
 );
 create index if not exists payments_business_id_idx on payments(business_id);
 
--- Genuine singleton: SellPoint's own payout details shown on upgrade.html,
+-- Genuine singleton: SellersPoint's own payout details shown on upgrade.html,
 -- not per-tenant. Edited only from the platform-admin backend.
 create table if not exists owner_payment (
   id integer primary key check (id = 1),
-  name text not null default 'SellPoint',
+  name text not null default 'SellersPoint',
   provider text not null default 'Manual bank transfer',
   link text not null default '',
   details text not null default ''
 );
 insert into owner_payment (id) values (1) on conflict (id) do nothing;
+
+-- Platform-wide feature toggles, editable only from the platform-admin
+-- backend. Kept separate from owner_payment since it's a different concern
+-- (feature flags vs. payout details), even though both are singletons.
+create table if not exists platform_settings (
+  id integer primary key check (id = 1),
+  extended_pricing_enabled boolean not null default false
+);
+insert into platform_settings (id) values (1) on conflict (id) do nothing;

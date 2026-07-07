@@ -199,7 +199,7 @@ async function activatePlan(businessId, plan, billingCycle) {
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
 }
 
-// --- SellPoint's own payout details (genuine singleton) -----------------
+// --- SellersPoint's own payout details (genuine singleton) -----------------
 
 async function getOwner() {
   const { rows } = await query("SELECT * FROM owner_payment WHERE id = 1");
@@ -214,6 +214,18 @@ async function updateOwner(fields) {
     [fields.name ?? current.name, fields.provider ?? current.provider, fields.link ?? current.link, fields.details ?? current.details]
   );
   return toOwnerJson(updated[0]);
+}
+
+async function getPlatformSettings() {
+  const { rows } = await query("SELECT extended_pricing_enabled FROM platform_settings WHERE id = 1");
+  return { extendedPricingEnabled: !!rows[0]?.extended_pricing_enabled };
+}
+
+async function updatePlatformSettings(fields) {
+  const current = await getPlatformSettings();
+  const enabled = fields.extendedPricingEnabled !== undefined ? !!fields.extendedPricingEnabled : current.extendedPricingEnabled;
+  await query("UPDATE platform_settings SET extended_pricing_enabled = $1 WHERE id = 1", [enabled]);
+  return { extendedPricingEnabled: enabled };
 }
 
 // --- Products / customers ------------------------------------------------
@@ -399,6 +411,8 @@ module.exports = {
   activatePlan,
   getOwner,
   updateOwner,
+  getPlatformSettings,
+  updatePlatformSettings,
   createProduct,
   deleteProduct,
   createCustomer,

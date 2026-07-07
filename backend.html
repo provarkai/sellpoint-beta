@@ -3,22 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SellPoint Platform Admin</title>
+  <title>SellersPoint Platform Admin</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="single-page">
   <main>
-    <header><div><h1>SellPoint Platform Admin</h1><p class="meta">Cross-tenant view - all businesses on SellPoint, not just one.</p></div><div class="top-actions"><a class="button-link" href="index.html">Open App</a><a class="button-link" href="upgrade.html" target="_blank">Payment Page</a><button id="logout">Log Out</button></div></header>
+    <header><div><h1>SellersPoint Platform Admin</h1><p class="meta">Cross-tenant view - all businesses on SellersPoint, not just one.</p></div><div class="top-actions"><a class="button-link" href="index.html">Open App</a><a class="button-link" href="upgrade.html" target="_blank">Payment Page</a><button id="logout">Log Out</button></div></header>
     <div id="notAuthorized" class="invoice" style="display:none">You're logged in, but this account isn't a platform admin.</div>
     <div id="adminContent" style="display:none">
       <section class="metrics"><div><small>Businesses</small><b id="totalBusinesses">0</b></div><div><small>Payments recorded</small><b id="totalPayments">0</b></div><div><small>Revenue collected</small><b id="totalRevenue">NGN 0</b></div></section>
       <section class="grid">
-        <form id="ownerPaymentForm"><h2>SellPoint Payment Details</h2><label>Business/Account name<input id="ownerName" required placeholder="SellPoint Technologies"></label><label>Payment provider<select id="ownerProvider"><option>Manual bank transfer</option><option>Paystack</option><option>Flutterwave</option><option>Monnify</option></select></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellpoint"></label><label>Bank/payment details<textarea id="ownerDetails" rows="5" placeholder="Bank: Example Bank
+        <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<select id="ownerProvider"><option>Manual bank transfer</option><option>Paystack</option><option>Flutterwave</option><option>Monnify</option></select></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><label>Bank/payment details<textarea id="ownerDetails" rows="5" placeholder="Bank: Example Bank
 Account: 1234567890
-Name: SellPoint"></textarea></label><button>Save SellPoint Payment Details</button></form>
+Name: SellersPoint"></textarea></label><button>Save SellersPoint Payment Details</button></form>
         <article><h2>Businesses</h2><div id="businessList" class="list"></div></article>
       </section>
-      <section class="grid"><article><h2>Recent Payments (All Tenants)</h2><div id="paymentLog" class="list"></div></article></section>
+      <section class="grid">
+        <article><h2>Pricing Tiers</h2><p class="meta">Growth/Pro/Business/Enterprise are priced differently but don't gate different features yet (no staff seats, AI credits, or reports) - see VISION.md. Leave this off until those exist.</p><label><input type="checkbox" id="extendedPricingToggle"> Show all 5 tiers to customers (off = Starter + Growth only)</label><button id="savePricingSettings">Save</button></article>
+        <article><h2>Recent Payments (All Tenants)</h2><div id="paymentLog" class="list"></div></article>
+      </section>
     </div>
   </main>
   <div id="toast"></div>

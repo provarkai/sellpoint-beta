@@ -1,8 +1,8 @@
 {
-  "name": "sellpoint-beta",
+  "name": "sellerspoint-beta",
   "version": "0.1.0",
   "private": true,
-  "description": "SellPoint - multi-tenant seller app, platform admin backend, and upgrade page backed by a Node/Express + Postgres (Supabase) API",
+  "description": "SellersPoint - multi-tenant seller app, platform admin backend, and upgrade page backed by a Node/Express + Postgres (Supabase) API",
   "main": "server/index.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",

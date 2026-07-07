@@ -4,7 +4,8 @@ const express = require("express");
 const db = require("./db");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin } = require("./auth");
 const payments = require("./payments");
-const { PRICING } = require("./pricing");
+const pricing = require("./pricing");
+const { PRICING } = pricing;
 
 const app = express();
 const ROOT = path.join(__dirname, "..");
@@ -193,7 +194,10 @@ app.post(
 );
 app.get(
   "/api/pricing",
-  handle(async (req, res) => res.json(PRICING))
+  handle(async (req, res) => {
+    const settings = await db.getPlatformSettings();
+    res.json(pricing.visibleTiers(settings.extendedPricingEnabled));
+  })
 );
 
 // --- Payments ----------------------------------------------------------------
@@ -204,7 +208,10 @@ app.post(
   handle(async (req, res) => {
     const { plan, billingCycle, email } = req.body || {};
     if (!email) return res.status(400).json({ error: "Email is required" });
-    if (!PRICING[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });
+    const settings = await db.getPlatformSettings();
+    const visible = pricing.visibleTiers(settings.extendedPricingEnabled);
+    if (!visible[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });
+    if (visible[plan].monthly == null) return res.status(400).json({ error: "This plan requires contacting sales" });
     if (!payments.isConfigured()) {
       return res.status(400).json({ error: "Paystack is not configured on this server" });
     }
@@ -250,7 +257,7 @@ app.post(
   })
 );
 
-// --- Platform admin (cross-tenant, SellPoint's own operators only) -----------
+// --- Platform admin (cross-tenant, SellersPoint's own operators only) -----------
 
 app.get(
   "/api/admin/businesses",
@@ -264,6 +271,17 @@ app.get(
   handle(async (req, res) => res.json(await db.listAllPayments()))
 );
 
+app.get(
+  "/api/admin/settings",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.getPlatformSettings()))
+);
+app.put(
+  "/api/admin/settings",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.updatePlatformSettings(req.body || {})))
+);
+
 app.listen(PORT, HOST, () => {
-  console.log(`SellPoint running at http://${HOST}:${PORT}`);
+  console.log(`SellersPoint running at http://${HOST}:${PORT}`);
 });

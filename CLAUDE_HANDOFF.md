@@ -1,4 +1,4 @@
-# SellPoint - Claude Code Handoff
+# SellersPoint - Claude Code Handoff
 
 ## Project Location
 This lives at:
@@ -8,7 +8,7 @@ This lives at:
 ## Pages
 - `index.html` - seller-facing app (multi-tenant: each logged-in business only ever sees its own data)
 - `login.html` / `signup.html` - Supabase Auth email+password
-- `backend.html` - SellPoint's own cross-tenant platform-admin panel (not a per-business admin view)
+- `backend.html` - SellersPoint's own cross-tenant platform-admin panel (not a per-business admin view)
 - `upgrade.html` - per-business plan upgrade + Paystack checkout page (requires login)
 
 ## Scripts
@@ -16,18 +16,18 @@ This lives at:
 - `login.js` / `signup.js` - Supabase Auth sign-in/sign-up
 - `auth-shared.js` - classic (non-module) script shared by every authenticated page; exposes `window.Auth.{requireSession, ensureBusiness, logout}`
 - `supabase-init.js` - the one `type="module"` script on each page; fetches `/api/config` and exposes `window.supabaseReady` (a Promise) so the classic scripts above can `await` it without needing to be modules themselves (module scripts don't leak declarations to `window`, which the app's inline `onclick="..."` handlers depend on)
-- `backend.js` - platform-admin: all businesses, all payments, SellPoint's own payout details
+- `backend.js` - platform-admin: all businesses, all payments, SellersPoint's own payout details
 - `upgrade.js` - plan selection and Paystack checkout
 - `styles.css` - shared styling
 - `server/index.js` - Express server: serves the static pages and the `/api/*` REST endpoints
 - `server/db.js` - Postgres access via `pg`, every business-scoped function takes a `businessId`
 - `server/auth.js` - Supabase session verification middleware (`requireAuthOnly`, `requireAuth`, `requirePlatformAdmin`)
-- `server/pricing.js` - subscription tier definitions (starter/basic/standard/premium) and order-limit lookup
+- `server/pricing.js` - subscription tier definitions (starter/growth/pro/business/enterprise) and order-limit lookup
 - `server/payments.js` - Paystack transaction init, webhook signature verification, verify-by-reference
 - `server/schema.sql` - Postgres schema, idempotent (`IF NOT EXISTS` everywhere) - apply with `npm run migrate`
 
 ## Multi-Tenancy
-SellPoint is a real multi-tenant SaaS: any number of independent businesses
+SellersPoint is a real multi-tenant SaaS: any number of independent businesses
 can sign up and each only ever sees its own products/customers/orders/plan.
 
 - `businesses` - one row per tenant (replaces the old single `business` row).
@@ -37,7 +37,7 @@ can sign up and each only ever sees its own products/customers/orders/plan.
   `business_id` and every query in `server/db.js` is scoped by it. Deletes
   also filter by `business_id` (not just the row's own id) so one tenant can
   never affect another tenant's row even by guessing an id.
-- `owner_payment` is a genuine singleton (`CHECK (id = 1)`) - it's SellPoint's
+- `owner_payment` is a genuine singleton (`CHECK (id = 1)`) - it's SellersPoint's
   own payout details shown on `upgrade.html`, not per-tenant.
 
 **Business creation happens on first login, not at signup.** Supabase can
@@ -51,13 +51,13 @@ email confirmation is on or off, instead of needing two different code paths.
 ## Two Different "Admin" Concepts
 - **A business's own admin view** is just the Settings tab in `index.html` -
   every logged-in business owner already has this, no separate page needed.
-- **`backend.html` is SellPoint's own cross-tenant operator panel** - it lists
+- **`backend.html` is SellersPoint's own cross-tenant operator panel** - it lists
   every business on the platform and every payment across all of them, and
-  edits SellPoint's own payout details. It is *not* a per-business dashboard
+  edits SellersPoint's own payout details. It is *not* a per-business dashboard
   anymore (that's what it was in the single-tenant beta). Gated by
   `requirePlatformAdmin`, which checks the logged-in user's email against the
   `PLATFORM_ADMIN_EMAILS` env var - there's no separate admin table, since
-  it's meant for the handful of people who run SellPoint itself, not tenants.
+  it's meant for the handful of people who run SellersPoint itself, not tenants.
 
 ## Authentication
 All auth is Supabase Auth (email + password) - the old shared HTTP Basic Auth
@@ -109,6 +109,12 @@ enable real checkout. With them unset, `/api/payments/initialize` returns a
   Paystack's checkout page.
 - `GET /api/admin/payments` (`requirePlatformAdmin`) - cross-tenant payment
   history, shown on `backend.html`.
+- `GET`/`PUT /api/admin/settings` (`requirePlatformAdmin`) - reads/writes
+  `platform_settings.extended_pricing_enabled`, the toggle behind
+  `backend.html`'s "Pricing Tiers" panel. `GET /api/pricing` (public) reads
+  this same flag via `pricing.visibleTiers()` to decide whether to return
+  just `{starter, growth}` or the full 5-tier ladder - see `VISION.md` for
+  why Pro/Business/Enterprise are hidden by default.
 
 Both the webhook and the verify-by-reference path funnel through
 `finalizeIfSuccessful()` in `server/index.js`, which uses `db.recordPayment()`'s
