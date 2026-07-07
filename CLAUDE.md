@@ -1,4 +1,4 @@
-# SellPoint — Strategic & Development Guide
+# SellersPoint — Strategic & Development Guide
 
 This is the single file that ties **strategy** (why we're building this, in
 what order, and why it wins) to **execution** (what's actually in the repo
@@ -23,7 +23,7 @@ and grow from one intelligent platform.
 
 **Category** — AI Business Operating System (AI BOS). Not inventory
 software, not POS software, not accounting software, not an invoice
-generator — SellPoint combines all of these into a single intelligent
+generator — SellersPoint combines all of these into a single intelligent
 operating system.
 
 ---
@@ -41,7 +41,7 @@ Every slice answers the same four questions:
 1. **What are we building?**
 2. **Why does it matter?**
 3. **How does it create a competitive advantage?**
-4. **How does it move SellPoint from Lagos → Africa → the world?**
+4. **How does it move SellersPoint from Lagos → Africa → the world?**
 
 Within each slice, features are numbered in **build priority order** —
 lower number = do first. Priority is driven by: (a) what's already
@@ -57,7 +57,7 @@ what most directly compounds retention or revenue.
 1. **What:** A secure, scalable, enterprise-grade platform — deployment,
    testing, security, performance, and onboarding UX — built *before*
    layering on commerce and AI features.
-2. **Why:** SellPoint already has multi-tenancy, Supabase Auth, business
+2. **Why:** SellersPoint already has multi-tenancy, Supabase Auth, business
    isolation, subscriptions, and Paystack checkout (see
    `DEVELOPMENT_RUNTHROUGH.md` §8) — but it has never been deployed, has
    zero automated tests, and has no input validation or Row Level
@@ -66,7 +66,7 @@ what most directly compounds retention or revenue.
    features on sand.
 3. **Competitive advantage:** Trust is the actual product for a business's
    sales and money data. Getting infrastructure right *before* scaling
-   features is what lets SellPoint credibly sit above informal
+   features is what lets SellersPoint credibly sit above informal
    spreadsheet/notebook tools and compete with funded incumbents on
    reliability, not just feature count.
 4. **Lagos → Africa → world:** A platform that only works for one business
@@ -122,14 +122,14 @@ what most directly compounds retention or revenue.
    operating loop — sales, CRM, inventory, finance, and commerce
    (storefront, QR ordering, payment links, delivery).
 2. **Why:** A tool used once a week is a utility; a tool used every hour is
-   infrastructure. Every feature here is chosen to convert SellPoint from
+   infrastructure. Every feature here is chosen to convert SellersPoint from
    "where I make an invoice" into "where my business day happens."
 3. **Competitive advantage:** Bundling sales, CRM, inventory, and finance
    in one mobile-first product beats assembling five separate tools
    (POS app + notebook + WhatsApp broadcasts + a banking app) — which is
    the real status quo for most African SMEs today.
 4. **Lagos → Africa → world:** The deeper a business's daily workflow is
-   embedded in SellPoint, the higher the switching cost — which is what
+   embedded in SellersPoint, the higher the switching cost — which is what
    makes the Slice Four localization investment (new currencies, payment
    rails) pay off instead of just adding surface area nobody uses.
 
@@ -139,7 +139,7 @@ what most directly compounds retention or revenue.
    `orders` table/flow; lowest lift, closes obvious gaps in the current
    order lifecycle.
 2. **Expenses, cashbook, Profit & Loss, daily reconciliation** — finance
-   basics that make SellPoint the source of truth for "did I make money
+   basics that make SellersPoint the source of truth for "did I make money
    today," a top daily question for the target user.
 3. **CRM depth: customer timelines, smart segmentation** — extends the
    existing `customers` table; directly enables Slice Three's AI insights
@@ -147,7 +147,7 @@ what most directly compounds retention or revenue.
 4. **Suppliers, purchase orders** — extends the existing `products` table;
    needed before barcode/batch/warehouse features make sense.
 5. **Payment links, QR ordering, online storefront** — builds directly on
-   the Paystack integration already shipped; turns SellPoint into a
+   the Paystack integration already shipped; turns SellersPoint into a
    revenue channel, not just a record-keeper.
 6. **Loyalty, wallet** — retention mechanics; sequence after storefront
    exists since loyalty needs a customer-facing surface to redeem against.
@@ -164,11 +164,11 @@ what most directly compounds retention or revenue.
 
 **Theme:** Intelligence as the Operating Layer
 
-1. **What:** Move SellPoint from record-keeping to decision-making —
+1. **What:** Move SellersPoint from record-keeping to decision-making —
    natural-language queries, proactive insights/briefings, automation
    (reminders, campaigns, smart pricing, forecasting), and eventually
    voice AI.
-2. **Why:** Once Slice Two makes SellPoint the system of record for sales,
+2. **Why:** Once Slice Two makes SellersPoint the system of record for sales,
    customers, expenses, and inventory, it's sitting on the exact data an
    AI needs to answer "who owes me money," "what should I reorder," and
    "how much profit did I make" — questions the target user currently
@@ -210,12 +210,12 @@ what most directly compounds retention or revenue.
 1. **What:** Multi-currency, multi-language, and multi-payment-rail
    support, plus country-specific tax/compliance — engineered as
    configuration on one shared architecture, not a fork per country.
-2. **Why:** SellPoint is NGN-only and Paystack-only today
+2. **Why:** SellersPoint is NGN-only and Paystack-only today
    (`DEVELOPMENT_RUNTHROUGH.md` §9.6, §9.9). Every country beyond Nigeria
    needs local currency and at least one dominant local payment rail
    before a single business there can use the product for real money.
 3. **Competitive advantage:** Building this as configuration (not a fork)
-   is what lets SellPoint enter a new country in weeks instead of months —
+   is what lets SellersPoint enter a new country in weeks instead of months —
    the actual mechanism behind "scale without rebuilding."
 4. **Lagos → Africa → world:** This slice *is* the Lagos → Africa step,
    literally — it is the direct unlock for every market beyond Nigeria,
@@ -262,7 +262,7 @@ what most directly compounds retention or revenue.
    competitors using punitive feature-gating don't have — see the
    flywheel below.
 4. **Lagos → Africa → world:** Embedded finance and a marketplace/developer
-   ecosystem are what let SellPoint capture value *beyond* software fees
+   ecosystem are what let SellersPoint capture value *beyond* software fees
    at continental scale — the same mechanism Stripe/Shopify used to grow
    from tools into infrastructure.
 
@@ -290,16 +290,28 @@ what most directly compounds retention or revenue.
 
 ### Pricing strategy — business-stage pricing
 
-Move from feature-based pricing (current: starter/basic/standard/premium,
-see `server/pricing.js`) to business-stage pricing:
+**Status: live in `server/pricing.js`, but only half-active.** All five
+tiers below are fully defined, but only Starter + Growth are actually
+offered to customers today (`platform_settings.extended_pricing_enabled`,
+toggled from `backend.html` → "Pricing Tiers") — because Pro and Business
+don't yet gate anything Growth doesn't have. Charging more for an
+identical product won't hold up once anyone compares tiers side by side,
+so **item 0 in this slice's priority order, above everything else, is
+building the features that justify Pro/Business's price** (staff seat
+limits enforced server-side, AI usage metering, a reports view) before
+flipping that toggle on for real customers.
 
 | Plan | Target customer | Monthly price | Core value |
 |---|---|---|---|
-| Starter | Side hustles & new sellers | Free | Get started quickly |
-| Growth | Everyday shop owners | ₦3,500 | Organize and grow sales |
+| Starter | Side hustles & new sellers | Free (30 orders/mo) | Get started quickly |
+| Growth | Everyday shop owners | ₦5,000 | Organize and grow sales |
 | Pro | Growing SMEs | ₦8,500 | Manage teams and optimize operations |
 | Business | Multi-branch companies | ₦20,000 | Control complex businesses |
 | Enterprise | Large organizations | Custom | Scale with dedicated support |
+
+Yearly billing = 10x monthly (2 months free) for every tier with a fixed
+price; Enterprise has no fixed price and is excluded from self-serve
+Paystack checkout until a contact-sales flow exists.
 
 **Revenue philosophy:** users should upgrade because their business has
 grown — not because essential features were removed.
@@ -325,7 +337,7 @@ international SMEs trading with Africa.
 
 ## Strategic Positioning Against Competitors
 
-| Competitor | What they do | SellPoint advantage |
+| Competitor | What they do | SellersPoint advantage |
 |---|---|---|
 | Shopify | E-commerce | AI-powered business operations beyond online stores |
 | Stripe | Payments | Complete business operating system with embedded payments |
@@ -336,17 +348,17 @@ international SMEs trading with Africa.
 
 ---
 
-## The SellPoint Flywheel
+## The SellersPoint Flywheel
 
 1. Free tools attract sellers.
 2. Sellers generate invoices and receipts.
-3. Receipts carry the SellPoint brand to new businesses.
-4. Recipients discover and join SellPoint.
+3. Receipts carry the SellersPoint brand to new businesses.
+4. Recipients discover and join SellersPoint.
 5. Growing businesses upgrade to paid plans.
 6. AI and automation increase business value and retention.
 7. Financial services, payments, and the marketplace create additional
    revenue streams.
-8. The ecosystem strengthens, making SellPoint the default business
+8. The ecosystem strengthens, making SellersPoint the default business
    operating system for African commerce.
 
 ---

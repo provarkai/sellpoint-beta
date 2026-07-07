@@ -1,5 +1,10 @@
 # SellersPoint - Claude Code Handoff
 
+This file covers architecture rationale - the "why" behind auth,
+multi-tenancy, and payments. For the strategic roadmap and business-stage
+pricing plan, see `CLAUDE.md`. For a fast orientation to what's built today
+and known gaps, see `DEVELOPMENT_RUNTHROUGH.md`.
+
 ## Project Location
 This lives at:
 
@@ -91,7 +96,7 @@ webhook, so that route is instead secured by verifying the
 ## Payments (Paystack)
 Set `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` (see `.env.example`) to
 enable real checkout. With them unset, `/api/payments/initialize` returns a
-400 and `upgrade.html` still works via the manual bank-transfer-proof flow.
+400 - there is no manual-payment fallback, checkout is Paystack-only.
 
 - `POST /api/payments/initialize` (`requireAuth`) - starts a Paystack
   transaction for the caller's business, plan, and billing cycle, returns
@@ -113,8 +118,9 @@ enable real checkout. With them unset, `/api/payments/initialize` returns a
   `platform_settings.extended_pricing_enabled`, the toggle behind
   `backend.html`'s "Pricing Tiers" panel. `GET /api/pricing` (public) reads
   this same flag via `pricing.visibleTiers()` to decide whether to return
-  just `{starter, growth}` or the full 5-tier ladder - see `VISION.md` for
-  why Pro/Business/Enterprise are hidden by default.
+  just `{starter, growth}` or the full 5-tier ladder - see `CLAUDE.md`'s
+  pricing strategy section for why Pro/Business/Enterprise are hidden by
+  default.
 
 Both the webhook and the verify-by-reference path funnel through
 `finalizeIfSuccessful()` in `server/index.js`, which uses `db.recordPayment()`'s
@@ -126,15 +132,19 @@ Once this is deployed somewhere with a public HTTPS URL, register
 activation doesn't depend on the seller's browser staying open through checkout.
 
 ## Good Next Tasks for Claude Code
-1. Staff invites (multiple `business_members` per business beyond `owner`) - schema supports it, no UI yet.
-2. Add Flutterwave as a second payment provider alongside Paystack.
-3. Add downloadable receipt PDF.
-4. Add customer-facing checkout page per order.
-5. Move file uploads (logo/digital product downloads) to Supabase Storage instead of base64 in Postgres.
-6. Add Postgres Row Level Security as defense-in-depth (not required today since the DB connection string never reaches the browser, but a good hardening step).
-7. Add expiry-based downgrade notifications (email/WhatsApp) before `plan_expires_at` lapses.
-8. Add server-side input validation (price/stock/qty are coerced but not range-checked).
+**Done:** server-side input validation (`server/validate.js`), automated
+tests + CI (`server/__tests__/`, `.github/workflows/ci.yml`).
+
+1. Tier feature gating (staff seat limits, AI usage metering, a reports view) before turning on Pro/Business/Enterprise for real customers - see `CLAUDE.md`'s pricing strategy section.
+2. Staff invites (multiple `business_members` per business beyond `owner`) - schema supports it, no UI yet.
+3. Add Flutterwave as a second payment provider alongside Paystack.
+4. Add downloadable receipt PDF.
+5. Add customer-facing checkout page per order.
+6. Move file uploads (logo/digital product downloads) to Supabase Storage instead of base64 in Postgres.
+7. Add Postgres Row Level Security as defense-in-depth (not required today since the DB connection string never reaches the browser, but a good hardening step).
+8. Add expiry-based downgrade notifications (email/WhatsApp) before `plan_expires_at` lapses.
 9. Multi-currency/i18n if expanding beyond Nigeria (everything is NGN-denominated today).
+10. Deploy (Railway/Render per `HOSTING.md`) - not done yet, and the last unfinished Slice One priority item.
 
 ## How To Run Locally
 1. Create a Supabase project (free tier is fine).
