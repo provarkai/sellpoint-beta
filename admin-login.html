@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SellersPoint Admin Login</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page payment-page">
+  <main>
+    <header><div><h1>SellersPoint Platform Admin</h1><p class="meta">Restricted - operator access only, separate from business logins.</p></div></header>
+    <article>
+      <form id="loginForm">
+        <label>Admin email<input id="email" type="email" required autocomplete="username"></label>
+        <label>Password<input id="password" type="password" required autocomplete="current-password"></label>
+        <button>Log In</button>
+      </form>
+    </article>
+  </main>
+  <div id="toast"></div>
+  <script type="module" src="supabase-init.js"></script>
+  <script defer src="admin-login.js"></script>
+</body>
+</html>

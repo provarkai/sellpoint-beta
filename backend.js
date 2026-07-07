@@ -47,17 +47,25 @@ $("savePricingSettings").onclick = async () => {
   toast(settings.extendedPricingEnabled ? "All 5 tiers are now visible to customers" : "Simplified to Starter + Growth only");
   render();
 };
-$("logout").onclick = () => window.Auth.logout();
+$("logout").onclick = async () => {
+  const supabase = await window.supabaseReady;
+  await supabase.auth.signOut();
+  location.href = "admin-login.html";
+};
 
 (async () => {
-  const ctx = await window.Auth.requireSession();
-  if (!ctx) return;
-  authToken = ctx.session.access_token;
+  const supabase = await window.supabaseReady;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return (location.href = "admin-login.html");
+  authToken = session.access_token;
   try {
     await loadAll();
     $("adminContent").style.display = "block";
     render();
   } catch (err) {
-    $("notAuthorized").style.display = "block";
+    // Signed in but not a platform admin (or session expired) - send back to
+    // the dedicated admin login rather than showing a mixed-auth state.
+    await supabase.auth.signOut();
+    location.href = "admin-login.html";
   }
 })().catch((err) => toast(err.message || "Something went wrong loading this page."));
