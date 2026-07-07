@@ -6,7 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server/index.js",
-    "migrate": "node --env-file-if-exists=.env server/migrate.js"
+    "migrate": "node --env-file-if-exists=.env server/migrate.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=22.5.0"
