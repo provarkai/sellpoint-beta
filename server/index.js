@@ -89,7 +89,7 @@ app.post(
   "/api/businesses",
   requireAuthOnly,
   handle(async (req, res) => {
-    const business = await db.createBusiness(req.user.id, req.body || {});
+    const business = await db.createBusiness(req.user.id, req.body || {}, req.user.email);
     res.status(201).json(business);
   })
 );
@@ -200,14 +200,126 @@ app.get(
   })
 );
 
+// --- Staff seats (owner-only management, any member can view) --------------
+
+app.get(
+  "/api/staff",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.getBusiness(req.businessId);
+    const roster = await db.listStaff(req.businessId);
+    res.json({ ...roster, limit: pricing.staffLimitFor(business.plan) });
+  })
+);
+app.post(
+  "/api/staff/invite",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can invite staff" });
+    const roster = await db.inviteStaff(req.businessId, (req.body || {}).email);
+    res.status(201).json(roster);
+  })
+);
+app.delete(
+  "/api/staff/invites/:email",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage staff" });
+    res.json(await db.revokeInvite(req.businessId, req.params.email));
+  })
+);
+app.delete(
+  "/api/staff/:userId",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can remove staff" });
+    res.json(await db.removeStaff(req.businessId, req.params.userId));
+  })
+);
+
+// --- AI Tools (server-side so the monthly limit can't be bypassed) ---------
+
+app.get(
+  "/api/ai/usage",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.getBusiness(req.businessId);
+    res.json({ used: await db.getAiUsage(req.businessId), limit: pricing.aiLimitFor(business.plan) });
+  })
+);
+app.post(
+  "/api/ai/generate",
+  requireAuth,
+  handle(async (req, res) => {
+    const { tool, productId, customerId, detail } = req.body || {};
+    const state = await db.getState(req.businessId);
+    const product = state.products.find((p) => p.id === productId);
+    const customer = state.customers.find((c) => c.id === customerId);
+    const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
+    const revenue = state.orders.reduce((s, o) => s + (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty, 0);
+    const tally = {};
+    state.orders.forEach((o) => {
+      const n = state.products.find((p) => p.id === o.productId)?.name || o.productName;
+      if (n) tally[n] = (tally[n] || 0) + o.qty;
+    });
+    const bestSeller = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const texts = {
+      caption: `New arrival: ${product?.name || "our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(product?.price || 0)}.\n\nSend a message now to order before stock runs out.`,
+      reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
+      reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
+      summary: `Sales summary:\n\nTotal orders: ${state.orders.length}\nTotal recorded revenue: ${money(revenue)}\nBest-selling item: ${bestSeller || "Not enough sales yet"}\nPending payments: ${state.orders.filter((o) => o.status === "Pending payment").length}\n\nSuggested action: follow up pending payments and restock fast-moving products.`,
+    };
+    const text = texts[tool];
+    if (!text) return res.status(400).json({ error: "Unknown AI tool" });
+    const used = await db.incrementAiUsage(req.businessId);
+    const business = await db.getBusiness(req.businessId);
+    res.json({ text, used, limit: pricing.aiLimitFor(business.plan) });
+  })
+);
+
+// --- Reports (Pro+) ----------------------------------------------------------
+
+app.get(
+  "/api/reports",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.getBusiness(req.businessId);
+    if (!pricing.reportsEnabledFor(business.plan)) {
+      return res.status(403).json({ error: "Reports are available on the Pro plan and above" });
+    }
+    res.json(await db.getReports(req.businessId));
+  })
+);
+
+// --- Branches (Business+) -----------------------------------------------------
+
+app.get(
+  "/api/branches",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listBranches(req.businessId)))
+);
+app.post(
+  "/api/branches",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createBranch(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/branches/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deleteBranch(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+
 // --- Payments ----------------------------------------------------------------
 
 app.post(
   "/api/payments/initialize",
   requireAuth,
   handle(async (req, res) => {
-    const { plan, billingCycle, email } = req.body || {};
-    if (!email) return res.status(400).json({ error: "Email is required" });
+    const { plan, billingCycle } = req.body || {};
+    const email = req.user.email; // already signed in - no need to re-collect it
     const settings = await db.getPlatformSettings();
     const visible = pricing.visibleTiers(settings.extendedPricingEnabled);
     if (!visible[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });

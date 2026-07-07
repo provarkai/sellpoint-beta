@@ -1,17 +1,18 @@
 let state={businessName:"Your Business",businessPhone:"",businessLogo:"",paymentProvider:"Paystack",paymentLink:"",paymentDetails:"",plan:"starter",products:[],customers:[],orders:[],events:[]};
 let pricing={};
 let authToken=null;
+let myRole=null;
 const $=id=>document.getElementById(id), money=n=>`NGN ${Number(n||0).toLocaleString("en-NG")}`;
 const clean=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)};
 async function api(method,url,body){const res=await fetch(url,{method,headers:{...(body?{"Content-Type":"application/json"}:{}),Authorization:`Bearer ${authToken}`},body:body?JSON.stringify(body):undefined});if(!res.ok){const err=await res.json().catch(()=>({error:"Request failed"}));throw new Error(err.error||"Request failed")}return res.status===204?null:res.json()}
 function applyState(s){Object.assign(state,s.business,{products:s.products,customers:s.customers,orders:s.orders,events:s.events})}
-async function loadState(){const [s,p]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing")]);applyState(s);pricing=p}
+async function loadState(){const [s,p,me]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me")]);applyState(s);pricing=p;myRole=me.role}
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
 const date=d=>new Intl.DateTimeFormat("en-NG",{month:"short",day:"numeric",year:"numeric"}).format(new Date(d));
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Tools",settings:"Settings"}[tab]}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Tools",reports:"Reports",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -47,7 +48,8 @@ async function delProduct(id){await api("DELETE",`/api/products/${id}`);state.pr
 async function delCustomer(id){await api("DELETE",`/api/customers/${id}`);state.customers=state.customers.filter(x=>x.id!==id);render()}
 async function delOrder(id){await api("DELETE",`/api/orders/${id}`);state.orders=state.orders.filter(x=>x.id!==id);render()}
 function caption(id){show("ai");$("aiTool").value="caption";$("aiProduct").value=id;generateAI()}
-function generateAI(){const p=product($("aiProduct").value),c=customer($("aiCustomer").value),d=$("aiDetail").value.trim(),rev=state.orders.reduce((s,o)=>s+total(o),0);const out={caption:`New arrival: ${p?.name||"our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(p?.price||0)}.\n\nSend a message now to order before stock runs out.`,reply:`Hello ${c?.name||"there"}, thanks for reaching out.\n\n${d||"Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,reminder:`Hello ${c?.name||"there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,summary:`Sales summary:\n\nTotal orders: ${state.orders.length}\nTotal recorded revenue: ${money(rev)}\nBest-selling item: ${bestProduct()||"Not enough sales yet"}\nPending payments: ${state.orders.filter(o=>o.status==="Pending payment").length}\n\nSuggested action: follow up pending payments and restock fast-moving products.`};$("aiOut").value=out[$("aiTool").value];toast("Message generated")}
+async function refreshAiUsage(){try{const u=await api("GET","/api/ai/usage");$("aiUsage").textContent=`${u.used}/${u.limit===null||u.limit===Infinity?"unlimited":u.limit} AI generations used this month`}catch{}}
+async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;$("aiUsage").textContent=`${result.used}/${result.limit===null||result.limit===Infinity?"unlimited":result.limit} AI generations used this month`;toast("Message generated")}catch(err){toast(err.message)}}
 $("invSelect").onchange=renderInvoice;$("copyInvoice").onclick=()=>copy(invoiceText());$("waInvoice").onclick=()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];wa(invoiceText(),customer(o?.customerId)?.phone||"")};$("genAI").onclick=generateAI;$("copyAI").onclick=()=>copy($("aiOut").value);$("upgrade").onclick=()=>open("upgrade.html","_blank","noopener");$("export").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}));a.download="sellpilot-data.json";a.click()};$("reset").onclick=async()=>{if(confirm("Reset all data?")){applyState(await api("POST","/api/reset"));render()}};$("demo").onclick=async()=>{applyState(await api("POST","/api/demo"));render();toast("Demo loaded")};
 
 function showPaywall(){const d=$("paywall");if(d?.showModal)d.showModal();else toast("Upgrade to continue taking orders")}
@@ -55,7 +57,66 @@ function salesPitch(){const paid=Object.values(pricing).find(t=>t.monthly>0);ret
 if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();const updated=await api("PUT","/api/business",{businessName:$("sBusiness").value.trim(),businessPhone:$("sPhone").value.replace(/\D/g,""),paymentProvider:"Paystack",paymentLink:$("sPaymentLink")?.value.trim()||"",paymentDetails:$("sPayment").value.trim()});Object.assign(state,updated);render();toast("Settings saved")}}
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("brandLogo"))$("brandLogo").innerHTML=state.businessLogo?`<img src="${state.businessLogo}" alt="Logo">`:"SP"}};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("brandLogo"))$("brandLogo").innerHTML=state.businessLogo?`<img src="${state.businessLogo}" alt="Logo">`:"SP"}renderProfile();renderTeamVisibility();renderBranchesVisibility()};
+
+function renderProfile(){
+  if($("profileName"))$("profileName").textContent=state.businessName||"Your Business";
+  if($("profilePhone"))$("profilePhone").textContent=state.businessPhone||"No phone set";
+  if($("profileRole"))$("profileRole").textContent=myRole==="owner"?"Owner":myRole==="staff"?"Staff":"";
+  if($("profilePlan"))$("profilePlan").textContent=(pricing[state.plan]?.name||state.plan)+" plan";
+  if($("profileLogo")&&$("profileLogoFallback")){
+    if(state.businessLogo){$("profileLogo").src=state.businessLogo;$("profileLogo").style.display="block";$("profileLogoFallback").style.display="none"}
+    else{$("profileLogo").style.display="none";$("profileLogoFallback").style.display="flex"}
+  }
+  if($("reportsTab"))$("reportsTab").style.display=pricing[state.plan]?.reports?"block":"none";
+}
+
+async function loadReports(){
+  if(!$("repRevenue"))return;
+  try{
+    const r=await api("GET","/api/reports");
+    $("repRevenue").innerHTML=r.revenueByMonth.map(x=>`<div class="item"><strong>${clean(x.month)}</strong><span class="meta">${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No revenue yet</span></div>`;
+    $("repProducts").innerHTML=r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
+    $("repCustomers").innerHTML=r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
+    $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+
+function renderTeamVisibility(){
+  if(!$("teamSection"))return;
+  $("teamSection").style.display=myRole==="owner"?"block":"none";
+  if(myRole==="owner")loadTeam();
+}
+async function loadTeam(){
+  try{
+    const roster=await api("GET","/api/staff");
+    const limit=roster.limit===Infinity?"unlimited":roster.limit;
+    $("teamCount").textContent=`${roster.staff.length}/${limit} seats used`;
+    $("teamLimitNote").textContent=roster.limit===0?"Upgrade to Pro or above to add staff seats.":`You can invite up to ${limit} staff member(s).`;
+    $("inviteForm").style.display=roster.limit===0?"none":"grid";
+    const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><span class="meta">Staff</span><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
+    $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function removeStaffMember(userId){await api("DELETE",`/api/staff/${userId}`);loadTeam()}
+async function revokeStaffInvite(email){await api("DELETE",`/api/staff/invites/${encodeURIComponent(email)}`);loadTeam()}
+if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim()});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
+
+function renderBranchesVisibility(){
+  if(!$("branchesSection"))return;
+  const enabled=!!pricing[state.plan]?.multiBranch;
+  $("branchesSection").style.display=enabled&&myRole==="owner"?"block":"none";
+  if(enabled&&myRole==="owner")loadBranches();
+}
+async function loadBranches(){
+  try{
+    const branches=await api("GET","/api/branches");
+    $("branchCount").textContent=`${branches.length} branches`;
+    $("branchList").innerHTML=branches.map(b=>`<div class="item"><strong>${clean(b.name)}</strong><span class="meta">${clean(b.address||"No address")}</span><div class="item-actions"><button onclick="deleteBranch('${b.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No branches yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function deleteBranch(id){await api("DELETE",`/api/branches/${id}`);loadBranches()}
+if($("branchForm"))$("branchForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/branches",{name:$("branchName").value.trim(),address:$("branchAddress").value.trim()});e.target.reset();loadBranches();toast("Branch added")}catch(err){toast(err.message)}};
 
 if($("sLogo"))$("sLogo").onchange=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{const updated=await api("PUT","/api/business",{businessLogo:reader.result});Object.assign(state,updated);render();toast("Logo saved")};reader.readAsDataURL(file)};
 

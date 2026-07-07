@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor } = require("./pricing");
+const { orderLimitFor, staffLimitFor, aiLimitFor, multiBranchFor } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -110,20 +110,36 @@ async function getMembership(userId) {
   return rows[0] ? { businessId: rows[0].business_id, role: rows[0].role } : null;
 }
 
-async function createBusiness(userId, fields) {
+async function createBusiness(userId, fields, email) {
   const existing = await getMembership(userId);
   if (existing) throw new OrderError("This account already has a business");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // A pending staff invite for this email takes priority over creating a
+    // new business - accepting an invite means joining an existing
+    // business as staff, not becoming an owner of a fresh one.
+    const invite = email
+      ? (await client.query("SELECT * FROM business_invites WHERE lower(email) = lower($1) LIMIT 1", [email])).rows[0]
+      : null;
+    if (invite) {
+      const { rows: businessRows } = await client.query("SELECT * FROM businesses WHERE id = $1", [invite.business_id]);
+      await client.query(
+        `INSERT INTO business_members (business_id, user_id, email, role) VALUES ($1, $2, $3, 'staff')`,
+        [invite.business_id, userId, email]
+      );
+      await client.query("DELETE FROM business_invites WHERE id = $1", [invite.id]);
+      await client.query("COMMIT");
+      return toBusinessJson(businessRows[0]);
+    }
     const { rows } = await client.query(
       `INSERT INTO businesses (name, phone) VALUES ($1, $2) RETURNING *`,
       [fields.businessName || "Your Business", fields.businessPhone || ""]
     );
     const business = rows[0];
     await client.query(
-      `INSERT INTO business_members (business_id, user_id, role) VALUES ($1, $2, 'owner')`,
-      [business.id, userId]
+      `INSERT INTO business_members (business_id, user_id, email, role) VALUES ($1, $2, $3, 'owner')`,
+      [business.id, userId, email || ""]
     );
     await client.query("COMMIT");
     return toBusinessJson(business);
@@ -152,6 +168,38 @@ async function getState(businessId) {
     customers: customers.rows.map(toCustomerJson),
     orders: orders.rows.map(toOrderJson),
     events: events.rows.map(toEventJson),
+  };
+}
+
+// Pro+ gated (see server/index.js) - deeper than the free dashboard
+// summary: revenue by month, top products, top customers, order status mix.
+async function getReports(businessId) {
+  const [revenueByMonth, topProducts, topCustomers, statusBreakdown] = await Promise.all([
+    query(
+      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, SUM(price * qty) AS revenue
+       FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered')
+       GROUP BY 1 ORDER BY 1 DESC LIMIT 6`,
+      [businessId]
+    ),
+    query(
+      `SELECT product_name, SUM(qty) AS units, SUM(price * qty) AS revenue
+       FROM orders WHERE business_id = $1
+       GROUP BY product_name ORDER BY units DESC LIMIT 5`,
+      [businessId]
+    ),
+    query(
+      `SELECT c.name, SUM(o.price * o.qty) AS spend, COUNT(*) AS orders
+       FROM orders o JOIN customers c ON c.id = o.customer_id
+       WHERE o.business_id = $1 GROUP BY c.name ORDER BY spend DESC LIMIT 5`,
+      [businessId]
+    ),
+    query(`SELECT status, COUNT(*) AS n FROM orders WHERE business_id = $1 GROUP BY status`, [businessId]),
+  ]);
+  return {
+    revenueByMonth: revenueByMonth.rows.map((r) => ({ month: r.month, revenue: Number(r.revenue) })),
+    topProducts: topProducts.rows.map((r) => ({ name: r.product_name, units: Number(r.units), revenue: Number(r.revenue) })),
+    topCustomers: topCustomers.rows.map((r) => ({ name: r.name, spend: Number(r.spend), orders: Number(r.orders) })),
+    statusBreakdown: statusBreakdown.rows.map((r) => ({ status: r.status, count: Number(r.n) })),
   };
 }
 
@@ -231,6 +279,108 @@ async function updatePlatformSettings(fields) {
   const enabled = fields.extendedPricingEnabled !== undefined ? !!fields.extendedPricingEnabled : current.extendedPricingEnabled;
   await query("UPDATE platform_settings SET extended_pricing_enabled = $1 WHERE id = 1", [enabled]);
   return { extendedPricingEnabled: enabled };
+}
+
+// --- Staff seats --------------------------------------------------------
+
+function toStaffJson(m) {
+  return { userId: m.user_id, email: m.email, role: m.role, createdAt: m.created_at };
+}
+function toInviteJson(i) {
+  return { id: i.id, email: i.email, createdAt: i.created_at };
+}
+
+async function listStaff(businessId) {
+  const [members, invites] = await Promise.all([
+    query("SELECT * FROM business_members WHERE business_id = $1 ORDER BY created_at", [businessId]),
+    query("SELECT * FROM business_invites WHERE business_id = $1 ORDER BY created_at", [businessId]),
+  ]);
+  return {
+    owner: members.rows.filter((m) => m.role === "owner").map(toStaffJson)[0] || null,
+    staff: members.rows.filter((m) => m.role === "staff").map(toStaffJson),
+    invites: invites.rows.map(toInviteJson),
+  };
+}
+
+async function inviteStaff(businessId, email) {
+  const clean = requireString(email, "Email").toLowerCase();
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = staffLimitFor(effectivePlan(businessRows[0]));
+  const { staff } = await listStaff(businessId);
+  if (staff.length >= limit) throw new OrderError("Staff seat limit reached for the current plan");
+  const existing = await query(
+    "SELECT 1 FROM business_members WHERE business_id = $1 AND lower(email) = $2",
+    [businessId, clean]
+  );
+  if (existing.rows.length) throw new OrderError("This person is already on your team");
+  await query(
+    "INSERT INTO business_invites (business_id, email) VALUES ($1, $2) ON CONFLICT (business_id, email) DO NOTHING",
+    [businessId, clean]
+  );
+  return listStaff(businessId);
+}
+
+async function revokeInvite(businessId, email) {
+  await query("DELETE FROM business_invites WHERE business_id = $1 AND lower(email) = lower($2)", [businessId, email]);
+  return listStaff(businessId);
+}
+
+async function removeStaff(businessId, userId) {
+  await query("DELETE FROM business_members WHERE business_id = $1 AND user_id = $2 AND role = 'staff'", [businessId, userId]);
+  return listStaff(businessId);
+}
+
+// --- AI usage -------------------------------------------------------------
+
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7); // "YYYY-MM"
+}
+
+async function getAiUsage(businessId) {
+  const month = currentMonth();
+  const { rows } = await query("SELECT count FROM ai_usage WHERE business_id = $1 AND month = $2", [businessId, month]);
+  return rows[0]?.count || 0;
+}
+
+async function incrementAiUsage(businessId) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = aiLimitFor(effectivePlan(businessRows[0]));
+  const month = currentMonth();
+  const used = await getAiUsage(businessId);
+  if (used >= limit) throw new OrderError("AI generation limit reached for the current plan this month");
+  await query(
+    `INSERT INTO ai_usage (business_id, month, count) VALUES ($1, $2, 1)
+     ON CONFLICT (business_id, month) DO UPDATE SET count = ai_usage.count + 1`,
+    [businessId, month]
+  );
+  return used + 1;
+}
+
+// --- Branches (Business tier+) ---------------------------------------------
+
+function toBranchJson(b) {
+  return { id: b.id, name: b.name, address: b.address, createdAt: b.created_at };
+}
+
+async function listBranches(businessId) {
+  const { rows } = await query("SELECT * FROM branches WHERE business_id = $1 ORDER BY created_at", [businessId]);
+  return rows.map(toBranchJson);
+}
+
+async function createBranch(businessId, data) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  if (!multiBranchFor(effectivePlan(businessRows[0]))) throw new OrderError("Multiple branches require the Business plan");
+  const name = requireString(data.name, "Branch name");
+  const { rows } = await query(
+    "INSERT INTO branches (business_id, name, address) VALUES ($1, $2, $3) RETURNING *",
+    [businessId, name, data.address || ""]
+  );
+  await logEvent(businessId, "branch_created", name);
+  return toBranchJson(rows[0]);
+}
+
+async function deleteBranch(businessId, id) {
+  await query("DELETE FROM branches WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
 
 // --- Products / customers ------------------------------------------------
@@ -436,4 +586,14 @@ module.exports = {
   getPaymentByReference,
   listAllBusinesses,
   listAllPayments,
+  listStaff,
+  inviteStaff,
+  revokeInvite,
+  removeStaff,
+  getAiUsage,
+  incrementAiUsage,
+  listBranches,
+  createBranch,
+  deleteBranch,
+  getReports,
 };
