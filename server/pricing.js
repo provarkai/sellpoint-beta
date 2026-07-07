@@ -1,7 +1,7 @@
 const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 
 const TIERS = {
-  starter: { name: "Starter", monthly: 0, orderLimit: 20, tagline: "Free - 20 orders/month, basic invoices and AI samples" },
+  starter: { name: "Starter", monthly: 0, orderLimit: 30, tagline: "Free - 30 orders/month, basic invoices and AI samples" },
   growth: { name: "Growth", monthly: 5000, orderLimit: Infinity, tagline: "Unlimited orders, branded invoices, WhatsApp tools" },
   pro: { name: "Pro", monthly: 8500, orderLimit: Infinity, tagline: "Everything in Growth plus AI credits and reports" },
   business: { name: "Business", monthly: 20000, orderLimit: Infinity, tagline: "Everything in Pro plus staff access and priority support" },

@@ -1,5 +1,4 @@
 const $ = (id) => document.getElementById(id);
-let owner = { name: "SellersPoint", provider: "Manual bank transfer", link: "", details: "Set payment details from backend.html" };
 let pricing = {};
 let cycle = "monthly";
 let selectedPlan = null;
@@ -18,15 +17,19 @@ function planCardsHtml() {
 function render() {
   $("planCards").innerHTML = planCardsHtml();
   $("planCards").querySelectorAll("button[data-plan]").forEach((b) => (b.onclick = () => selectPlan(b.dataset.plan)));
-  $("paymentDetails").innerHTML = '<div class="row"><span>Account</span><b>' + (owner.name || "SellersPoint") + '</b></div><div class="row"><span>Provider</span><b>' + owner.provider + '</b></div><div class="row"><span>Details</span><b>' + (owner.details || "Add payment details from backend.html").replace(/\n/g, "<br>") + '</b></div>';
-  $("paymentLinkBtn").href = owner.link || "#";
-  $("paymentLinkBtn").style.pointerEvents = owner.link ? "auto" : "none";
   const tier = selectedPlan ? pricing[selectedPlan] : null;
   const price = tier ? (cycle === "yearly" ? tier.yearly : tier.monthly) : 0;
   const cycleLabel = cycle === "yearly" ? "year" : "month";
   $("selectedPlanMeta").textContent = tier ? tier.name + " - " + money(price) + "/" + cycleLabel : "Select a plan above.";
   $("payNow").disabled = !tier;
-  $("activationMsg").value = "Hello SellersPoint, I paid for " + (tier ? tier.name : "a plan") + (tier ? " (" + money(price) + "/" + cycleLabel + ")" : "") + ".\n\nAccount name: " + (owner.name || "SellersPoint") + "\nProvider: " + owner.provider + "\n\nPlease activate my SellersPoint Beta account.";
+  if (tier && tier.monthly > 0) {
+    const savings = tier.monthly * 12 - tier.yearly;
+    $("cycleHint").textContent = cycle === "yearly"
+      ? "Paying annually saves you " + money(savings) + "/year (2 months free) versus paying monthly."
+      : "Switch to yearly to save " + money(savings) + "/year (2 months free).";
+  } else {
+    $("cycleHint").textContent = "";
+  }
 }
 
 function selectPlan(key) { selectedPlan = key; render(); }
@@ -46,10 +49,6 @@ $("payNow").onclick = async () => {
   }
 };
 
-$("copyPayment").onclick = () => navigator.clipboard.writeText($("paymentDetails").innerText).then(() => toast("Payment details copied"));
-$("copyActivation").onclick = () => navigator.clipboard.writeText($("activationMsg").value).then(() => toast("Activation message copied"));
-$("sendActivation").onclick = () => open("https://wa.me/?text=" + encodeURIComponent($("activationMsg").value), "_blank", "noopener");
-
 async function checkReturnFromPaystack() {
   const params = new URLSearchParams(location.search);
   const reference = params.get("reference") || params.get("trxref");
@@ -68,18 +67,16 @@ async function checkReturnFromPaystack() {
 }
 
 async function loadAll() {
-  const [ownerRes, pricingRes] = await Promise.all([
-    fetch("/api/owner").then((r) => (r.ok ? r.json() : owner)),
-    fetch("/api/pricing").then((r) => (r.ok ? r.json() : {})),
-  ]);
-  owner = ownerRes;
-  pricing = pricingRes;
+  pricing = await fetch("/api/pricing").then((r) => (r.ok ? r.json() : {}));
 }
+
 (async () => {
   const ctx = await window.Auth.requireSession();
   if (!ctx) return;
   authToken = ctx.session.access_token;
   await loadAll();
+  const paramPlan = new URLSearchParams(location.search).get("plan");
+  if (paramPlan && pricing[paramPlan] && pricing[paramPlan].monthly > 0) selectedPlan = paramPlan;
   render();
   checkReturnFromPaystack();
 })().catch((err) => toast(err.message || "Something went wrong loading this page."));

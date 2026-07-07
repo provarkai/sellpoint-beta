@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade SellersPoint Beta</title>
+  <title>SellersPoint Upgrade</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="single-page payment-page">
   <main>
-    <header><div><h1>Upgrade SellersPoint Beta</h1><p class="meta">Pay with Paystack for instant activation, or pay manually and send proof.</p></div><a class="button-link" href="index.html">Back to App</a></header>
+    <header><div><h1>SellersPoint Upgrade</h1><p class="meta">Pay with Paystack for instant activation.</p></div><a class="button-link" href="index.html">Back to App</a></header>
     <div id="verifyStatus" class="invoice" style="display:none"></div>
     <p class="actions cycle-toggle"><button id="cycleMonthly" class="active">Monthly</button><button id="cycleYearly">Yearly</button></p>
+    <p class="meta" id="cycleHint"></p>
     <section id="planCards" class="plans upgrade-plans"></section>
     <section class="grid">
       <article><h2>Pay with Paystack</h2><label>Email for receipt<input id="checkoutEmail" type="email" placeholder="you@business.com"></label><p class="meta" id="selectedPlanMeta">Select a plan above.</p><button id="payNow" disabled>Pay Now</button></article>
-      <article><h2>Or Pay Manually</h2><div id="paymentDetails" class="invoice"></div><p class="actions"><button id="copyPayment">Copy Payment Details</button><a id="paymentLinkBtn" class="button-link" href="#" target="_blank">Open Payment Link</a></p></article>
+      <article><h2>Monthly or Annual?</h2><p><b>Monthly</b> - recommended if you're just getting started. Pay as you go, cancel any time.</p><p><b>Annual</b> - best value once you know SellersPoint fits your business: pay once a year and get 2 months free versus paying monthly.</p></article>
     </section>
-    <section class="grid"><article><h2>Activation Message</h2><p class="meta">If you paid manually, send this to confirm and request activation.</p><textarea id="activationMsg" rows="10" readonly></textarea><p class="actions"><button id="copyActivation">Copy Message</button><button id="sendActivation">Send WhatsApp</button></p></article></section>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>
