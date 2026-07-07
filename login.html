@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in - SellPoint</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page payment-page">
+  <main>
+    <header><div><h1>Log in to SellPoint</h1><p class="meta">Manage your products, orders, and customers.</p></div></header>
+    <section class="grid">
+      <form id="loginForm">
+        <h2>Log in</h2>
+        <label>Email<input id="email" type="email" required></label>
+        <label>Password<input id="password" type="password" required></label>
+        <button>Log In</button>
+        <p class="meta">No account yet? <a href="signup.html">Sign up</a></p>
+      </form>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script type="module" src="supabase-init.js"></script>
+  <script defer src="auth-shared.js"></script>
+  <script defer src="login.js"></script>
+</body>
+</html>

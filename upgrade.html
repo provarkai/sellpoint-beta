@@ -8,11 +8,19 @@
 </head>
 <body class="single-page payment-page">
   <main>
-    <header><div><h1>Upgrade SellPoint Beta</h1><p class="meta">Choose a plan, pay, then send payment proof to activate your account.</p></div><a class="button-link" href="index.html">Back to App</a></header>
-    <section class="plans upgrade-plans"><div><b>Starter</b><span>NGN 3,000/month</span><small>Unlimited orders, branded invoices, WhatsApp tools, product/service/digital delivery.</small><button onclick="selectPlan('Starter','NGN 3,000/month')">Choose Starter</button></div><div class="featured"><b>Pro</b><span>NGN 7,000/month</span><small>Everything in Starter plus AI credits, staff access, reports, priority support.</small><button onclick="selectPlan('Pro','NGN 7,000/month')">Choose Pro</button></div></section>
-    <section class="grid"><article><h2>SellPoint Payment Details</h2><div id="paymentDetails" class="invoice"></div><p class="actions"><button id="copyPayment">Copy Payment Details</button><a id="paymentLinkBtn" class="button-link" href="#" target="_blank">Open Payment Link</a></p></article><article><h2>Activation Message</h2><textarea id="activationMsg" rows="12" readonly></textarea><p class="actions"><button id="copyActivation">Copy Message</button><button id="sendActivation">Send WhatsApp</button></p></article></section>
+    <header><div><h1>Upgrade SellPoint Beta</h1><p class="meta">Pay with Paystack for instant activation, or pay manually and send proof.</p></div><a class="button-link" href="index.html">Back to App</a></header>
+    <div id="verifyStatus" class="invoice" style="display:none"></div>
+    <p class="actions cycle-toggle"><button id="cycleMonthly" class="active">Monthly</button><button id="cycleYearly">Yearly</button></p>
+    <section id="planCards" class="plans upgrade-plans"></section>
+    <section class="grid">
+      <article><h2>Pay with Paystack</h2><label>Email for receipt<input id="checkoutEmail" type="email" placeholder="you@business.com"></label><p class="meta" id="selectedPlanMeta">Select a plan above.</p><button id="payNow" disabled>Pay Now</button></article>
+      <article><h2>Or Pay Manually</h2><div id="paymentDetails" class="invoice"></div><p class="actions"><button id="copyPayment">Copy Payment Details</button><a id="paymentLinkBtn" class="button-link" href="#" target="_blank">Open Payment Link</a></p></article>
+    </section>
+    <section class="grid"><article><h2>Activation Message</h2><p class="meta">If you paid manually, send this to confirm and request activation.</p><textarea id="activationMsg" rows="10" readonly></textarea><p class="actions"><button id="copyActivation">Copy Message</button><button id="sendActivation">Send WhatsApp</button></p></article></section>
   </main>
   <div id="toast"></div>
-  <script src="upgrade.js"></script>
+  <script type="module" src="supabase-init.js"></script>
+  <script defer src="auth-shared.js"></script>
+  <script defer src="upgrade.js"></script>
 </body>
 </html>
