@@ -312,6 +312,9 @@ app.post(
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Add at least one item" });
     }
+    if (!String(customerName || "").trim()) {
+      return res.status(400).json({ error: "Customer name is required" });
+    }
     const cleanItems = items.map((it) => ({
       name: String(it?.name || "").trim() || "Item",
       qty: Math.max(1, Number(it?.qty) || 1),

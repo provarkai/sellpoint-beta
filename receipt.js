@@ -93,8 +93,10 @@ $("receiptForm").onsubmit = async (e) => {
   if (!items.length) return toast("Add at least one item");
   const businessName = $("businessNameInput").value.trim();
   if (!businessName) return toast("Enter a business name");
+  const customerName = $("customerName").value.trim();
+  if (!customerName) return toast("Enter a customer name");
   const shared = {
-    customerName: $("customerName").value.trim(),
+    customerName,
     businessPhone: $("businessPhone").value.trim(),
     businessAddress: $("businessAddress").value.trim(),
     items,
