@@ -58,6 +58,7 @@ function renderReceipt(r) {
   const itemRows = r.items.map((it) => `<tr><td>${clean(it.name)}</td><td>${it.qty}</td><td>${money(it.price)}</td><td>${money(it.qty * it.price)}</td></tr>`).join("");
   const brandUrl = location.origin + "/receipt.html";
   $("receiptBox").innerHTML = `
+    <div class="receipt-watermark"><span>${clean(r.businessName)}</span></div>
     <div class="receipt-doc-head">
       ${r.businessLogo ? `<img class="invoice-logo" src="${r.businessLogo}" alt="Business logo">` : ""}
       <div><strong class="receipt-biz-name">${clean(r.businessName)}</strong>${r.businessPhone ? `<div class="meta">${clean(r.businessPhone)}</div>` : ""}${r.businessAddress ? `<div class="meta">${clean(r.businessAddress)}</div>` : ""}</div>

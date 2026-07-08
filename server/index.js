@@ -25,7 +25,11 @@ app.use(
 // bar request has no way to attach as a header. Each page's own script
 // checks for a session client-side and redirects to login.html if missing;
 // the real enforcement is server-side, on the /api/* routes below.
-app.use(express.static(ROOT));
+// no-cache (not no-store) so the browser still sends a conditional request
+// and can use a 304 - this app ships frequent small JS/CSS fixes, and a
+// stale cached script silently running old logic is worse than one extra
+// revalidation round trip per load.
+app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: true, maxAge: 0, setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
 
 // Every db.* call now hits Postgres (async), so a single async-aware wrapper
 // covers all routes - a synchronous try/catch would return before an awaited
