@@ -52,6 +52,12 @@ app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: tru
 
 app.use("/api", apiLimiter);
 
+// Clean shareable storefront URLs (/store/my-shop) instead of a query
+// string - store.js reads the slug back out of location.pathname. Static
+// serving above already ran and found nothing at this path, so this always
+// falls through to here for any /store/* request.
+app.get("/store/:slug", (req, res) => res.sendFile(path.join(ROOT, "store.html")));
+
 // Every db.* call now hits Postgres (async), so a single async-aware wrapper
 // covers all routes - a synchronous try/catch would return before an awaited
 // rejection surfaces.
@@ -171,6 +177,27 @@ app.post(
   handle(async (req, res) => {
     if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change the plan" });
     res.json(await db.downgradeToStarter(req.businessId));
+  })
+);
+
+// --- Public storefront (Growth+) --------------------------------------------
+
+app.put(
+  "/api/business/storefront",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change storefront settings" });
+    res.json(await db.updateStorefrontSettings(req.businessId, req.body || {}));
+  })
+);
+
+// Public, no auth - this is the page a business's customers land on.
+app.get(
+  "/api/store/:slug",
+  handle(async (req, res) => {
+    const storefront = await db.getStorefront(req.params.slug);
+    if (!storefront) return res.status(404).json({ error: "Storefront not found" });
+    res.json(storefront);
   })
 );
 

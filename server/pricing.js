@@ -19,12 +19,14 @@ const ADDON_AI_CREDITS = 500;
 // location (0 = single location only).
 // reportsTier is "none"/"basic"/"standard"/"advanced" - see db.js#getReports
 // for what each level actually includes.
+// storefront: Growth and above get a public catalog page (/store/<slug>) -
+// see server/index.js's /api/store/:slug and db.js#getStorefront.
 const TIERS = {
-  starter: { name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0, reportsTier: "none", receiptLimit: 50, tagline: "Free - 30 orders/month, 5 products, basic invoices and AI samples" },
-  growth: { name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 50, branchLimit: 0, reportsTier: "basic", receiptLimit: Infinity, tagline: "Unlimited orders, 30 products, branded invoices, unlimited free receipts" },
-  pro: { name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 3, aiLimit: 500, branchLimit: 1, reportsTier: "standard", receiptLimit: Infinity, tagline: "Everything in Growth plus 3 staff, a second branch, more AI generations, and sales reports" },
-  business: { name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 20, aiLimit: 5000, branchLimit: 20, reportsTier: "advanced", receiptLimit: Infinity, tagline: "Everything in Pro plus up to 20 staff, 20 branches, and advanced reports" },
-  enterprise: { name: "Enterprise", monthly: null, orderLimit: Infinity, productLimit: Infinity, staffLimit: Infinity, aiLimit: Infinity, branchLimit: Infinity, reportsTier: "advanced", receiptLimit: Infinity, tagline: "Talk to sales for volume, SLAs, white-label, and dedicated support" },
+  starter: { name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0, reportsTier: "none", receiptLimit: 50, storefront: false, tagline: "Free - 30 orders/month, 5 products, basic invoices and AI samples" },
+  growth: { name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 50, branchLimit: 0, reportsTier: "basic", receiptLimit: Infinity, storefront: true, tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, unlimited free receipts" },
+  pro: { name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 3, aiLimit: 500, branchLimit: 1, reportsTier: "standard", receiptLimit: Infinity, storefront: true, tagline: "Everything in Growth plus 3 staff, a second branch, more AI generations, and sales reports" },
+  business: { name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 20, aiLimit: 5000, branchLimit: 20, reportsTier: "advanced", receiptLimit: Infinity, storefront: true, tagline: "Everything in Pro plus up to 20 staff, 20 branches, and advanced reports" },
+  enterprise: { name: "Enterprise", monthly: null, orderLimit: Infinity, productLimit: Infinity, staffLimit: Infinity, aiLimit: Infinity, branchLimit: Infinity, reportsTier: "advanced", receiptLimit: Infinity, storefront: true, tagline: "Talk to sales for volume, SLAs, white-label, and dedicated support" },
 };
 
 // monthly: null means "contact us" - not a fixed price, so it's excluded
@@ -86,6 +88,10 @@ function receiptLimitFor(plan) {
   return PRICING[plan]?.receiptLimit ?? PRICING.starter.receiptLimit;
 }
 
+function storefrontEnabledFor(plan) {
+  return !!(PRICING[plan]?.storefront ?? PRICING.starter.storefront);
+}
+
 module.exports = {
   PRICING,
   priceFor,
@@ -98,6 +104,7 @@ module.exports = {
   branchLimitFor,
   reportsTierFor,
   receiptLimitFor,
+  storefrontEnabledFor,
   YEARLY_MULTIPLIER,
   ADDON_PRICE,
   ADDON_AI_CREDITS,

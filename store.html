@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Storefront - SellersPoint</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page storefront-page">
+  <main class="storefront-main">
+    <div id="notFound" style="display:none">
+      <h1>Storefront not found</h1>
+      <p class="meta">This shop link isn't active. It may have been disabled or the URL might be wrong.</p>
+    </div>
+    <div id="storeContent" style="display:none">
+      <header class="storefront-header">
+        <img id="storeLogo" src="" alt="" style="display:none">
+        <div id="storeLogoFallback" class="storefront-logo-fallback"></div>
+        <div><h1 id="storeName"></h1><p class="meta" id="storeMeta"></p></div>
+      </header>
+      <section id="storeGrid" class="storefront-grid"></section>
+    </div>
+  </main>
+  <div id="cartBar" class="storefront-cart-bar" style="display:none">
+    <span id="cartSummary"></span>
+    <button id="viewCart">View Cart</button>
+  </div>
+  <dialog id="cartModal">
+    <h2>Your order</h2>
+    <div id="cartItems" class="list"></div>
+    <p class="row storefront-cart-total"><span>Total</span><b id="cartTotal">NGN 0</b></p>
+    <label>Your name<input id="buyerName" placeholder="Optional"></label>
+    <p class="actions">
+      <button id="closeCart">Keep Shopping</button>
+      <button id="orderWhatsApp">Order via WhatsApp</button>
+    </p>
+  </dialog>
+  <div id="toast"></div>
+  <script defer src="store.js"></script>
+</body>
+</html>

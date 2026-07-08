@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, ADDON_AI_CREDITS } = require("./pricing");
+const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor, ADDON_AI_CREDITS } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -8,6 +8,30 @@ const pool = new Pool({
 });
 
 const uid = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+function slugify(text) {
+  return String(text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "shop";
+}
+
+// Loops appending a short random suffix until it finds a slug not already
+// taken - collisions are rare (most business names differ) but far from
+// impossible ("Glow Beauty" is a common shop name), and slugs are the
+// public URL segment so they must be unique.
+async function uniqueSlug(client, base) {
+  const root = slugify(base);
+  let candidate = root;
+  for (let i = 0; i < 20; i++) {
+    const { rows } = await client.query("SELECT 1 FROM businesses WHERE lower(slug) = lower($1)", [candidate]);
+    if (!rows.length) return candidate;
+    candidate = root + "-" + Math.random().toString(36).slice(2, 6);
+  }
+  return root + "-" + Date.now().toString(36);
+}
 
 // Same class as validate.js's ValidationError - OrderError predates the
 // validate module and covers non-input errors too (order limit reached,
@@ -36,6 +60,9 @@ function toBusinessJson(b) {
     plan: effectivePlan(b),
     billingCycle: b.billing_cycle,
     planExpiresAt: b.plan_expires_at,
+    slug: b.slug,
+    storefrontEnabled: b.storefront_enabled,
+    storefrontEligible: storefrontEnabledFor(effectivePlan(b)),
   };
 }
 function effectivePlan(b) {
@@ -52,6 +79,7 @@ function toProductJson(p) {
     type: p.type,
     deliveryLink: p.delivery_link,
     deliveryNote: p.delivery_note,
+    image: p.image,
   };
 }
 function toCustomerJson(c) {
@@ -133,9 +161,11 @@ async function createBusiness(userId, fields, email) {
       await client.query("COMMIT");
       return toBusinessJson(businessRows[0]);
     }
+    const businessName = fields.businessName || "Your Business";
+    const slug = await uniqueSlug(client, businessName);
     const { rows } = await client.query(
-      `INSERT INTO businesses (name, phone) VALUES ($1, $2) RETURNING *`,
-      [fields.businessName || "Your Business", fields.businessPhone || ""]
+      `INSERT INTO businesses (name, phone, slug) VALUES ($1, $2, $3) RETURNING *`,
+      [businessName, fields.businessPhone || "", slug]
     );
     const business = rows[0];
     await client.query(
@@ -285,6 +315,60 @@ async function downgradeToStarter(businessId) {
   const business = await setPlan(businessId, "starter", "monthly", null);
   await logEvent(businessId, "plan_downgraded", "starter");
   return business;
+}
+
+// --- Public storefront (Growth plan and above) ------------------------------
+
+// Separate from updateBusiness (which deliberately only ever touches profile
+// fields) since this needs its own validation: slug uniqueness, and a
+// server-side plan check before allowing enabled=true - a tenant flipping
+// this on with dev tools shouldn't work if they're on Starter, the same way
+// they can't grant themselves a paid plan through the profile endpoint.
+async function updateStorefrontSettings(businessId, { enabled, slug }) {
+  const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Business not found");
+  const eligible = storefrontEnabledFor(effectivePlan(current));
+  const nextEnabled = enabled !== undefined ? !!enabled && eligible : current.storefront_enabled && eligible;
+  let nextSlug = current.slug;
+  if (slug !== undefined) {
+    const cleanSlug = slugify(slug);
+    if (cleanSlug !== current.slug.toLowerCase()) {
+      const { rows: taken } = await query("SELECT 1 FROM businesses WHERE lower(slug) = lower($1) AND id != $2", [cleanSlug, businessId]);
+      if (taken.length) throw new OrderError("That storefront URL is already taken");
+      nextSlug = cleanSlug;
+    }
+  }
+  const { rows: updated } = await query(
+    "UPDATE businesses SET storefront_enabled=$1, slug=$2 WHERE id = $3 RETURNING *",
+    [nextEnabled, nextSlug, businessId]
+  );
+  return toBusinessJson(updated[0]);
+}
+
+function toStorefrontProductJson(p) {
+  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image };
+}
+
+// Public - no auth. Returns null (server/index.js 404s) unless the business
+// exists, has explicitly turned the storefront on, AND is currently on an
+// eligible plan - re-checked live so a lapsed/downgraded plan takes the
+// storefront down automatically, not just at the moment they downgrade.
+async function getStorefront(slug) {
+  const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
+  const business = rows[0];
+  if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) return null;
+  const { rows: products } = await query(
+    "SELECT * FROM products WHERE business_id = $1 ORDER BY created_at DESC",
+    [business.id]
+  );
+  return {
+    businessName: business.name,
+    businessLogo: business.logo,
+    businessPhone: business.phone,
+    businessAddress: business.address,
+    products: products.map(toStorefrontProductJson),
+  };
 }
 
 // --- SellersPoint's own payout details (genuine singleton) -----------------
@@ -501,8 +585,8 @@ async function createProduct(businessId, data) {
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
   const id = uid("p");
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [
       id,
       businessId,
@@ -513,6 +597,7 @@ async function createProduct(businessId, data) {
       data.type || "Product",
       data.deliveryLink || "",
       data.deliveryNote || "",
+      data.image || "",
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -679,6 +764,8 @@ module.exports = {
   updateBusiness,
   activatePlan,
   downgradeToStarter,
+  updateStorefrontSettings,
+  getStorefront,
   getOwner,
   updateOwner,
   getPlatformSettings,

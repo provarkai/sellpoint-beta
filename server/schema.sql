@@ -19,6 +19,16 @@ create table if not exists businesses (
 );
 alter table businesses add column if not exists address text not null default '';
 
+-- Public storefront (Growth plan and above - see pricing.js#storefrontEnabledFor).
+-- slug is the shareable URL segment (/store/<slug>); storefront_enabled is a
+-- seller-controlled switch so a business isn't publicly visible before
+-- they've built out their catalog, even once they're on an eligible plan.
+alter table businesses add column if not exists slug text;
+alter table businesses add column if not exists storefront_enabled boolean not null default false;
+update businesses set slug = 'shop-' || substr(id::text, 1, 8) where slug is null;
+alter table businesses alter column slug set not null;
+create unique index if not exists businesses_slug_idx on businesses(lower(slug));
+
 -- One row per (Supabase Auth user, business). user_id is unique for now since
 -- a user belongs to exactly one business (owner or staff) - multi-business
 -- membership can relax this later without changing the table shape.
@@ -107,9 +117,11 @@ create table if not exists products (
   type text not null default 'Product',
   delivery_link text not null default '',
   delivery_note text not null default '',
+  image text not null default '',
   created_at timestamptz not null default now()
 );
 create index if not exists products_business_id_idx on products(business_id);
+alter table products add column if not exists image text not null default '';
 
 create table if not exists customers (
   id text primary key,
