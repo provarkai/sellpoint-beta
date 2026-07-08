@@ -6,19 +6,20 @@
   <title>Log in - SellersPoint</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="single-page payment-page">
-  <main>
-    <header><div><h1>Log in to SellersPoint</h1><p class="meta">Manage your products, orders, and customers.</p></div></header>
-    <section class="grid">
-      <form id="loginForm">
-        <h2>Log in</h2>
-        <label>Email<input id="email" type="email" required></label>
-        <label>Password<input id="password" type="password" required></label>
-        <button>Log In</button>
-        <p class="meta">No account yet? <a href="signup.html">Sign up</a></p>
-      </form>
-    </section>
-    <p class="meta" style="text-align:center;margin-top:18px">Just need a quick receipt? Try the <a href="receipt.html">free Receipt Generator</a> - no full setup required.</p>
+<body class="single-page premium-page">
+  <main class="premium-main premium-auth">
+    <div class="premium-hero">
+      <span class="premium-kicker">SellersPoint</span>
+      <h1>Log in to your account</h1>
+      <p class="premium-sub">Manage your products, orders, and customers.</p>
+    </div>
+    <form id="loginForm">
+      <label>Email<input id="email" type="email" required></label>
+      <label>Password<input id="password" type="password" required></label>
+      <button>Log In</button>
+      <p class="meta">No account yet? <a href="signup.html">Sign up</a></p>
+    </form>
+    <p class="meta premium-hint">Just need a quick receipt? Try the <a href="receipt.html">free Receipt Generator</a> - no full setup required.</p>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>

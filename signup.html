@@ -6,20 +6,21 @@
   <title>Sign up - SellersPoint</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="single-page payment-page">
-  <main>
-    <header><div><h1>Create your SellersPoint account</h1><p class="meta">Free to start - 30 orders/month, upgrade any time.</p></div></header>
-    <section class="grid">
-      <form id="signupForm">
-        <h2>Sign up</h2>
-        <label>Business name<input id="businessName" required placeholder="Your Business"></label>
-        <label>Email<input id="email" type="email" required></label>
-        <label>Password<input id="password" type="password" required minlength="6"></label>
-        <button>Create Account</button>
-        <p class="meta">Already have an account? <a href="login.html">Log in</a></p>
-      </form>
-    </section>
-    <p class="meta" style="text-align:center;margin-top:18px">Just need a quick receipt? Try the <a href="receipt.html">free Receipt Generator</a> - no full setup required.</p>
+<body class="single-page premium-page">
+  <main class="premium-main premium-auth">
+    <div class="premium-hero">
+      <span class="premium-kicker">SellersPoint</span>
+      <h1>Create your account</h1>
+      <p class="premium-sub">Free to start - 30 orders/month, upgrade any time.</p>
+    </div>
+    <form id="signupForm">
+      <label>Business name<input id="businessName" required placeholder="Your Business"></label>
+      <label>Email<input id="email" type="email" required></label>
+      <label>Password<input id="password" type="password" required minlength="6"></label>
+      <button>Create Account</button>
+      <p class="meta">Already have an account? <a href="login.html">Log in</a></p>
+    </form>
+    <p class="meta premium-hint">Just need a quick receipt? Try the <a href="receipt.html">free Receipt Generator</a> - no full setup required.</p>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>

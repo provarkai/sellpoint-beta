@@ -6,16 +6,18 @@
   <title>SellersPoint Admin Login</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="single-page payment-page">
-  <main>
-    <header><div><h1>SellersPoint Platform Admin</h1><p class="meta">Restricted - operator access only, separate from business logins.</p></div></header>
-    <article>
-      <form id="loginForm">
-        <label>Admin email<input id="email" type="email" required autocomplete="username"></label>
-        <label>Password<input id="password" type="password" required autocomplete="current-password"></label>
-        <button>Log In</button>
-      </form>
-    </article>
+<body class="single-page premium-page">
+  <main class="premium-main premium-auth">
+    <div class="premium-hero">
+      <span class="premium-kicker">SellersPoint Platform Admin</span>
+      <h1>Operator access</h1>
+      <p class="premium-sub">Restricted - separate from business logins.</p>
+    </div>
+    <form id="loginForm">
+      <label>Admin email<input id="email" type="email" required autocomplete="username"></label>
+      <label>Password<input id="password" type="password" required autocomplete="current-password"></label>
+      <button>Log In</button>
+    </form>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>

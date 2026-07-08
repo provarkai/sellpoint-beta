@@ -4,31 +4,55 @@ let cycle = "monthly";
 let authToken = null;
 let busy = false;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
+const unlimited = (v) => v === Infinity || v === null || v === undefined;
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
 async function api(method, url, body) { const res = await fetch(url, { method, headers: { ...(body ? { "Content-Type": "application/json" } : {}), Authorization: `Bearer ${authToken}` }, body: body ? JSON.stringify(body) : undefined }); if (!res.ok) { const err = await res.json().catch(() => ({ error: "Request failed" })); throw new Error(err.error || "Request failed"); } return res.status === 204 ? null : res.json(); }
 
 function featuresFor(t) {
   const list = [
-    t.orderLimit === Infinity || t.orderLimit == null ? "Unlimited orders" : t.orderLimit + " orders/month",
-    t.staffLimit === Infinity ? "Unlimited staff seats" : t.staffLimit > 0 ? t.staffLimit + " staff seat" + (t.staffLimit > 1 ? "s" : "") : "No staff seats",
-    t.aiLimit === Infinity ? "Unlimited AI generations" : t.aiLimit + " AI generations/month",
+    unlimited(t.orderLimit) ? "Unlimited orders" : t.orderLimit + " orders/month",
+    unlimited(t.staffLimit) ? "Unlimited staff seats" : t.staffLimit > 0 ? t.staffLimit + " staff seat" + (t.staffLimit > 1 ? "s" : "") : "No staff seats",
+    unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month",
+    unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit > 0 ? t.branchLimit + " extra branch" + (t.branchLimit > 1 ? "es" : "") : "Single location",
   ];
-  if (t.reports) list.push("Sales &amp; revenue reports");
-  if (t.multiBranch) list.push("Multiple branches");
+  if (t.reports) list.push("Sales & revenue reports");
   return list;
 }
 
 function planCardsHtml() {
-  return Object.entries(pricing).filter(([, t]) => t.monthly > 0).map(([key, t]) => {
-    const price = cycle === "yearly" ? t.yearly : t.monthly;
+  return Object.entries(pricing).filter(([key]) => key !== "starter").map(([key, t]) => {
+    const isEnterprise = t.monthly == null;
+    const priceHtml = isEnterprise
+      ? '<p class="premium-price">Custom<span> pricing</span></p>'
+      : '<p class="premium-price">' + money(cycle === "yearly" ? t.yearly : t.monthly) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p>';
     const features = featuresFor(t).map((f) => "<li>" + f + "</li>").join("");
-    return '<article class="premium-card"><h2>' + t.name + '</h2><p class="premium-price">' + money(price) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p><p class="meta">' + t.tagline + '</p><ul class="premium-features">' + features + '</ul><button data-plan="' + key + '">Choose ' + t.name + '</button></article>';
+    const cta = isEnterprise
+      ? '<a class="button-link" href="mailto:sales@sellerspoint.app?subject=Enterprise%20plan">Contact Sales</a>'
+      : '<button data-plan="' + key + '">Choose ' + t.name + '</button>';
+    return '<article class="premium-card' + (isEnterprise ? " premium-card-enterprise" : "") + '"><h2>' + t.name + '</h2>' + priceHtml + '<p class="meta">' + t.tagline + '</p><ul class="premium-features">' + features + '</ul>' + cta + '</article>';
   }).join("");
+}
+
+function comparisonTableHtml() {
+  const keys = Object.keys(pricing);
+  const rows = [
+    ["Price", (t) => (t.monthly == null ? "Custom" : t.monthly === 0 ? "Free" : money(cycle === "yearly" ? t.yearly : t.monthly) + "/" + (cycle === "yearly" ? "yr" : "mo"))],
+    ["Orders", (t) => (unlimited(t.orderLimit) ? "Unlimited" : t.orderLimit + "/month")],
+    ["Staff seats", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
+    ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
+    ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? "+" + t.branchLimit : "Single location")],
+    ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
+    ["Reports", (t) => (t.reports ? "✓" : "-")],
+  ];
+  const head = "<tr><th>Feature</th>" + keys.map((k) => "<th>" + pricing[k].name + "</th>").join("") + "</tr>";
+  const body = rows.map(([label, fn]) => "<tr><td>" + label + "</td>" + keys.map((k) => "<td>" + fn(pricing[k]) + "</td>").join("") + "</tr>").join("");
+  return "<table>" + head + body + "</table>";
 }
 
 function render() {
   $("planCards").innerHTML = planCardsHtml();
   $("planCards").querySelectorAll("button[data-plan]").forEach((b) => (b.onclick = () => chooseAndPay(b.dataset.plan)));
+  if ($("comparisonTable")) $("comparisonTable").innerHTML = comparisonTableHtml();
   const anyTier = Object.values(pricing).find((t) => t.monthly > 0);
   if (anyTier) {
     const savings = anyTier.monthly * 12 - anyTier.yearly;

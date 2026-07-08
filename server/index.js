@@ -303,9 +303,12 @@ app.post(
     const total = cleanItems.reduce((s, it) => s + it.qty * it.price, 0);
     const used = await db.incrementReceiptUsage(req.businessId);
     const business = await db.getBusiness(req.businessId);
+    const reference = "SP-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(2).toString("hex").toUpperCase();
     const receipt = {
+      reference,
       businessName: business.businessName,
       businessLogo: business.businessLogo,
+      businessPhone: business.businessPhone,
       customerName: String(customerName || "").trim(),
       items: cleanItems,
       total,

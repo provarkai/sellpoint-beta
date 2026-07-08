@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor, staffLimitFor, aiLimitFor, multiBranchFor, receiptLimitFor } = require("./pricing");
+const { orderLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -378,7 +378,7 @@ async function incrementReceiptUsage(businessId) {
   return used + 1;
 }
 
-// --- Branches (Business tier+) ---------------------------------------------
+// --- Branches (Pro: 1 extra, Business+: unlimited) -------------------------
 
 function toBranchJson(b) {
   return { id: b.id, name: b.name, address: b.address, createdAt: b.created_at };
@@ -391,7 +391,9 @@ async function listBranches(businessId) {
 
 async function createBranch(businessId, data) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  if (!multiBranchFor(effectivePlan(businessRows[0]))) throw new OrderError("Multiple branches require the Business plan");
+  const limit = branchLimitFor(effectivePlan(businessRows[0]));
+  const existing = await listBranches(businessId);
+  if (existing.length >= limit) throw new OrderError("Branch limit reached for the current plan");
   const name = requireString(data.name, "Branch name");
   const { rows } = await query(
     "INSERT INTO branches (business_id, name, address) VALUES ($1, $2, $3) RETURNING *",

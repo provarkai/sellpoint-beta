@@ -24,13 +24,25 @@ function collectItems() {
 }
 
 function renderReceipt(r) {
-  const rows = r.items.map((it) => `<div class="row"><span>${clean(it.name)} x ${it.qty}</span><b>${money(it.qty * it.price)}</b></div>`).join("");
-  $("receiptBox").innerHTML = `${r.businessLogo ? `<img class="invoice-logo" src="${r.businessLogo}" alt="Business logo">` : ""}<h2>Receipt</h2><div class="row"><span>From</span><b>${clean(r.businessName)}</b></div>${r.customerName ? `<div class="row"><span>Customer</span><b>${clean(r.customerName)}</b></div>` : ""}<div class="row"><span>Date</span><b>${new Date(r.issuedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" })}</b></div>${rows}<div class="row"><span>Total</span><b>${money(r.total)}</b></div><p class="meta" style="margin-top:14px">Powered by SellersPoint - create your own free receipts at sellerspoint.app/receipt.html</p>`;
+  const dateStr = new Date(r.issuedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+  const itemRows = r.items.map((it) => `<tr><td>${clean(it.name)}</td><td>${it.qty}</td><td>${money(it.price)}</td><td>${money(it.qty * it.price)}</td></tr>`).join("");
+  const brandUrl = location.origin + "/receipt.html";
+  $("receiptBox").innerHTML = `
+    <div class="receipt-doc-head">
+      ${r.businessLogo ? `<img class="invoice-logo" src="${r.businessLogo}" alt="Business logo">` : ""}
+      <div><strong class="receipt-biz-name">${clean(r.businessName)}</strong>${r.businessPhone ? `<div class="meta">${clean(r.businessPhone)}</div>` : ""}</div>
+      <div class="receipt-doc-meta"><span class="meta">Receipt</span><strong>${clean(r.reference || "")}</strong><span class="meta">${dateStr}</span></div>
+    </div>
+    ${r.customerName ? `<div class="row"><span>Billed to</span><b>${clean(r.customerName)}</b></div>` : ""}
+    <table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+    <div class="row receipt-total"><span>Total</span><b>${money(r.total)}</b></div>
+    <div class="receipt-doc-footer">Powered by <a href="${brandUrl}" target="_blank" rel="noopener">SellersPoint</a> - create your own free branded receipts</div>
+  `;
 }
 
 function receiptText(r) {
-  const lines = r.items.map((it) => `${it.name} x ${it.qty} - ${money(it.qty * it.price)}`).join("\n");
-  return `Receipt from ${r.businessName}\n${r.customerName ? "Customer: " + r.customerName + "\n" : ""}${lines}\nTotal: ${money(r.total)}\n\nPowered by SellersPoint`;
+  const lines = r.items.map((it) => `${it.name} x ${it.qty} @ ${money(it.price)} = ${money(it.qty * it.price)}`).join("\n");
+  return `Receipt ${r.reference || ""} from ${r.businessName}\n${r.customerName ? "Billed to: " + r.customerName + "\n" : ""}${lines}\nTotal: ${money(r.total)}\n\nPowered by SellersPoint - ${location.origin}/receipt.html`;
 }
 
 let lastReceipt = null;
