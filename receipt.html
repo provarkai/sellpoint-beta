@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Receipt Generator - SellersPoint</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page payment-page">
+  <main>
+    <header><div><h1>Free Professional Receipt Generator</h1><p class="meta" id="usageNote">Create a branded receipt in seconds - free every month.</p></div><a class="button-link" href="index.html">Open App</a></header>
+    <section class="grid">
+      <form id="receiptForm">
+        <h2>Receipt details</h2>
+        <label>Customer name<input id="customerName" placeholder="Optional"></label>
+        <div id="itemRows" class="list"></div>
+        <p class="actions"><button type="button" id="addItem">Add Item</button></p>
+        <button id="generateBtn">Generate Receipt</button>
+      </form>
+      <article>
+        <h2>Preview</h2>
+        <div id="receiptBox" class="invoice">Fill in the form and generate to preview your receipt.</div>
+        <p class="actions"><button id="copyReceipt">Copy</button><button id="printReceipt">Print</button></p>
+        <div id="upsell" class="delivery-box" style="display:none">
+          <b>Want to save customers, inventory, and sales automatically?</b>
+          <p class="meta">This receipt tool is free and stands on its own. SellersPoint also tracks your products, customers, orders, invoices, and AI tools in one place.</p>
+          <a class="button-link" href="index.html">Continue with SellersPoint</a>
+        </div>
+      </article>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script type="module" src="supabase-init.js"></script>
+  <script defer src="auth-shared.js"></script>
+  <script defer src="receipt.js"></script>
+</body>
+</html>

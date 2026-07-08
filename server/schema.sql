@@ -73,6 +73,15 @@ create table if not exists ai_usage (
   primary key (business_id, month)
 );
 
+-- Standalone free "Receipt Generator" lead-magnet tool (not tied to
+-- orders/products) - counted separately against pricing.receiptLimit.
+create table if not exists receipt_usage (
+  business_id uuid not null references businesses(id) on delete cascade,
+  month text not null,
+  count integer not null default 0,
+  primary key (business_id, month)
+);
+
 create table if not exists products (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,

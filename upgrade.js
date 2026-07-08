@@ -7,10 +7,22 @@ const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
 async function api(method, url, body) { const res = await fetch(url, { method, headers: { ...(body ? { "Content-Type": "application/json" } : {}), Authorization: `Bearer ${authToken}` }, body: body ? JSON.stringify(body) : undefined }); if (!res.ok) { const err = await res.json().catch(() => ({ error: "Request failed" })); throw new Error(err.error || "Request failed"); } return res.status === 204 ? null : res.json(); }
 
+function featuresFor(t) {
+  const list = [
+    t.orderLimit === Infinity || t.orderLimit == null ? "Unlimited orders" : t.orderLimit + " orders/month",
+    t.staffLimit === Infinity ? "Unlimited staff seats" : t.staffLimit > 0 ? t.staffLimit + " staff seat" + (t.staffLimit > 1 ? "s" : "") : "No staff seats",
+    t.aiLimit === Infinity ? "Unlimited AI generations" : t.aiLimit + " AI generations/month",
+  ];
+  if (t.reports) list.push("Sales &amp; revenue reports");
+  if (t.multiBranch) list.push("Multiple branches");
+  return list;
+}
+
 function planCardsHtml() {
   return Object.entries(pricing).filter(([, t]) => t.monthly > 0).map(([key, t]) => {
     const price = cycle === "yearly" ? t.yearly : t.monthly;
-    return '<div><b>' + t.name + '</b><span>' + money(price) + '/' + (cycle === "yearly" ? "year" : "month") + '</span><small>' + t.tagline + '</small><button data-plan="' + key + '">Choose ' + t.name + '</button></div>';
+    const features = featuresFor(t).map((f) => "<li>" + f + "</li>").join("");
+    return '<article class="premium-card"><h2>' + t.name + '</h2><p class="premium-price">' + money(price) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p><p class="meta">' + t.tagline + '</p><ul class="premium-features">' + features + '</ul><button data-plan="' + key + '">Choose ' + t.name + '</button></article>';
   }).join("");
 }
 

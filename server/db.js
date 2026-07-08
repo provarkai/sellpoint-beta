@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor, staffLimitFor, aiLimitFor, multiBranchFor } = require("./pricing");
+const { orderLimitFor, staffLimitFor, aiLimitFor, multiBranchFor, receiptLimitFor } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -356,6 +356,28 @@ async function incrementAiUsage(businessId) {
   return used + 1;
 }
 
+// --- Receipt Generator usage (free-standing lead-magnet tool) --------------
+
+async function getReceiptUsage(businessId) {
+  const month = currentMonth();
+  const { rows } = await query("SELECT count FROM receipt_usage WHERE business_id = $1 AND month = $2", [businessId, month]);
+  return rows[0]?.count || 0;
+}
+
+async function incrementReceiptUsage(businessId) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = receiptLimitFor(effectivePlan(businessRows[0]));
+  const month = currentMonth();
+  const used = await getReceiptUsage(businessId);
+  if (used >= limit) throw new OrderError("Free receipt limit reached for the current plan this month");
+  await query(
+    `INSERT INTO receipt_usage (business_id, month, count) VALUES ($1, $2, 1)
+     ON CONFLICT (business_id, month) DO UPDATE SET count = receipt_usage.count + 1`,
+    [businessId, month]
+  );
+  return used + 1;
+}
+
 // --- Branches (Business tier+) ---------------------------------------------
 
 function toBranchJson(b) {
@@ -592,6 +614,8 @@ module.exports = {
   removeStaff,
   getAiUsage,
   incrementAiUsage,
+  getReceiptUsage,
+  incrementReceiptUsage,
   listBranches,
   createBranch,
   deleteBranch,

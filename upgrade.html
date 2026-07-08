@@ -6,14 +6,18 @@
   <title>SellersPoint Upgrade</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="single-page payment-page">
-  <main>
-    <header><div><h1>SellersPoint Upgrade</h1><p class="meta">Pay with Paystack for instant activation.</p></div><a class="button-link" href="index.html">Back to App</a></header>
+<body class="single-page premium-page">
+  <main class="premium-main">
+    <a class="button-link premium-back" href="index.html">Back to App</a>
+    <div class="premium-hero">
+      <span class="premium-kicker">SellersPoint Upgrade</span>
+      <h1>Unlock what your business is ready for.</h1>
+      <p class="premium-sub">Instant activation with Paystack. Cancel any time. No manual email step - you're already signed in.</p>
+    </div>
     <div id="verifyStatus" class="invoice" style="display:none"></div>
-    <p class="actions cycle-toggle"><button id="cycleMonthly" class="active">Monthly</button><button id="cycleYearly">Yearly</button></p>
-    <p class="meta" id="cycleHint"></p>
-    <section id="planCards" class="plans upgrade-plans"></section>
-    <section><article><h2>Monthly or Annual?</h2><p><b>Monthly</b> - recommended if you're just getting started. Pay as you go, cancel any time.</p><p><b>Annual</b> - best value once you know SellersPoint fits your business: pay once a year and get 2 months free versus paying monthly.</p></article></section>
+    <p class="actions cycle-toggle premium-toggle"><button id="cycleMonthly" class="active">Monthly</button><button id="cycleYearly">Yearly - 2 months free</button></p>
+    <p class="meta premium-hint" id="cycleHint"></p>
+    <section id="planCards" class="premium-plans"></section>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>

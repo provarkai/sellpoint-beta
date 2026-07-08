@@ -277,6 +277,45 @@ app.post(
   })
 );
 
+// --- Receipt Generator (free lead-magnet tool, separate from orders) -------
+
+app.get(
+  "/api/receipts/usage",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.getBusiness(req.businessId);
+    res.json({ used: await db.getReceiptUsage(req.businessId), limit: pricing.receiptLimitFor(business.plan) });
+  })
+);
+app.post(
+  "/api/receipts/generate",
+  requireAuth,
+  handle(async (req, res) => {
+    const { customerName, items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Add at least one item" });
+    }
+    const cleanItems = items.map((it) => ({
+      name: String(it?.name || "").trim() || "Item",
+      qty: Math.max(1, Number(it?.qty) || 1),
+      price: Math.max(0, Number(it?.price) || 0),
+    }));
+    const total = cleanItems.reduce((s, it) => s + it.qty * it.price, 0);
+    const used = await db.incrementReceiptUsage(req.businessId);
+    const business = await db.getBusiness(req.businessId);
+    const receipt = {
+      businessName: business.businessName,
+      businessLogo: business.businessLogo,
+      customerName: String(customerName || "").trim(),
+      items: cleanItems,
+      total,
+      issuedAt: new Date().toISOString(),
+      poweredBy: "SellersPoint",
+    };
+    res.json({ receipt, used, limit: pricing.receiptLimitFor(business.plan) });
+  })
+);
+
 // --- Reports (Pro+) ----------------------------------------------------------
 
 app.get(
