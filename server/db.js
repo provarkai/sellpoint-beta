@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor } = require("./pricing");
+const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -29,6 +29,7 @@ function toBusinessJson(b) {
     businessName: b.name,
     businessPhone: b.phone,
     businessLogo: b.logo,
+    businessAddress: b.address,
     paymentProvider: b.payment_provider,
     paymentLink: b.payment_link,
     paymentDetails: b.payment_details,
@@ -171,31 +172,40 @@ async function getState(businessId) {
   };
 }
 
-// Pro+ gated (see server/index.js) - deeper than the free dashboard
-// summary: revenue by month, top products, top customers, order status mix.
-async function getReports(businessId) {
+// Growth+ gated (see server/index.js), depth increases with plan:
+// basic = revenue + status only; standard = + top 5 products/customers;
+// advanced = + top 10 products/customers and a longer revenue history.
+async function getReports(businessId, tier = "basic") {
+  const months = tier === "advanced" ? 12 : tier === "standard" ? 6 : 3;
+  const topN = tier === "advanced" ? 10 : 5;
+  const includeTop = tier !== "basic";
   const [revenueByMonth, topProducts, topCustomers, statusBreakdown] = await Promise.all([
     query(
       `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, SUM(price * qty) AS revenue
        FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered')
-       GROUP BY 1 ORDER BY 1 DESC LIMIT 6`,
-      [businessId]
+       GROUP BY 1 ORDER BY 1 DESC LIMIT $2`,
+      [businessId, months]
     ),
-    query(
-      `SELECT product_name, SUM(qty) AS units, SUM(price * qty) AS revenue
-       FROM orders WHERE business_id = $1
-       GROUP BY product_name ORDER BY units DESC LIMIT 5`,
-      [businessId]
-    ),
-    query(
-      `SELECT c.name, SUM(o.price * o.qty) AS spend, COUNT(*) AS orders
-       FROM orders o JOIN customers c ON c.id = o.customer_id
-       WHERE o.business_id = $1 GROUP BY c.name ORDER BY spend DESC LIMIT 5`,
-      [businessId]
-    ),
+    includeTop
+      ? query(
+          `SELECT product_name, SUM(qty) AS units, SUM(price * qty) AS revenue
+           FROM orders WHERE business_id = $1
+           GROUP BY product_name ORDER BY units DESC LIMIT $2`,
+          [businessId, topN]
+        )
+      : Promise.resolve({ rows: [] }),
+    includeTop
+      ? query(
+          `SELECT c.name, SUM(o.price * o.qty) AS spend, COUNT(*) AS orders
+           FROM orders o JOIN customers c ON c.id = o.customer_id
+           WHERE o.business_id = $1 GROUP BY c.name ORDER BY spend DESC LIMIT $2`,
+          [businessId, topN]
+        )
+      : Promise.resolve({ rows: [] }),
     query(`SELECT status, COUNT(*) AS n FROM orders WHERE business_id = $1 GROUP BY status`, [businessId]),
   ]);
   return {
+    tier,
     revenueByMonth: revenueByMonth.rows.map((r) => ({ month: r.month, revenue: Number(r.revenue) })),
     topProducts: topProducts.rows.map((r) => ({ name: r.product_name, units: Number(r.units), revenue: Number(r.revenue) })),
     topCustomers: topCustomers.rows.map((r) => ({ name: r.name, spend: Number(r.spend), orders: Number(r.orders) })),
@@ -216,6 +226,7 @@ async function updateBusiness(businessId, fields) {
     name: fields.businessName ?? current.name,
     phone: fields.businessPhone ?? current.phone,
     logo: fields.businessLogo ?? current.logo,
+    address: fields.businessAddress ?? current.address,
     payment_provider: fields.paymentProvider ?? current.payment_provider,
     payment_link: fields.paymentLink ?? current.payment_link,
     payment_details: fields.paymentDetails ?? current.payment_details,
@@ -224,13 +235,14 @@ async function updateBusiness(businessId, fields) {
     plan_expires_at: fields.planExpiresAt !== undefined ? fields.planExpiresAt : current.plan_expires_at,
   };
   const { rows: updated } = await query(
-    `UPDATE businesses SET name=$1, phone=$2, logo=$3, payment_provider=$4, payment_link=$5,
-       payment_details=$6, plan=$7, billing_cycle=$8, plan_expires_at=$9
-     WHERE id = $10 RETURNING *`,
+    `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
+       payment_details=$7, plan=$8, billing_cycle=$9, plan_expires_at=$10
+     WHERE id = $11 RETURNING *`,
     [
       merged.name,
       merged.phone,
       merged.logo,
+      merged.address,
       merged.payment_provider,
       merged.payment_link,
       merged.payment_details,
@@ -410,6 +422,10 @@ async function deleteBranch(businessId, id) {
 // --- Products / customers ------------------------------------------------
 
 async function createProduct(businessId, data) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM products WHERE business_id = $1", [businessId]);
+  const limit = productLimitFor(effectivePlan(businessRows[0]));
+  if (countRows[0].n >= limit) throw new OrderError("Product listing limit reached for the current plan");
   const name = requireString(data.name, "Product name");
   const price = requireNumber(data.price, "Price", { min: 0 });
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });

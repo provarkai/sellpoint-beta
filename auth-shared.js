@@ -12,10 +12,11 @@
     const me = await fetch("/api/me", { headers: { Authorization: "Bearer " + token } }).then((r) => r.json());
     if (!me.business) {
       const businessName = session.user.user_metadata?.businessName || "Your Business";
+      const businessPhone = session.user.user_metadata?.businessPhone || "";
       await fetch("/api/businesses", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ businessName }),
+        body: JSON.stringify({ businessName, businessPhone }),
       });
     }
   }

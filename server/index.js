@@ -309,6 +309,7 @@ app.post(
       businessName: business.businessName,
       businessLogo: business.businessLogo,
       businessPhone: business.businessPhone,
+      businessAddress: business.businessAddress,
       customerName: String(customerName || "").trim(),
       items: cleanItems,
       total,
@@ -319,17 +320,18 @@ app.post(
   })
 );
 
-// --- Reports (Pro+) ----------------------------------------------------------
+// --- Reports (Growth+, depth increases with plan) ---------------------------
 
 app.get(
   "/api/reports",
   requireAuth,
   handle(async (req, res) => {
     const business = await db.getBusiness(req.businessId);
-    if (!pricing.reportsEnabledFor(business.plan)) {
-      return res.status(403).json({ error: "Reports are available on the Pro plan and above" });
+    const tier = pricing.reportsTierFor(business.plan);
+    if (tier === "none") {
+      return res.status(403).json({ error: "Reports are available on the Growth plan and above" });
     }
-    res.json(await db.getReports(req.businessId));
+    res.json(await db.getReports(req.businessId, tier));
   })
 );
 

@@ -30,7 +30,7 @@ function renderReceipt(r) {
   $("receiptBox").innerHTML = `
     <div class="receipt-doc-head">
       ${r.businessLogo ? `<img class="invoice-logo" src="${r.businessLogo}" alt="Business logo">` : ""}
-      <div><strong class="receipt-biz-name">${clean(r.businessName)}</strong>${r.businessPhone ? `<div class="meta">${clean(r.businessPhone)}</div>` : ""}</div>
+      <div><strong class="receipt-biz-name">${clean(r.businessName)}</strong>${r.businessPhone ? `<div class="meta">${clean(r.businessPhone)}</div>` : ""}${r.businessAddress ? `<div class="meta">${clean(r.businessAddress)}</div>` : ""}</div>
       <div class="receipt-doc-meta"><span class="meta">Receipt</span><strong>${clean(r.reference || "")}</strong><span class="meta">${dateStr}</span></div>
     </div>
     ${r.customerName ? `<div class="row"><span>Billed to</span><b>${clean(r.customerName)}</b></div>` : ""}
@@ -56,7 +56,6 @@ $("receiptForm").onsubmit = async (e) => {
     const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), items });
     lastReceipt = result.receipt;
     renderReceipt(lastReceipt);
-    $("upsell").style.display = "block";
     $("usageNote").textContent = result.limit === Infinity || result.limit === null
       ? "Unlimited receipts on your plan."
       : `${result.used}/${result.limit} free receipts used this month.`;
@@ -67,6 +66,7 @@ $("receiptForm").onsubmit = async (e) => {
 };
 $("copyReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); navigator.clipboard.writeText(receiptText(lastReceipt)); toast("Copied"); };
 $("printReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); print(); };
+$("waReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); open("https://wa.me/?text=" + encodeURIComponent(receiptText(lastReceipt)), "_blank", "noopener"); };
 
 (async () => {
   // Unlike the rest of the app, an unauthenticated visitor here is a lead,

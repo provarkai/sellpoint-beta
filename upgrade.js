@@ -8,14 +8,25 @@ const unlimited = (v) => v === Infinity || v === null || v === undefined;
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
 async function api(method, url, body) { const res = await fetch(url, { method, headers: { ...(body ? { "Content-Type": "application/json" } : {}), Authorization: `Bearer ${authToken}` }, body: body ? JSON.stringify(body) : undefined }); if (!res.ok) { const err = await res.json().catch(() => ({ error: "Request failed" })); throw new Error(err.error || "Request failed"); } return res.status === 204 ? null : res.json(); }
 
-function featuresFor(t) {
+const REPORT_LABELS = { none: null, basic: "Basic reports", standard: "Sales & revenue reports", advanced: "Advanced sales & revenue reports" };
+
+// key is passed in (not just the tier object) because Growth's "no staff"
+// gap is deliberately reframed as a positive - its free, unlimited receipt
+// generator - rather than a "0 staff" line like the other tiers.
+function featuresFor(key, t) {
   const list = [
     unlimited(t.orderLimit) ? "Unlimited orders" : t.orderLimit + " orders/month",
-    unlimited(t.staffLimit) ? "Unlimited staff seats" : t.staffLimit > 0 ? t.staffLimit + " staff seat" + (t.staffLimit > 1 ? "s" : "") : "No staff seats",
-    unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month",
-    unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit > 0 ? t.branchLimit + " extra branch" + (t.branchLimit > 1 ? "es" : "") : "Single location",
+    unlimited(t.productLimit) ? "Unlimited products" : t.productLimit + " products",
   ];
-  if (t.reports) list.push("Sales & revenue reports");
+  if (key === "growth") {
+    list.push("Unlimited free receipt generator");
+  } else if (t.staffLimit > 0) {
+    list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
+  }
+  if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " extra branch" + (t.branchLimit > 1 ? "es" : ""));
+  list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
+  const reportLabel = REPORT_LABELS[t.reportsTier];
+  if (reportLabel) list.push(reportLabel);
   return list;
 }
 
@@ -25,24 +36,27 @@ function planCardsHtml() {
     const priceHtml = isEnterprise
       ? '<p class="premium-price">Custom<span> pricing</span></p>'
       : '<p class="premium-price">' + money(cycle === "yearly" ? t.yearly : t.monthly) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p>';
-    const features = featuresFor(t).map((f) => "<li>" + f + "</li>").join("");
     const cta = isEnterprise
       ? '<a class="button-link" href="mailto:sales@sellerspoint.app?subject=Enterprise%20plan">Contact Sales</a>'
       : '<button data-plan="' + key + '">Choose ' + t.name + '</button>';
-    return '<article class="premium-card' + (isEnterprise ? " premium-card-enterprise" : "") + '"><h2>' + t.name + '</h2>' + priceHtml + '<p class="meta">' + t.tagline + '</p><ul class="premium-features">' + features + '</ul>' + cta + '</article>';
+    const body = isEnterprise
+      ? '<p class="meta">' + t.tagline + '</p>'
+      : '<p class="meta">' + t.tagline + '</p><ul class="premium-features">' + featuresFor(key, t).map((f) => "<li>" + f + "</li>").join("") + '</ul>';
+    return '<article class="premium-card' + (isEnterprise ? " premium-card-enterprise" : "") + '"><h2>' + t.name + '</h2>' + priceHtml + body + cta + '</article>';
   }).join("");
 }
 
 function comparisonTableHtml() {
-  const keys = Object.keys(pricing);
+  const keys = Object.keys(pricing).filter((k) => k !== "enterprise");
   const rows = [
     ["Price", (t) => (t.monthly == null ? "Custom" : t.monthly === 0 ? "Free" : money(cycle === "yearly" ? t.yearly : t.monthly) + "/" + (cycle === "yearly" ? "yr" : "mo"))],
     ["Orders", (t) => (unlimited(t.orderLimit) ? "Unlimited" : t.orderLimit + "/month")],
-    ["Staff seats", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
+    ["Products", (t) => (unlimited(t.productLimit) ? "Unlimited" : t.productLimit)],
+    ["Staff", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
     ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? "+" + t.branchLimit : "Single location")],
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
-    ["Reports", (t) => (t.reports ? "✓" : "-")],
+    ["Reports", (t) => (REPORT_LABELS[t.reportsTier] || "-")],
   ];
   const head = "<tr><th>Feature</th>" + keys.map((k) => "<th>" + pricing[k].name + "</th>").join("") + "</tr>";
   const body = rows.map(([label, fn]) => "<tr><td>" + label + "</td>" + keys.map((k) => "<td>" + fn(pricing[k]) + "</td>").join("") + "</tr>").join("");

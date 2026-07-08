@@ -8,6 +8,7 @@ create table if not exists businesses (
   name text not null default 'Your Business',
   phone text not null default '',
   logo text not null default '',
+  address text not null default '',
   payment_provider text not null default 'Manual bank transfer',
   payment_link text not null default '',
   payment_details text not null default '',
@@ -16,6 +17,7 @@ create table if not exists businesses (
   plan_expires_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table businesses add column if not exists address text not null default '';
 
 -- One row per (Supabase Auth user, business). user_id is unique for now since
 -- a user belongs to exactly one business (owner or staff) - multi-business

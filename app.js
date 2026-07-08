@@ -21,7 +21,8 @@ function render(){
   $("pList").innerHTML=state.products.map(p=>`<div class="item"><div class="item-clickable" style="cursor:pointer" onclick="toggleItem('${p.id}')"><div class="item-top"><strong>${clean(p.name)}</strong><span>${money(p.price)}</span></div><div class="meta">${clean(p.type||"Product")} - ${clean(p.category||"General")} - ${p.stock} ${p.type==="Service"?"slots":p.type==="Digital product"?"licenses":"in stock"}</div></div><div id="details-${p.id}" style="display:none">${productDetailsHtml(p)}</div><div class="item-actions"><button onclick="caption('${p.id}')">Caption</button><button onclick="delProduct('${p.id}')">Delete</button></div></div>`).join("");
   $("cList").innerHTML=state.customers.map(c=>`<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}</div><div class="item-actions"><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`).join("");
   $("oList").innerHTML=state.orders.map(o=>{const p=product(o.productId),c=customer(o.customerId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - ${clean(o.status)} - ${date(o.createdAt)}</div><div class="item-actions"><button onclick="openInvoice('${o.id}')">Invoice</button><button onclick="wa(orderMsg('${o.id}'),'${c?.phone||""}')">WhatsApp</button><button onclick="paid('${o.id}')">Paid</button>${(p?.type||o.productType)==="Digital product"?`<button onclick="deliverDigital('${o.id}')">Deliver</button>`:""}<button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
-  $("pCount").textContent=`${state.products.length} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;$("used").textContent=state.orders.length;
+  const pLimRaw=pricing[state.plan]?.productLimit,pLim=pLimRaw===null||pLimRaw===undefined?Infinity:pLimRaw;
+  $("pCount").textContent=`${state.products.length}/${pLim===Infinity?"unlimited":pLim} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;$("used").textContent=state.orders.length;
   if($("planName"))$("planName").textContent=pricing[state.plan]?.name||state.plan;
   if($("orderLimit")){const lim=orderLimit();$("orderLimit").textContent=lim===Infinity?"unlimited":lim}
   const priceLabel=t=>t.monthly===0?"Free":t.monthly==null?"Custom Pricing":money(t.monthly)+"/month";
@@ -35,7 +36,7 @@ function render(){
 }
 function updateProductFields(){const t=$("pType").value;$("pDeliveryLinkField").style.display=t==="Digital product"?"block":"none";$("pNoteField").style.display=t==="Product"?"none":"block";$("pNoteLabel").textContent=t==="Service"?"Booking / service instructions":"Delivery note"}
 if($("pType")){$("pType").onchange=updateProductFields;updateProductFields()}
-$("productForm").onsubmit=async e=>{e.preventDefault();const created=await api("POST","/api/products",{name:$("pName").value.trim(),price:+$("pPrice").value,stock:+$("pStock").value,category:$("pCat").value.trim(),type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||""});state.products.unshift(created);e.target.reset();updateProductFields();render();toast("Item saved")};
+$("productForm").onsubmit=async e=>{e.preventDefault();try{const created=await api("POST","/api/products",{name:$("pName").value.trim(),price:+$("pPrice").value,stock:+$("pStock").value,category:$("pCat").value.trim(),type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||""});state.products.unshift(created);e.target.reset();updateProductFields();render();toast("Item saved")}catch(err){toast(err.message)}};
 $("customerForm").onsubmit=async e=>{e.preventDefault();const created=await api("POST","/api/customers",{name:$("cName").value.trim(),phone:$("cPhone").value.replace(/\D/g,""),location:$("cLoc").value.trim()});state.customers.unshift(created);e.target.reset();render();toast("Customer saved")};
 $("orderForm").onsubmit=async e=>{e.preventDefault();const p=product($("oProduct").value),c=customer($("oCustomer").value),q=+$("oQty").value;if(state.orders.length>=orderLimit()){showPaywall();return}if(!p||!c)return toast("Add product and customer first");if(q>p.stock)return toast("Not enough stock");try{const created=await api("POST","/api/orders",{productId:p.id,customerId:c.id,qty:q,status:$("oStatus").value});p.stock-=q;state.orders.unshift(created);e.target.reset();$("oQty").value=1;render();toast("Order created")}catch(err){toast(err.message)}};
 function renderInvoice(){const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o){$("invoiceBox").textContent="Create an order first.";return}$("invSelect").value=o.id;const c=customer(o.customerId),p=product(o.productId);$("invoiceBox").innerHTML=`${state.businessLogo?`<img class="invoice-logo" src="${state.businessLogo}" alt="Business logo">`:""}<h2>${["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice"}</h2><div class="row"><span>Business</span><b>${clean(state.businessName)}</b></div><div class="row"><span>Business phone</span><b>${clean(state.businessPhone||"")}</b></div><div class="row"><span>Date</span><b>${date(o.createdAt)}</b></div><div class="row"><span>Customer</span><b>${clean(c?.name||"")}</b></div><div class="row"><span>Phone</span><b>${clean(c?.phone||"")}</b></div><div class="row"><span>Product</span><b>${clean(p?.name||o.productName)}</b></div><div class="row"><span>Quantity</span><b>${o.qty}</b></div><div class="row"><span>Status</span><b>${clean(o.status)}</b></div><div class="row"><span>Total</span><b>${money(total(o))}</b></div>${digitalDeliveryHtml(o,p)}<div class="row"><span>Payment provider</span><b>${clean(state.paymentProvider||"Paystack")}</b></div><div class="row"><span>Payment</span><b>${clean(state.paymentDetails||"Add payment details in Settings")}</b></div>${state.paymentLink?`<a class="payment-link" href="${state.paymentLink}" target="_blank" rel="noopener">Pay online</a>`:""}`}
@@ -54,10 +55,10 @@ $("invSelect").onchange=renderInvoice;$("copyInvoice").onclick=()=>copy(invoiceT
 
 function showPaywall(){const d=$("paywall");if(d?.showModal)d.showModal();else toast("Upgrade to continue taking orders")}
 function salesPitch(){const paid=Object.values(pricing).find(t=>t.monthly>0);return "Hi, SellersPoint Beta helps sellers and service businesses manage products, services, customers, orders, invoices, stock or slots, payment links, WhatsApp messages, and AI captions in one simple app."+(paid?` ${paid.name} plan is ${money(paid.monthly)}/month.`:"")}
-if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();const updated=await api("PUT","/api/business",{businessName:$("sBusiness").value.trim(),businessPhone:$("sPhone").value.replace(/\D/g,""),paymentProvider:"Paystack",paymentLink:$("sPaymentLink")?.value.trim()||"",paymentDetails:$("sPayment").value.trim()});Object.assign(state,updated);render();toast("Settings saved")}}
+if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();const updated=await api("PUT","/api/business",{businessName:$("sBusiness").value.trim(),businessPhone:$("sPhone").value.replace(/\D/g,""),businessAddress:$("sAddress")?.value.trim()||"",paymentProvider:"Paystack",paymentLink:$("sPaymentLink")?.value.trim()||"",paymentDetails:$("sPayment").value.trim()});Object.assign(state,updated);render();toast("Settings saved")}}
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("brandLogo"))$("brandLogo").innerHTML=state.businessLogo?`<img src="${state.businessLogo}" alt="Logo">`:"SP"}renderProfile();renderTeamVisibility();renderBranchesVisibility()};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("brandLogo"))$("brandLogo").innerHTML=state.businessLogo?`<img src="${state.businessLogo}" alt="Logo">`:"SP"}renderProfile();renderTeamVisibility();renderBranchesVisibility()};
 
 function renderProfile(){
   if($("profileName"))$("profileName").textContent=state.businessName||"Your Business";
@@ -68,7 +69,7 @@ function renderProfile(){
     if(state.businessLogo){$("profileLogo").src=state.businessLogo;$("profileLogo").style.display="block";$("profileLogoFallback").style.display="none"}
     else{$("profileLogo").style.display="none";$("profileLogoFallback").style.display="flex"}
   }
-  if($("reportsTab"))$("reportsTab").style.display=pricing[state.plan]?.reports?"block":"none";
+  if($("reportsTab"))$("reportsTab").style.display=(pricing[state.plan]?.reportsTier||"none")!=="none"?"block":"none";
 }
 
 async function loadReports(){
@@ -76,8 +77,9 @@ async function loadReports(){
   try{
     const r=await api("GET","/api/reports");
     $("repRevenue").innerHTML=r.revenueByMonth.map(x=>`<div class="item"><strong>${clean(x.month)}</strong><span class="meta">${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No revenue yet</span></div>`;
-    $("repProducts").innerHTML=r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
-    $("repCustomers").innerHTML=r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
+    const upgradeHint=`<div class="item"><span class="meta">Upgrade to Pro or above to see this</span></div>`;
+    $("repProducts").innerHTML=r.tier==="basic"?upgradeHint:r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
+    $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint:r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
   }catch(err){toast(err.message)}
 }
@@ -90,10 +92,11 @@ function renderTeamVisibility(){
 async function loadTeam(){
   try{
     const roster=await api("GET","/api/staff");
-    const limit=roster.limit===Infinity?"unlimited":roster.limit;
-    $("teamCount").textContent=`${roster.staff.length}/${limit} seats used`;
-    $("teamLimitNote").textContent=roster.limit===0?"Upgrade to Pro or above to add staff seats.":`You can invite up to ${limit} staff member(s).`;
-    $("inviteForm").style.display=roster.limit===0?"none":"grid";
+    const rawLimit=roster.limit===null||roster.limit===undefined?Infinity:roster.limit;
+    const limit=rawLimit===Infinity?"unlimited":rawLimit;
+    $("teamCount").textContent=`${roster.staff.length}/${limit} staff`;
+    $("teamLimitNote").textContent=rawLimit===0?"Upgrade to Pro or above to add staff.":`You can invite up to ${limit} staff member(s).`;
+    $("inviteForm").style.display=rawLimit===0?"none":"grid";
     const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><span class="meta">Staff</span><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
     $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;
   }catch(err){toast(err.message)}

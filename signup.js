@@ -7,9 +7,10 @@ async function boot() {
   $("signupForm").onsubmit = async (e) => {
     e.preventDefault();
     const businessName = $("businessName").value.trim();
+    const businessPhone = $("businessPhone").value.replace(/\D/g, "");
     const email = $("email").value.trim();
     const password = $("password").value;
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName, businessPhone } } });
     if (error) return toast(error.message);
     if (data.session) {
       // Email confirmation is off on this Supabase project - session is
