@@ -23,6 +23,36 @@ function collectItems() {
   })).filter((it) => it.name);
 }
 
+// Mirrors server/index.js's /api/receipts/generate math exactly, for
+// visitors with no account to attribute a server-tracked receipt to -
+// the free tool works with or without signing in; only a signed-in
+// account gets usage tracking, a saved business profile, and a logo.
+function buildReceiptLocally({ businessName, customerName, businessPhone, businessAddress, items, includeVat }) {
+  const cleanItems = items.map((it) => ({
+    name: String(it.name || "").trim() || "Item",
+    qty: Math.max(1, Number(it.qty) || 1),
+    price: Math.max(0, Number(it.price) || 0),
+  }));
+  const subtotal = cleanItems.reduce((s, it) => s + it.qty * it.price, 0);
+  const vat = includeVat ? Math.round(subtotal * 0.075 * 100) / 100 : 0;
+  const reference = "SP-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(16).slice(2, 6).toUpperCase();
+  return {
+    reference,
+    businessName,
+    businessLogo: "",
+    businessPhone,
+    businessAddress,
+    customerName,
+    items: cleanItems,
+    subtotal,
+    vatRate: includeVat ? 0.075 : 0,
+    vat,
+    total: subtotal + vat,
+    issuedAt: new Date().toISOString(),
+    poweredBy: "SellersPoint",
+  };
+}
+
 function renderReceipt(r) {
   const dateStr = new Date(r.issuedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
   const itemRows = r.items.map((it) => `<tr><td>${clean(it.name)}</td><td>${it.qty}</td><td>${money(it.price)}</td><td>${money(it.qty * it.price)}</td></tr>`).join("");
@@ -47,6 +77,13 @@ function receiptText(r) {
   return `Receipt ${r.reference || ""} from ${r.businessName}\n${r.customerName ? "Billed to: " + r.customerName + "\n" : ""}${lines}\n${vatLines}Total: ${money(r.total)}\n\nPowered by SellersPoint - ${location.origin}/receipt.html`;
 }
 
+function usageLabel(used, limit) {
+  if (authToken) {
+    return limit === Infinity || limit === null ? "Unlimited receipts on your plan." : `${used}/${limit} free receipts used this month.`;
+  }
+  return "Free tool - no sign-in required. Sign in to save your business profile and track usage.";
+}
+
 let lastReceipt = null;
 
 $("addItem").onclick = () => addRow();
@@ -54,20 +91,30 @@ $("receiptForm").onsubmit = async (e) => {
   e.preventDefault();
   const items = collectItems();
   if (!items.length) return toast("Add at least one item");
+  const businessName = $("businessNameInput").value.trim();
+  if (!businessName) return toast("Enter a business name");
+  const shared = {
+    customerName: $("customerName").value.trim(),
+    businessPhone: $("businessPhone").value.trim(),
+    businessAddress: $("businessAddress").value.trim(),
+    items,
+    includeVat: $("includeVat").checked,
+  };
   try {
-    const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), businessPhone: $("businessPhone").value.trim(), businessAddress: $("businessAddress").value.trim(), items, includeVat: $("includeVat").checked });
-    lastReceipt = result.receipt;
+    if (authToken) {
+      const result = await api("POST", "/api/receipts/generate", { ...shared, businessName });
+      lastReceipt = result.receipt;
+      $("usageNote").textContent = usageLabel(result.used, result.limit);
+    } else {
+      lastReceipt = buildReceiptLocally({ ...shared, businessName });
+    }
     renderReceipt(lastReceipt);
     $("upsell").style.display = "block";
-    $("usageNote").textContent = result.limit === Infinity || result.limit === null
-      ? "Unlimited receipts on your plan."
-      : `${result.used}/${result.limit} free receipts used this month.`;
     toast("Receipt generated");
   } catch (err) {
     toast(err.message);
   }
 };
-$("copyReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); navigator.clipboard.writeText(receiptText(lastReceipt)); toast("Copied"); };
 $("printReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); print(); };
 $("waReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); open("https://wa.me/?text=" + encodeURIComponent(receiptText(lastReceipt)), "_blank", "noopener"); };
 
@@ -102,21 +149,23 @@ $("downloadPdf").onclick = async () => {
 };
 
 (async () => {
-  // Unlike the rest of the app, an unauthenticated visitor here is a lead,
-  // not a returning user - send them to signup (with a link back to login
-  // for existing accounts) instead of straight to the login page.
+  // This tool works with or without an account - anonymous visitors type
+  // in their own business name and generate entirely client-side; signing
+  // in just adds usage tracking and prefills the business profile.
+  addRow();
+  $("usageNote").textContent = usageLabel();
   const supabase = await window.supabaseReady;
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return (location.href = "signup.html");
+  if (!session) return;
   await window.Auth.ensureBusiness(session);
   authToken = session.access_token;
-  addRow();
+  $("usageNote").textContent = usageLabel();
   try {
     const [usage, me] = await Promise.all([api("GET", "/api/receipts/usage"), api("GET", "/api/me")]);
-    $("usageNote").textContent = usage.limit === Infinity || usage.limit === null
-      ? "Unlimited receipts on your plan."
-      : `${usage.used}/${usage.limit} free receipts used this month.`;
+    $("usageNote").textContent = usageLabel(usage.used, usage.limit);
     if (me.business) {
+      $("businessNameInput").value = me.business.businessName || "";
+      $("businessNameHint").textContent = "(from your account - edit any time)";
       $("businessPhone").value = me.business.businessPhone || "";
       $("businessAddress").value = me.business.businessAddress || "";
     }

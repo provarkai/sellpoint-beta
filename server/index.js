@@ -308,7 +308,7 @@ app.post(
   "/api/receipts/generate",
   requireAuth,
   handle(async (req, res) => {
-    const { customerName, items, businessPhone, businessAddress, includeVat } = req.body || {};
+    const { businessName, customerName, items, businessPhone, businessAddress, includeVat } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Add at least one item" });
     }
@@ -324,11 +324,11 @@ app.post(
     const reference = "SP-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(2).toString("hex").toUpperCase();
     const receipt = {
       reference,
-      businessName: business.businessName,
-      businessLogo: business.businessLogo,
       // The receipt form lets the seller type these in directly (so this
       // free tool doesn't require a trip to Settings first) - fall back to
       // the saved business profile when left blank.
+      businessName: String(businessName || "").trim() || business.businessName,
+      businessLogo: business.businessLogo,
       businessPhone: String(businessPhone || "").trim() || business.businessPhone,
       businessAddress: String(businessAddress || "").trim() || business.businessAddress,
       customerName: String(customerName || "").trim(),
