@@ -218,6 +218,15 @@ async function getBusiness(businessId) {
   return rows[0] ? toBusinessJson(rows[0]) : null;
 }
 
+// Profile fields only - deliberately does NOT accept plan/billingCycle/
+// planExpiresAt from caller-supplied fields, even though this is reachable
+// from a plain authenticated tenant via PUT /api/business. Those three
+// columns must only ever change through setPlan() (activatePlan/
+// downgradeToStarter), which are only called from the payment
+// webhook/verify flow and the explicit downgrade route - never from
+// arbitrary request bodies. (Previously this function trusted
+// fields.plan/billingCycle/planExpiresAt directly, which let any signed-in
+// tenant grant themselves any paid tier for free via a raw PUT request.)
 async function updateBusiness(businessId, fields) {
   const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const current = rows[0];
@@ -230,14 +239,11 @@ async function updateBusiness(businessId, fields) {
     payment_provider: fields.paymentProvider ?? current.payment_provider,
     payment_link: fields.paymentLink ?? current.payment_link,
     payment_details: fields.paymentDetails ?? current.payment_details,
-    plan: fields.plan ?? current.plan,
-    billing_cycle: fields.billingCycle ?? current.billing_cycle,
-    plan_expires_at: fields.planExpiresAt !== undefined ? fields.planExpiresAt : current.plan_expires_at,
   };
   const { rows: updated } = await query(
     `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
-       payment_details=$7, plan=$8, billing_cycle=$9, plan_expires_at=$10
-     WHERE id = $11 RETURNING *`,
+       payment_details=$7
+     WHERE id = $8 RETURNING *`,
     [
       merged.name,
       merged.phone,
@@ -246,13 +252,18 @@ async function updateBusiness(businessId, fields) {
       merged.payment_provider,
       merged.payment_link,
       merged.payment_details,
-      merged.plan,
-      merged.billing_cycle,
-      merged.plan_expires_at,
       businessId,
     ]
   );
   return toBusinessJson(updated[0]);
+}
+
+async function setPlan(businessId, plan, billingCycle, planExpiresAt) {
+  const { rows } = await query(
+    "UPDATE businesses SET plan=$1, billing_cycle=$2, plan_expires_at=$3 WHERE id = $4 RETURNING *",
+    [plan, billingCycle, planExpiresAt, businessId]
+  );
+  return toBusinessJson(rows[0]);
 }
 
 async function activatePlan(businessId, plan, billingCycle) {
@@ -260,8 +271,20 @@ async function activatePlan(businessId, plan, billingCycle) {
   const expires = new Date(now);
   if (billingCycle === "yearly") expires.setFullYear(expires.getFullYear() + 1);
   else expires.setMonth(expires.getMonth() + 1);
-  await updateBusiness(businessId, { plan, billingCycle, planExpiresAt: expires.toISOString() });
+  await setPlan(businessId, plan, billingCycle, expires.toISOString());
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
+}
+
+// Immediate downgrade to Starter, at the tenant's own request. Per the
+// Refund Policy, this doesn't refund unused time on the current paid
+// period - it's the same "no auto-renewal" model everything already uses
+// (plans lapse to Starter on their own via effectivePlan() once
+// plan_expires_at passes), just triggered early by choice instead of by
+// expiry.
+async function downgradeToStarter(businessId) {
+  const business = await setPlan(businessId, "starter", "monthly", null);
+  await logEvent(businessId, "plan_downgraded", "starter");
+  return business;
 }
 
 // --- SellersPoint's own payout details (genuine singleton) -----------------
@@ -655,6 +678,7 @@ module.exports = {
   getState,
   updateBusiness,
   activatePlan,
+  downgradeToStarter,
   getOwner,
   updateOwner,
   getPlatformSettings,

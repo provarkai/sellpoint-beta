@@ -1,6 +1,7 @@
 const path = require("node:path");
 const crypto = require("node:crypto");
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const db = require("./db");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin } = require("./auth");
 const payments = require("./payments");
@@ -10,6 +11,24 @@ const app = express();
 const ROOT = path.join(__dirname, "..");
 const PORT = process.env.PORT || 5174;
 const HOST = process.env.HOST || "0.0.0.0";
+
+// Deploy targets (Railway/Render) sit behind a reverse proxy - without this,
+// express-rate-limit sees every request as coming from the proxy's IP and
+// either rate-limits everyone together or refuses to start.
+app.set("trust proxy", 1);
+
+// General ceiling across the whole API (well above real usage, just a
+// backstop against scraping/abuse) - the webhook is excluded since Paystack
+// is a legitimate high-volume caller, not a user.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === "/api/payments/webhook",
+});
+// Business/account creation is the highest-value target for spam signups.
+const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
 
 app.use(
   express.json({
@@ -30,6 +49,8 @@ app.use(
 // stale cached script silently running old logic is worse than one extra
 // revalidation round trip per load.
 app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: true, maxAge: 0, setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
+
+app.use("/api", apiLimiter);
 
 // Every db.* call now hits Postgres (async), so a single async-aware wrapper
 // covers all routes - a synchronous try/catch would return before an awaited
@@ -111,6 +132,7 @@ app.get(
 
 app.post(
   "/api/businesses",
+  createBusinessLimiter,
   requireAuthOnly,
   handle(async (req, res) => {
     const business = await db.createBusiness(req.user.id, req.body || {}, req.user.email);
@@ -141,6 +163,15 @@ app.put(
   "/api/business",
   requireAuth,
   handle(async (req, res) => res.json(await db.updateBusiness(req.businessId, req.body || {})))
+);
+
+app.post(
+  "/api/business/downgrade",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change the plan" });
+    res.json(await db.downgradeToStarter(req.businessId));
+  })
 );
 
 app.get(
