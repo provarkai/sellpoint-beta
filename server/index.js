@@ -216,6 +216,11 @@ app.post(
   requireAuth,
   handle(async (req, res) => res.status(201).json(await db.createProduct(req.businessId, req.body || {})))
 );
+app.put(
+  "/api/products/:id",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.updateProduct(req.businessId, req.params.id, req.body || {})))
+);
 app.delete(
   "/api/products/:id",
   requireAuth,

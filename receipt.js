@@ -143,7 +143,10 @@ $("downloadPdf").onclick = async () => {
     if (!window.jspdf) throw new Error("PDF export isn't available right now - try again in a moment.");
     const canvas = await renderCanvas();
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: "px", format: [canvas.width, canvas.height] });
+    // jsPDF's "px" unit combined with a custom [width,height] format has a
+    // known internal scaling bug without this hotfix - without it, the
+    // page comes out the wrong size and the image is misplaced/cropped.
+    const pdf = new jsPDF({ unit: "px", format: [canvas.width, canvas.height], hotfixes: ["px_scaling"] });
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save((lastReceipt.reference || "receipt") + ".pdf");
   } catch (err) {

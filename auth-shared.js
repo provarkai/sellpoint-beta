@@ -7,6 +7,9 @@
   // because Supabase may require email confirmation before a session exists -
   // this way both "confirmation on" and "confirmation off" projects work the
   // same way, driven by the businessName captured in signup's user_metadata.
+  // Returns true the one time it actually creates a business, so callers
+  // (signup.js/login.js) know to route a brand-new account through
+  // onboarding.html instead of straight to the dashboard.
   async function ensureBusiness(session) {
     const token = session.access_token;
     const me = await fetch("/api/me", { headers: { Authorization: "Bearer " + token } }).then((r) => r.json());
@@ -18,7 +21,9 @@
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({ businessName, businessPhone }),
       });
+      return true;
     }
+    return false;
   }
 
   async function requireSession() {

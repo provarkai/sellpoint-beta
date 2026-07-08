@@ -604,6 +604,32 @@ async function createProduct(businessId, data) {
   return toProductJson(rows[0]);
 }
 
+async function updateProduct(businessId, id, data) {
+  const { rows } = await query("SELECT * FROM products WHERE id = $1 AND business_id = $2", [id, businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Product not found");
+  const name = data.name !== undefined ? requireString(data.name, "Product name") : current.name;
+  const price = data.price !== undefined ? requireNumber(data.price, "Price", { min: 0 }) : Number(current.price);
+  const stock = data.stock !== undefined ? requireNumber(data.stock, "Stock", { min: 0, integer: true }) : current.stock;
+  const { rows: updated } = await query(
+    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8
+     WHERE id = $9 AND business_id = $10 RETURNING *`,
+    [
+      name,
+      price,
+      stock,
+      data.category !== undefined ? data.category : current.category,
+      data.type !== undefined ? data.type : current.type,
+      data.deliveryLink !== undefined ? data.deliveryLink : current.delivery_link,
+      data.deliveryNote !== undefined ? data.deliveryNote : current.delivery_note,
+      data.image !== undefined ? data.image : current.image,
+      id,
+      businessId,
+    ]
+  );
+  return toProductJson(updated[0]);
+}
+
 async function deleteProduct(businessId, id) {
   await query("DELETE FROM products WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
@@ -772,6 +798,7 @@ module.exports = {
   updatePlatformSettings,
   updatePricingOverrides,
   createProduct,
+  updateProduct,
   deleteProduct,
   createCustomer,
   deleteCustomer,

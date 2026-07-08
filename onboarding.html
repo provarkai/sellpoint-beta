@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set up your business - SellersPoint</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page premium-page">
+  <main class="premium-main premium-auth">
+    <div class="premium-hero">
+      <span class="premium-kicker">Welcome to SellersPoint</span>
+      <h1>Let's set up your business</h1>
+      <p class="premium-sub">Two minutes now saves confusion later - you can always change this in Settings.</p>
+    </div>
+    <form id="onboardingForm">
+      <label>Business logo<input id="oLogo" type="file" accept="image/*"></label>
+      <label>Address<input id="oAddress" placeholder="123 Market Street, Lagos"></label>
+      <label>Paystack payment link <span class="meta">(optional)</span><input id="oPaymentLink" placeholder="https://paystack.shop/your-link"></label>
+      <label>Payment details <span class="meta">(shown on invoices)</span><textarea id="oPayment" rows="4" placeholder="Bank: Example Bank
+Account: 1234567890
+Name: Your Business"></textarea></label>
+      <button>Finish Setup</button>
+      <p class="meta"><a href="index.html">Skip for now</a></p>
+    </form>
+  </main>
+  <div id="toast"></div>
+  <script type="module" src="supabase-init.js"></script>
+  <script defer src="auth-shared.js"></script>
+  <script defer src="onboarding.js"></script>
+</body>
+</html>
