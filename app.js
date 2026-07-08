@@ -105,17 +105,15 @@ async function removeStaffMember(userId){await api("DELETE",`/api/staff/${userId
 async function revokeStaffInvite(email){await api("DELETE",`/api/staff/invites/${encodeURIComponent(email)}`);loadTeam()}
 if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim()});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
 
-const branchLimitFor=key=>{const raw=pricing[key]?.branchLimit;return raw===null||raw===undefined?Infinity:raw};
 function renderBranchesVisibility(){
   if(!$("branchesSection"))return;
-  const limit=branchLimitFor(state.plan);
-  $("branchesSection").style.display=limit>0&&myRole==="owner"?"block":"none";
-  if(limit>0&&myRole==="owner")loadBranches();
+  $("branchesSection").style.display=myRole==="owner"?"block":"none";
+  if(myRole==="owner")loadBranches();
 }
 async function loadBranches(){
   try{
-    const branches=await api("GET","/api/branches");
-    const limit=branchLimitFor(state.plan);
+    const{branches,limit:rawLimit}=await api("GET","/api/branches");
+    const limit=rawLimit===null||rawLimit===undefined?Infinity:rawLimit;
     $("branchCount").textContent=`${branches.length}/${limit===Infinity?"unlimited":limit} branches used`;
     if($("branchForm"))$("branchForm").style.display=branches.length>=limit?"none":"grid";
     $("branchList").innerHTML=branches.map(b=>`<div class="item"><strong>${clean(b.name)}</strong><span class="meta">${clean(b.address||"No address")}</span><div class="item-actions"><button onclick="deleteBranch('${b.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No branches yet</span></div>`;

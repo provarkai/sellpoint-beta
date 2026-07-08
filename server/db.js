@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor } = require("./pricing");
+const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, ADDON_AI_CREDITS } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 
 const pool = new Pool({
@@ -293,6 +293,31 @@ async function updatePlatformSettings(fields) {
   return { extendedPricingEnabled: enabled };
 }
 
+// --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
+
+async function recordAddonPurchase(businessId, type) {
+  const month = type === "ai_credits" ? currentMonth() : null;
+  await query("INSERT INTO addon_purchases (business_id, type, month) VALUES ($1, $2, $3)", [businessId, type, month]);
+}
+
+async function getAddonAiBonus(businessId) {
+  const { rows } = await query(
+    "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'ai_credits' AND month = $2",
+    [businessId, currentMonth()]
+  );
+  return rows[0].n * ADDON_AI_CREDITS;
+}
+
+async function getAddonSeatBonus(businessId) {
+  const { rows } = await query("SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'staff'", [businessId]);
+  return rows[0].n;
+}
+
+async function getAddonBranchBonus(businessId) {
+  const { rows } = await query("SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'branch'", [businessId]);
+  return rows[0].n;
+}
+
 // --- Staff seats --------------------------------------------------------
 
 function toStaffJson(m) {
@@ -314,10 +339,15 @@ async function listStaff(businessId) {
   };
 }
 
+async function effectiveStaffLimit(businessId) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const base = staffLimitFor(effectivePlan(businessRows[0]));
+  return base === Infinity ? base : base + (await getAddonSeatBonus(businessId));
+}
+
 async function inviteStaff(businessId, email) {
   const clean = requireString(email, "Email").toLowerCase();
-  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  const limit = staffLimitFor(effectivePlan(businessRows[0]));
+  const limit = await effectiveStaffLimit(businessId);
   const { staff } = await listStaff(businessId);
   if (staff.length >= limit) throw new OrderError("Staff seat limit reached for the current plan");
   const existing = await query(
@@ -354,9 +384,14 @@ async function getAiUsage(businessId) {
   return rows[0]?.count || 0;
 }
 
-async function incrementAiUsage(businessId) {
+async function effectiveAiLimit(businessId) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  const limit = aiLimitFor(effectivePlan(businessRows[0]));
+  const base = aiLimitFor(effectivePlan(businessRows[0]));
+  return base === Infinity ? base : base + (await getAddonAiBonus(businessId));
+}
+
+async function incrementAiUsage(businessId) {
+  const limit = await effectiveAiLimit(businessId);
   const month = currentMonth();
   const used = await getAiUsage(businessId);
   if (used >= limit) throw new OrderError("AI generation limit reached for the current plan this month");
@@ -390,7 +425,7 @@ async function incrementReceiptUsage(businessId) {
   return used + 1;
 }
 
-// --- Branches (Pro: 1 extra, Business+: unlimited) -------------------------
+// --- Branches (Pro: 1, Business: 20, plus purchasable add-ons) -------------
 
 function toBranchJson(b) {
   return { id: b.id, name: b.name, address: b.address, createdAt: b.created_at };
@@ -401,9 +436,14 @@ async function listBranches(businessId) {
   return rows.map(toBranchJson);
 }
 
-async function createBranch(businessId, data) {
+async function effectiveBranchLimit(businessId) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  const limit = branchLimitFor(effectivePlan(businessRows[0]));
+  const base = branchLimitFor(effectivePlan(businessRows[0]));
+  return base === Infinity ? base : base + (await getAddonBranchBonus(businessId));
+}
+
+async function createBranch(businessId, data) {
+  const limit = await effectiveBranchLimit(businessId);
   const existing = await listBranches(businessId);
   if (existing.length >= limit) throw new OrderError("Branch limit reached for the current plan");
   const name = requireString(data.name, "Branch name");
@@ -630,12 +670,16 @@ module.exports = {
   inviteStaff,
   revokeInvite,
   removeStaff,
+  effectiveStaffLimit,
   getAiUsage,
   incrementAiUsage,
+  effectiveAiLimit,
   getReceiptUsage,
   incrementReceiptUsage,
   listBranches,
   createBranch,
   deleteBranch,
+  effectiveBranchLimit,
   getReports,
+  recordAddonPurchase,
 };

@@ -1,5 +1,12 @@
 const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 
+// A-la-carte add-ons (see /api/addons/purchase): every add-on costs the
+// same flat NGN 2,000, one-off, on top of any plan. "ai_credits" grants
+// ADDON_AI_CREDITS extra AI generations for the calendar month purchased in;
+// "staff" and "branch" grant one extra seat/branch permanently.
+const ADDON_PRICE = 2000;
+const ADDON_AI_CREDITS = 500;
+
 // staffLimit/aiLimit/branchLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
 // enforcement) - this is the fix for the gap flagged in CLAUDE.md's pricing
@@ -8,8 +15,8 @@ const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 // Generator (server/index.js /api/receipts/generate) is a free-standing
 // lead-magnet tool, not tied to the orders/invoicing flow, so it gets its
 // own monthly cap that's generous even on Starter.
-// branchLimit is the number of *extra* branches allowed beyond the
-// business's main location (0 = single location only).
+// branchLimit is the number of branches allowed beyond the business's main
+// location (0 = single location only).
 // reportsTier is "none"/"basic"/"standard"/"advanced" - see db.js#getReports
 // for what each level actually includes.
 const TIERS = {
@@ -85,6 +92,8 @@ module.exports = {
   reportsTierFor,
   receiptLimitFor,
   YEARLY_MULTIPLIER,
+  ADDON_PRICE,
+  ADDON_AI_CREDITS,
   SIMPLE_TIER_KEYS,
   visibleTiers,
 };

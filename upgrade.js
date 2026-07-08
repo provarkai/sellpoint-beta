@@ -23,7 +23,7 @@ function featuresFor(key, t) {
   } else if (t.staffLimit > 0) {
     list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
   }
-  if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " extra branch" + (t.branchLimit > 1 ? "es" : ""));
+  if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " branch" + (t.branchLimit > 1 ? "es" : ""));
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
   const reportLabel = REPORT_LABELS[t.reportsTier];
   if (reportLabel) list.push(reportLabel);
@@ -54,7 +54,7 @@ function comparisonTableHtml() {
     ["Products", (t) => (unlimited(t.productLimit) ? "Unlimited" : t.productLimit)],
     ["Staff", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
-    ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? "+" + t.branchLimit : "Single location")],
+    ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? t.branchLimit : "Single location")],
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
     ["Reports", (t) => (REPORT_LABELS[t.reportsTier] || "-")],
   ];
@@ -94,6 +94,8 @@ async function chooseAndPay(plan) {
   }
 }
 
+const ADDON_LABELS = { ai_credits: "500 extra AI generations", staff: "an extra staff seat", branch: "an extra branch" };
+
 async function checkReturnFromPaystack() {
   const params = new URLSearchParams(location.search);
   const reference = params.get("reference") || params.get("trxref");
@@ -103,13 +105,30 @@ async function checkReturnFromPaystack() {
   box.textContent = "Confirming your payment...";
   try {
     const result = await api("GET", "/api/payments/verify/" + encodeURIComponent(reference));
-    box.textContent = result.status === "success"
-      ? "Payment confirmed. Your plan is now " + (pricing[result.plan]?.name || result.plan) + "."
-      : "Payment status: " + result.status + ". If you were charged, contact support with reference " + reference + ".";
+    if (result.status !== "success") {
+      box.textContent = "Payment status: " + result.status + ". If you were charged, contact support with reference " + reference + ".";
+    } else if (result.addonType) {
+      box.textContent = "Payment confirmed - " + (ADDON_LABELS[result.addonType] || "your add-on") + " has been added.";
+    } else {
+      box.textContent = "Payment confirmed. Your plan is now " + (pricing[result.plan]?.name || result.plan) + ".";
+    }
   } catch (err) {
     box.textContent = "Could not confirm payment automatically: " + err.message + ". Reference: " + reference;
   }
 }
+
+async function buyAddon(type) {
+  if (busy) return;
+  busy = true;
+  try {
+    const result = await api("POST", "/api/addons/purchase", { type });
+    location.href = result.authorizationUrl;
+  } catch (err) {
+    toast(err.message);
+    busy = false;
+  }
+}
+if ($("addonCards")) $("addonCards").querySelectorAll("button[data-addon]").forEach((b) => (b.onclick = () => buyAddon(b.dataset.addon)));
 
 async function loadAll() {
   pricing = await fetch("/api/pricing").then((r) => (r.ok ? r.json() : {}));

@@ -84,6 +84,19 @@ create table if not exists receipt_usage (
   primary key (business_id, month)
 );
 
+-- One row per a-la-carte add-on purchase (see server/index.js
+-- /api/addons/purchase). "ai_credits" rows carry a month (the bonus applies
+-- to that calendar month only); "staff"/"branch" rows leave month null
+-- (a purchased seat/branch is permanent, not monthly).
+create table if not exists addon_purchases (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  type text not null check (type in ('ai_credits', 'staff', 'branch')),
+  month text,
+  created_at timestamptz not null default now()
+);
+create index if not exists addon_purchases_business_id_idx on addon_purchases(business_id);
+
 create table if not exists products (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,

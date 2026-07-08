@@ -54,9 +54,30 @@ function handle(fn) {
 async function finalizeIfSuccessful(txData) {
   if (!txData || txData.status !== "success") return false;
   const { reference, amount, metadata } = txData || {};
-  const plan = metadata?.plan;
   const businessId = metadata?.businessId;
-  if (!reference || !plan || !businessId) return false;
+  if (!reference || !businessId) return false;
+
+  // Add-on purchases (one-off, no plan/billingCycle in metadata) fulfill
+  // differently from plan upgrades - recorded in the same payments table
+  // for a unified audit trail, but plan is a synthetic "addon:<type>" tag
+  // rather than a real tier, and there's no activatePlan step.
+  if (metadata?.addonType) {
+    const isNew = await db.recordPayment({
+      businessId,
+      provider: "paystack",
+      reference,
+      plan: `addon:${metadata.addonType}`,
+      billingCycle: "onetime",
+      amount: (amount || 0) / 100,
+      status: "success",
+      rawPayload: txData,
+    });
+    if (isNew) await db.recordAddonPurchase(businessId, metadata.addonType);
+    return isNew;
+  }
+
+  const plan = metadata?.plan;
+  if (!plan) return false;
   const billingCycle = metadata?.billingCycle === "yearly" ? "yearly" : "monthly";
   const isNew = await db.recordPayment({
     businessId,
@@ -206,9 +227,8 @@ app.get(
   "/api/staff",
   requireAuth,
   handle(async (req, res) => {
-    const business = await db.getBusiness(req.businessId);
     const roster = await db.listStaff(req.businessId);
-    res.json({ ...roster, limit: pricing.staffLimitFor(business.plan) });
+    res.json({ ...roster, limit: await db.effectiveStaffLimit(req.businessId) });
   })
 );
 app.post(
@@ -243,8 +263,7 @@ app.get(
   "/api/ai/usage",
   requireAuth,
   handle(async (req, res) => {
-    const business = await db.getBusiness(req.businessId);
-    res.json({ used: await db.getAiUsage(req.businessId), limit: pricing.aiLimitFor(business.plan) });
+    res.json({ used: await db.getAiUsage(req.businessId), limit: await db.effectiveAiLimit(req.businessId) });
   })
 );
 app.post(
@@ -272,8 +291,7 @@ app.post(
     const text = texts[tool];
     if (!text) return res.status(400).json({ error: "Unknown AI tool" });
     const used = await db.incrementAiUsage(req.businessId);
-    const business = await db.getBusiness(req.businessId);
-    res.json({ text, used, limit: pricing.aiLimitFor(business.plan) });
+    res.json({ text, used, limit: await db.effectiveAiLimit(req.businessId) });
   })
 );
 
@@ -291,7 +309,7 @@ app.post(
   "/api/receipts/generate",
   requireAuth,
   handle(async (req, res) => {
-    const { customerName, items } = req.body || {};
+    const { customerName, items, businessPhone, businessAddress } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Add at least one item" });
     }
@@ -308,8 +326,11 @@ app.post(
       reference,
       businessName: business.businessName,
       businessLogo: business.businessLogo,
-      businessPhone: business.businessPhone,
-      businessAddress: business.businessAddress,
+      // The receipt form lets the seller type these in directly (so this
+      // free tool doesn't require a trip to Settings first) - fall back to
+      // the saved business profile when left blank.
+      businessPhone: String(businessPhone || "").trim() || business.businessPhone,
+      businessAddress: String(businessAddress || "").trim() || business.businessAddress,
       customerName: String(customerName || "").trim(),
       items: cleanItems,
       total,
@@ -340,7 +361,10 @@ app.get(
 app.get(
   "/api/branches",
   requireAuth,
-  handle(async (req, res) => res.json(await db.listBranches(req.businessId)))
+  handle(async (req, res) => {
+    const branches = await db.listBranches(req.businessId);
+    res.json({ branches, limit: await db.effectiveBranchLimit(req.businessId) });
+  })
 );
 app.post(
   "/api/branches",
@@ -353,6 +377,32 @@ app.delete(
   handle(async (req, res) => {
     await db.deleteBranch(req.businessId, req.params.id);
     res.status(204).end();
+  })
+);
+
+// --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
+
+const ADDON_TYPES = ["ai_credits", "staff", "branch"];
+
+app.post(
+  "/api/addons/purchase",
+  requireAuth,
+  handle(async (req, res) => {
+    const { type } = req.body || {};
+    if (!ADDON_TYPES.includes(type)) return res.status(400).json({ error: "Unknown add-on" });
+    if (!payments.isConfigured()) {
+      return res.status(400).json({ error: "Paystack is not configured on this server" });
+    }
+    const reference = `spaddon_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
+    const callbackUrl = `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
+    const result = await payments.initializeAddonTransaction({
+      email: req.user.email,
+      addonType: type,
+      reference,
+      callbackUrl,
+      businessId: req.businessId,
+    });
+    res.json({ authorizationUrl: result.authorizationUrl, amount: result.amount, reference });
   })
 );
 
@@ -396,7 +446,7 @@ app.get(
     }
     const activated = await finalizeIfSuccessful(txData);
     const business = await db.getBusiness(req.businessId);
-    res.json({ status: txData.status, activated, plan: business.plan });
+    res.json({ status: txData.status, activated, plan: business.plan, addonType: txData.metadata?.addonType || null });
   })
 );
 

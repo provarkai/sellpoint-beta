@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { priceFor } = require("./pricing");
+const { priceFor, ADDON_PRICE } = require("./pricing");
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
@@ -34,6 +34,30 @@ async function initializeTransaction({ email, plan, billingCycle, reference, cal
   return { authorizationUrl: body.data.authorization_url, amount: amountNaira };
 }
 
+// One-off a-la-carte purchases (extra AI credits / staff seat / branch) -
+// same dynamic Paystack checkout as plan upgrades (not a static payment
+// link) so activation stays automatic; addonType travels in metadata
+// instead of plan/billingCycle.
+async function initializeAddonTransaction({ email, addonType, reference, callbackUrl, businessId }) {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      amount: Math.round(ADDON_PRICE * 100),
+      reference,
+      callback_url: callbackUrl,
+      metadata: { addonType, businessId },
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.status) throw new Error(body.message || "Paystack initialize failed");
+  return { authorizationUrl: body.data.authorization_url, amount: ADDON_PRICE };
+}
+
 // Paystack signs the raw request body with HMAC SHA512 using the secret key -
 // must verify against the raw bytes, not the re-serialized parsed JSON, since
 // key ordering/whitespace differences would break the signature.
@@ -61,6 +85,7 @@ async function verifyTransaction(reference) {
 module.exports = {
   isConfigured,
   initializeTransaction,
+  initializeAddonTransaction,
   verifyWebhookSignature,
   verifyTransaction,
   PAYSTACK_PUBLIC_KEY,

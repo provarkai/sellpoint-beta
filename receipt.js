@@ -53,9 +53,10 @@ $("receiptForm").onsubmit = async (e) => {
   const items = collectItems();
   if (!items.length) return toast("Add at least one item");
   try {
-    const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), items });
+    const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), businessPhone: $("businessPhone").value.trim(), businessAddress: $("businessAddress").value.trim(), items });
     lastReceipt = result.receipt;
     renderReceipt(lastReceipt);
+    $("upsell").style.display = "block";
     $("usageNote").textContent = result.limit === Infinity || result.limit === null
       ? "Unlimited receipts on your plan."
       : `${result.used}/${result.limit} free receipts used this month.`;
@@ -79,9 +80,13 @@ $("waReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a rece
   authToken = session.access_token;
   addRow();
   try {
-    const usage = await api("GET", "/api/receipts/usage");
+    const [usage, me] = await Promise.all([api("GET", "/api/receipts/usage"), api("GET", "/api/me")]);
     $("usageNote").textContent = usage.limit === Infinity || usage.limit === null
       ? "Unlimited receipts on your plan."
       : `${usage.used}/${usage.limit} free receipts used this month.`;
+    if (me.business) {
+      $("businessPhone").value = me.business.businessPhone || "";
+      $("businessAddress").value = me.business.businessAddress || "";
+    }
   } catch {}
 })().catch((err) => toast(err.message || "Something went wrong loading this page."));
