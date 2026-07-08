@@ -17,12 +17,13 @@
         <label>Customer name<input id="customerName" placeholder="Optional"></label>
         <div id="itemRows" class="list"></div>
         <p class="actions"><button type="button" id="addItem">Add Item</button></p>
+        <label><input type="checkbox" id="includeVat"> Add 7.5% VAT</label>
         <button id="generateBtn">Generate Receipt</button>
       </form>
       <article>
         <h2>Preview</h2>
         <div id="receiptBox" class="receipt-doc">Fill in the form and generate to preview your receipt.</div>
-        <p class="actions"><button id="copyReceipt">Copy</button><button id="printReceipt">Print</button><button id="waReceipt">Share on WhatsApp</button></p>
+        <p class="actions"><button id="copyReceipt">Copy</button><button id="printReceipt">Print</button><button id="downloadImage">Download Image</button><button id="downloadPdf">Download PDF</button><button id="waReceipt">Share on WhatsApp</button></p>
         <div id="upsell" class="delivery-box" style="display:none">
           <b>Want to save customers, inventory, and sales automatically?</b>
           <p class="meta">This receipt tool is free and stands on its own. SellersPoint also tracks your products, customers, orders, invoices, and AI tools in one place.</p>
@@ -34,6 +35,8 @@
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>
   <script defer src="auth-shared.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script defer src="receipt.js"></script>
 </body>
 </html>

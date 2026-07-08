@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { priceFor, ADDON_PRICE } = require("./pricing");
+const { ADDON_PRICE } = require("./pricing");
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
@@ -9,9 +9,11 @@ function isConfigured() {
   return !!(PAYSTACK_SECRET_KEY && PAYSTACK_PUBLIC_KEY);
 }
 
-async function initializeTransaction({ email, plan, billingCycle, reference, callbackUrl, businessId }) {
-  const amountNaira = priceFor(plan, billingCycle);
-  if (amountNaira === null) throw new Error("Unknown plan");
+// amountNaira is resolved by the caller (server/index.js), which has DB
+// access to the admin's price overrides - this module stays a thin Paystack
+// client with no pricing knowledge of its own.
+async function initializeTransaction({ email, plan, billingCycle, amountNaira, reference, callbackUrl, businessId }) {
+  if (amountNaira == null) throw new Error("Unknown plan");
   const res = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
     method: "POST",
     headers: {

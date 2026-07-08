@@ -5,7 +5,6 @@ const db = require("./db");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin } = require("./auth");
 const payments = require("./payments");
 const pricing = require("./pricing");
-const { PRICING } = pricing;
 
 const app = express();
 const ROOT = path.join(__dirname, "..");
@@ -217,7 +216,7 @@ app.get(
   "/api/pricing",
   handle(async (req, res) => {
     const settings = await db.getPlatformSettings();
-    res.json(pricing.visibleTiers(settings.extendedPricingEnabled));
+    res.json(pricing.applyPricingOverrides(settings.pricingOverrides));
   })
 );
 
@@ -309,7 +308,7 @@ app.post(
   "/api/receipts/generate",
   requireAuth,
   handle(async (req, res) => {
-    const { customerName, items, businessPhone, businessAddress } = req.body || {};
+    const { customerName, items, businessPhone, businessAddress, includeVat } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Add at least one item" });
     }
@@ -319,6 +318,7 @@ app.post(
       price: Math.max(0, Number(it?.price) || 0),
     }));
     const total = cleanItems.reduce((s, it) => s + it.qty * it.price, 0);
+    const vat = includeVat ? Math.round(total * 0.075 * 100) / 100 : 0;
     const used = await db.incrementReceiptUsage(req.businessId);
     const business = await db.getBusiness(req.businessId);
     const reference = "SP-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(2).toString("hex").toUpperCase();
@@ -333,7 +333,10 @@ app.post(
       businessAddress: String(businessAddress || "").trim() || business.businessAddress,
       customerName: String(customerName || "").trim(),
       items: cleanItems,
-      total,
+      subtotal: total,
+      vatRate: includeVat ? 0.075 : 0,
+      vat,
+      total: total + vat,
       issuedAt: new Date().toISOString(),
       poweredBy: "SellersPoint",
     };
@@ -415,19 +418,21 @@ app.post(
     const { plan, billingCycle } = req.body || {};
     const email = req.user.email; // already signed in - no need to re-collect it
     const settings = await db.getPlatformSettings();
-    const visible = pricing.visibleTiers(settings.extendedPricingEnabled);
-    if (!visible[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });
-    if (visible[plan].monthly == null) return res.status(400).json({ error: "This plan requires contacting sales" });
+    const tiers = pricing.applyPricingOverrides(settings.pricingOverrides);
+    if (!tiers[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });
+    if (tiers[plan].monthly == null) return res.status(400).json({ error: "This plan requires contacting sales" });
     if (!payments.isConfigured()) {
       return res.status(400).json({ error: "Paystack is not configured on this server" });
     }
     const reference = `sp_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
     const cycle = billingCycle === "yearly" ? "yearly" : "monthly";
+    const amountNaira = cycle === "yearly" ? tiers[plan].yearly : tiers[plan].monthly;
     const result = await payments.initializeTransaction({
       email,
       plan,
       billingCycle: cycle,
+      amountNaira,
       reference,
       callbackUrl,
       businessId: req.businessId,
@@ -486,6 +491,21 @@ app.put(
   "/api/admin/settings",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.updatePlatformSettings(req.body || {})))
+);
+
+app.put(
+  "/api/admin/pricing",
+  requirePlatformAdmin,
+  handle(async (req, res) => {
+    const overrides = {};
+    for (const key of pricing.OVERRIDABLE_TIERS) {
+      const value = Number((req.body || {})[key]);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: `Invalid price for ${key}` });
+      overrides[key] = value;
+    }
+    const settings = await db.updatePricingOverrides(overrides);
+    res.json(pricing.applyPricingOverrides(settings.pricingOverrides));
+  })
 );
 
 app.listen(PORT, HOST, () => {

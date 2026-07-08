@@ -164,7 +164,7 @@ create index if not exists payments_business_id_idx on payments(business_id);
 create table if not exists owner_payment (
   id integer primary key check (id = 1),
   name text not null default 'SellersPoint',
-  provider text not null default 'Manual bank transfer',
+  provider text not null default 'Paystack',
   link text not null default '',
   details text not null default ''
 );
@@ -173,8 +173,13 @@ insert into owner_payment (id) values (1) on conflict (id) do nothing;
 -- Platform-wide feature toggles, editable only from the platform-admin
 -- backend. Kept separate from owner_payment since it's a different concern
 -- (feature flags vs. payout details), even though both are singletons.
+-- pricing_overrides holds admin-edited monthly prices, e.g.
+-- {"growth": 6000, "pro": 15000} - keys not present fall back to
+-- server/pricing.js's hardcoded defaults (see pricing.js#applyOverrides).
 create table if not exists platform_settings (
   id integer primary key check (id = 1),
-  extended_pricing_enabled boolean not null default false
+  extended_pricing_enabled boolean not null default false,
+  pricing_overrides jsonb not null default '{}'::jsonb
 );
 insert into platform_settings (id) values (1) on conflict (id) do nothing;
+alter table platform_settings add column if not exists pricing_overrides jsonb not null default '{}'::jsonb;

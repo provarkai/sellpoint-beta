@@ -12,13 +12,13 @@
     <div id="adminContent" style="display:none">
       <section class="metrics"><div><small>Businesses</small><b id="totalBusinesses">0</b></div><div><small>Payments recorded</small><b id="totalPayments">0</b></div><div><small>Revenue collected</small><b id="totalRevenue">NGN 0</b></div></section>
       <section class="grid">
-        <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<select id="ownerProvider"><option>Manual bank transfer</option><option>Paystack</option><option>Flutterwave</option><option>Monnify</option></select></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><label>Bank/payment details<textarea id="ownerDetails" rows="5" placeholder="Bank: Example Bank
+        <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<input value="Paystack" disabled></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><label>Bank/payment details<textarea id="ownerDetails" rows="5" placeholder="Bank: Example Bank
 Account: 1234567890
 Name: SellersPoint"></textarea></label><button>Save SellersPoint Payment Details</button></form>
         <article><h2>Businesses</h2><div id="businessList" class="list"></div></article>
       </section>
       <section class="grid">
-        <article><h2>Pricing Tiers</h2><p class="meta">Pro adds staff seats and reports; Business adds unlimited seats and multi-branch. Turn this on when you're ready to sell the full ladder, not just Starter + Growth.</p><label><input type="checkbox" id="extendedPricingToggle"> Show all 5 tiers to customers (off = Starter + Growth only)</label><button id="savePricingSettings">Save</button></article>
+        <form id="pricingForm"><h2>Pricing Tiers</h2><p class="meta">Set the monthly price for each plan - yearly is automatically 10x monthly (2 months free). Starter is always free; Enterprise is always custom.</p><label>Growth (NGN/month)<input id="priceGrowth" type="number" min="0" required></label><label>Pro (NGN/month)<input id="pricePro" type="number" min="0" required></label><label>Business (NGN/month)<input id="priceBusiness" type="number" min="0" required></label><button>Save Pricing</button></form>
         <article><h2>Recent Payments (All Tenants)</h2><div id="paymentLog" class="list"></div></article>
       </section>
     </div>

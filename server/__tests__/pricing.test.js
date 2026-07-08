@@ -41,12 +41,20 @@ test("orderLimitFor falls back to the starter limit for an unknown plan", () => 
   assert.equal(orderLimitFor("nonexistent"), PRICING.starter.orderLimit);
 });
 
-test("visibleTiers returns only Starter + Growth by default", () => {
-  const { visibleTiers } = require("../pricing");
-  assert.deepEqual(Object.keys(visibleTiers(false)), ["starter", "growth"]);
+test("applyPricingOverrides replaces monthly/yearly only for growth/pro/business", () => {
+  const { applyPricingOverrides } = require("../pricing");
+  const overridden = applyPricingOverrides({ growth: 6000, pro: 15000 });
+  assert.equal(overridden.growth.monthly, 6000);
+  assert.equal(overridden.growth.yearly, 60000);
+  assert.equal(overridden.pro.monthly, 15000);
+  assert.equal(overridden.business.monthly, PRICING.business.monthly); // untouched
+  assert.equal(overridden.starter.monthly, 0); // never overridable
 });
 
-test("visibleTiers returns the full ladder when extended pricing is enabled", () => {
-  const { visibleTiers } = require("../pricing");
-  assert.deepEqual(Object.keys(visibleTiers(true)), Object.keys(PRICING));
+test("applyPricingOverrides with no overrides returns the same prices as PRICING", () => {
+  const { applyPricingOverrides } = require("../pricing");
+  const overridden = applyPricingOverrides();
+  for (const plan of Object.keys(PRICING)) {
+    assert.equal(overridden[plan].monthly, PRICING[plan].monthly);
+  }
 });

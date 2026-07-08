@@ -282,15 +282,22 @@ async function updateOwner(fields) {
 }
 
 async function getPlatformSettings() {
-  const { rows } = await query("SELECT extended_pricing_enabled FROM platform_settings WHERE id = 1");
-  return { extendedPricingEnabled: !!rows[0]?.extended_pricing_enabled };
+  const { rows } = await query("SELECT extended_pricing_enabled, pricing_overrides FROM platform_settings WHERE id = 1");
+  return { extendedPricingEnabled: !!rows[0]?.extended_pricing_enabled, pricingOverrides: rows[0]?.pricing_overrides || {} };
 }
 
 async function updatePlatformSettings(fields) {
   const current = await getPlatformSettings();
   const enabled = fields.extendedPricingEnabled !== undefined ? !!fields.extendedPricingEnabled : current.extendedPricingEnabled;
   await query("UPDATE platform_settings SET extended_pricing_enabled = $1 WHERE id = 1", [enabled]);
-  return { extendedPricingEnabled: enabled };
+  return { ...current, extendedPricingEnabled: enabled };
+}
+
+async function updatePricingOverrides(overrides) {
+  const current = await getPlatformSettings();
+  const merged = { ...current.pricingOverrides, ...overrides };
+  await query("UPDATE platform_settings SET pricing_overrides = $1 WHERE id = 1", [JSON.stringify(merged)]);
+  return { ...current, pricingOverrides: merged };
 }
 
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
@@ -652,6 +659,7 @@ module.exports = {
   updateOwner,
   getPlatformSettings,
   updatePlatformSettings,
+  updatePricingOverrides,
   createProduct,
   deleteProduct,
   createCustomer,

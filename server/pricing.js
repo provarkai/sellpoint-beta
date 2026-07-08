@@ -36,8 +36,24 @@ const PRICING = Object.fromEntries(
   ])
 );
 
-function priceFor(plan, cycle) {
-  const tier = PRICING[plan];
+// Growth/Pro/Business monthly prices are admin-editable (see backend.html's
+// Pricing Tiers form -> PUT /api/admin/pricing), stored as a small jsonb
+// map on platform_settings rather than hardcoded here. Starter stays free
+// and Enterprise stays "contact us" - only these three ever get overridden.
+const OVERRIDABLE_TIERS = ["growth", "pro", "business"];
+
+function applyPricingOverrides(overrides = {}) {
+  return Object.fromEntries(
+    Object.entries(PRICING).map(([key, tier]) => {
+      if (!OVERRIDABLE_TIERS.includes(key) || overrides[key] == null) return [key, tier];
+      const monthly = Number(overrides[key]);
+      return [key, { ...tier, monthly, yearly: monthly * YEARLY_MULTIPLIER }];
+    })
+  );
+}
+
+function priceFor(plan, cycle, overrides) {
+  const tier = applyPricingOverrides(overrides)[plan];
   if (!tier) return null;
   return cycle === "yearly" ? tier.yearly : tier.monthly;
 }
@@ -70,20 +86,11 @@ function receiptLimitFor(plan) {
   return PRICING[plan]?.receiptLimit ?? PRICING.starter.receiptLimit;
 }
 
-// Only Starter + Growth are offered by default (SIMPLE_TIER_KEYS). The full
-// ladder stays defined so plan lookups (priceFor/orderLimitFor/
-// effectivePlan) never break, and a platform admin can turn the rest on
-// from backend.html once satisfied the gating above holds up.
-const SIMPLE_TIER_KEYS = ["starter", "growth"];
-
-function visibleTiers(extendedPricingEnabled) {
-  const keys = extendedPricingEnabled ? Object.keys(PRICING) : SIMPLE_TIER_KEYS;
-  return Object.fromEntries(keys.map((key) => [key, PRICING[key]]));
-}
-
 module.exports = {
   PRICING,
   priceFor,
+  applyPricingOverrides,
+  OVERRIDABLE_TIERS,
   orderLimitFor,
   productLimitFor,
   staffLimitFor,
@@ -94,6 +101,4 @@ module.exports = {
   YEARLY_MULTIPLIER,
   ADDON_PRICE,
   ADDON_AI_CREDITS,
-  SIMPLE_TIER_KEYS,
-  visibleTiers,
 };

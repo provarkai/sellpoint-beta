@@ -35,6 +35,7 @@ function renderReceipt(r) {
     </div>
     ${r.customerName ? `<div class="row"><span>Billed to</span><b>${clean(r.customerName)}</b></div>` : ""}
     <table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+    ${r.vat ? `<div class="row"><span>Subtotal</span><b>${money(r.subtotal)}</b></div><div class="row"><span>VAT (7.5%)</span><b>${money(r.vat)}</b></div>` : ""}
     <div class="row receipt-total"><span>Total</span><b>${money(r.total)}</b></div>
     <div class="receipt-doc-footer">Powered by <a href="${brandUrl}" target="_blank" rel="noopener">SellersPoint</a> - create your own free branded receipts</div>
   `;
@@ -42,7 +43,8 @@ function renderReceipt(r) {
 
 function receiptText(r) {
   const lines = r.items.map((it) => `${it.name} x ${it.qty} @ ${money(it.price)} = ${money(it.qty * it.price)}`).join("\n");
-  return `Receipt ${r.reference || ""} from ${r.businessName}\n${r.customerName ? "Billed to: " + r.customerName + "\n" : ""}${lines}\nTotal: ${money(r.total)}\n\nPowered by SellersPoint - ${location.origin}/receipt.html`;
+  const vatLines = r.vat ? `Subtotal: ${money(r.subtotal)}\nVAT (7.5%): ${money(r.vat)}\n` : "";
+  return `Receipt ${r.reference || ""} from ${r.businessName}\n${r.customerName ? "Billed to: " + r.customerName + "\n" : ""}${lines}\n${vatLines}Total: ${money(r.total)}\n\nPowered by SellersPoint - ${location.origin}/receipt.html`;
 }
 
 let lastReceipt = null;
@@ -53,7 +55,7 @@ $("receiptForm").onsubmit = async (e) => {
   const items = collectItems();
   if (!items.length) return toast("Add at least one item");
   try {
-    const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), businessPhone: $("businessPhone").value.trim(), businessAddress: $("businessAddress").value.trim(), items });
+    const result = await api("POST", "/api/receipts/generate", { customerName: $("customerName").value.trim(), businessPhone: $("businessPhone").value.trim(), businessAddress: $("businessAddress").value.trim(), items, includeVat: $("includeVat").checked });
     lastReceipt = result.receipt;
     renderReceipt(lastReceipt);
     $("upsell").style.display = "block";
@@ -68,6 +70,36 @@ $("receiptForm").onsubmit = async (e) => {
 $("copyReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); navigator.clipboard.writeText(receiptText(lastReceipt)); toast("Copied"); };
 $("printReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); print(); };
 $("waReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); open("https://wa.me/?text=" + encodeURIComponent(receiptText(lastReceipt)), "_blank", "noopener"); };
+
+async function renderCanvas() {
+  if (!window.html2canvas) throw new Error("Image export isn't available right now - try again in a moment.");
+  return html2canvas($("receiptBox"), { backgroundColor: "#ffffff", scale: 2 });
+}
+$("downloadImage").onclick = async () => {
+  if (!lastReceipt) return toast("Generate a receipt first");
+  try {
+    const canvas = await renderCanvas();
+    const link = document.createElement("a");
+    link.download = (lastReceipt.reference || "receipt") + ".png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  } catch (err) {
+    toast(err.message);
+  }
+};
+$("downloadPdf").onclick = async () => {
+  if (!lastReceipt) return toast("Generate a receipt first");
+  try {
+    if (!window.jspdf) throw new Error("PDF export isn't available right now - try again in a moment.");
+    const canvas = await renderCanvas();
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "px", format: [canvas.width, canvas.height] });
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+    pdf.save((lastReceipt.reference || "receipt") + ".pdf");
+  } catch (err) {
+    toast(err.message);
+  }
+};
 
 (async () => {
   // Unlike the rest of the app, an unauthenticated visitor here is a lead,
