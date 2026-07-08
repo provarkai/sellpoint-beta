@@ -8,23 +8,30 @@
 </head>
 <body class="single-page storefront-page">
   <main class="storefront-main">
-    <div id="notFound" style="display:none">
+    <div id="notFound" style="display:none;padding:32px 20px">
       <h1>Storefront not found</h1>
       <p class="meta">This shop link isn't active. It may have been disabled or the URL might be wrong.</p>
     </div>
     <div id="storeContent" style="display:none">
+      <div class="storefront-banner"></div>
       <header class="storefront-header">
         <img id="storeLogo" src="" alt="" style="display:none">
         <div id="storeLogoFallback" class="storefront-logo-fallback"></div>
-        <div><h1 id="storeName"></h1><p class="meta" id="storeMeta"></p></div>
+        <div class="storefront-header-info"><h1 id="storeName"></h1><p class="meta" id="storeMeta"></p></div>
+        <a id="navLink" class="button-link storefront-nav-link" href="/index.html">Open App</a>
       </header>
       <section id="storeGrid" class="storefront-grid"></section>
+      <p class="meta storefront-footer">Powered by <a href="/signup.html">SellersPoint</a> - create your own free storefront</p>
     </div>
   </main>
   <div id="cartBar" class="storefront-cart-bar" style="display:none">
     <span id="cartSummary"></span>
     <button id="viewCart">View Cart</button>
   </div>
+  <dialog id="productModal">
+    <div id="productModalBody"></div>
+    <p class="actions"><button id="closeProductModal">Close</button><button id="productModalAdd">Add to Cart</button></p>
+  </dialog>
   <dialog id="cartModal">
     <h2>Your order</h2>
     <div id="cartItems" class="list"></div>
@@ -36,6 +43,7 @@
     </p>
   </dialog>
   <div id="toast"></div>
+  <script type="module" src="/supabase-init.js"></script>
   <script defer src="/store.js"></script>
 </body>
 </html>

@@ -14,6 +14,7 @@ function getSlug() {
 let store = null;
 let cartKey = "";
 let cart = {}; // productId -> qty
+let viewingProductId = null;
 
 function loadCart() {
   try {
@@ -61,17 +62,40 @@ function setQty(id, qty) {
 function renderGrid() {
   $("storeGrid").innerHTML = store.products.map((p) => {
     const outOfStock = p.stock <= 0;
-    return `<article class="storefront-card">
+    return `<article class="storefront-card" onclick="viewProduct('${p.id}')">
       ${p.image ? `<img class="storefront-card-img" src="${p.image}" alt="${clean(p.name)}">` : `<div class="storefront-card-img storefront-card-noimg">No photo</div>`}
       <div class="storefront-card-body">
         <strong>${clean(p.name)}</strong>
         <span class="meta">${clean(p.category || p.type || "")}</span>
         <span class="storefront-price">${money(p.price)}</span>
-        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}')">${outOfStock ? "Out of stock" : "Add to Cart"}</button>
+        <button ${outOfStock ? "disabled" : ""} onclick="event.stopPropagation();addToCart('${p.id}')">${outOfStock ? "Out of stock" : "Add to Cart"}</button>
       </div>
     </article>`;
   }).join("") || `<p class="meta">No products listed yet.</p>`;
 }
+
+function viewProduct(id) {
+  const p = product(id);
+  if (!p) return;
+  viewingProductId = id;
+  const outOfStock = p.stock <= 0;
+  $("productModalBody").innerHTML = `
+    ${p.image ? `<img class="storefront-modal-img" src="${p.image}" alt="${clean(p.name)}">` : `<div class="storefront-modal-img storefront-card-noimg">No photo</div>`}
+    <h2>${clean(p.name)}</h2>
+    <p class="meta">${clean(p.category || p.type || "")}</p>
+    <p class="storefront-price">${money(p.price)}</p>
+    <p class="meta">${outOfStock ? "Out of stock" : p.type === "Service" ? `${p.stock} slot${p.stock === 1 ? "" : "s"} available` : p.type === "Digital product" ? `${p.stock} license${p.stock === 1 ? "" : "s"} available` : `${p.stock} in stock`}</p>
+  `;
+  $("productModalAdd").disabled = outOfStock;
+  $("productModalAdd").textContent = outOfStock ? "Out of stock" : "Add to Cart";
+  $("productModal").showModal();
+}
+$("closeProductModal").onclick = () => $("productModal").close();
+$("productModalAdd").onclick = () => {
+  if (!viewingProductId) return;
+  addToCart(viewingProductId);
+  $("productModal").close();
+};
 
 function renderCartModal() {
   const entries = Object.entries(cart);
@@ -120,4 +144,16 @@ $("orderWhatsApp").onclick = () => {
   renderGrid();
   renderCartBar();
   $("storeContent").style.display = "block";
+
+  // Anyone signed in gets a straight link back to their own dashboard;
+  // everyone else sees a lead-gen link into signup instead, same "quiet
+  // referral engine" pattern as the receipt tool.
+  try {
+    const supabase = await window.supabaseReady;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      $("navLink").textContent = "Create Your Store";
+      $("navLink").href = "/signup.html";
+    }
+  } catch {}
 })().catch(() => { $("notFound").style.display = "block"; });
