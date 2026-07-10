@@ -65,6 +65,7 @@ function toBusinessJson(b) {
     storefrontEligible: storefrontEnabledFor(effectivePlan(b)),
     storefrontBanner: b.storefront_banner,
     socialLinks: b.social_links || {},
+    whyBuyText: b.why_buy_text || "",
   };
 }
 function effectivePlan(b) {
@@ -335,7 +336,7 @@ async function downgradeToStarter(businessId) {
 // anything be stashed in social_links, unbounded.
 const SOCIAL_KEYS = ["instagram", "facebook", "tiktok", "x", "whatsapp"];
 
-async function updateStorefrontSettings(businessId, { enabled, slug, banner, socialLinks }) {
+async function updateStorefrontSettings(businessId, { enabled, slug, banner, socialLinks, whyBuyText }) {
   const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const current = rows[0];
   if (!current) throw new OrderError("Business not found");
@@ -357,9 +358,10 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
       SOCIAL_KEYS.filter((k) => socialLinks[k]).map((k) => [k, String(socialLinks[k]).trim().slice(0, 200)])
     );
   }
+  const nextWhyBuy = whyBuyText !== undefined ? String(whyBuyText).slice(0, 2000) : current.why_buy_text;
   const { rows: updated } = await query(
-    "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4 WHERE id = $5 RETURNING *",
-    [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), businessId]
+    "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4, why_buy_text=$5 WHERE id = $6 RETURNING *",
+    [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), nextWhyBuy, businessId]
   );
   return toBusinessJson(updated[0]);
 }
@@ -381,6 +383,10 @@ async function getStorefront(slug) {
     "SELECT * FROM products WHERE business_id = $1 ORDER BY created_at DESC",
     [business.id]
   );
+  const { rows: completedRows } = await query(
+    "SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status IN ('Paid','Delivered')",
+    [business.id]
+  );
   return {
     businessName: business.name,
     businessLogo: business.logo,
@@ -388,6 +394,9 @@ async function getStorefront(slug) {
     businessPhone: business.phone,
     businessAddress: business.address,
     socialLinks: business.social_links || {},
+    memberSince: business.created_at,
+    completedOrders: completedRows[0].n,
+    whyBuyText: business.why_buy_text || "",
     products: products.map(toStorefrontProductJson),
   };
 }

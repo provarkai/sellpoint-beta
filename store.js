@@ -84,8 +84,28 @@ function shareProduct(id) {
   }
 }
 
+let searchQuery = "";
+let activeCategory = "";
+function filteredProducts() {
+  return store.products.filter((p) => {
+    if (activeCategory && (p.category || p.type || "Other") !== activeCategory) return false;
+    if (searchQuery && !p.name.toLowerCase().includes(searchQuery)) return false;
+    return true;
+  });
+}
+function renderCategoryChips() {
+  const el = $("storeCategoryChips");
+  if (!el) return;
+  const categories = [...new Set(store.products.map((p) => p.category || p.type || "Other"))];
+  if (categories.length < 2) { el.innerHTML = ""; return; }
+  const chips = ["All", ...categories];
+  el.innerHTML = chips.map((c) => `<button type="button" class="${(c === "All" ? !activeCategory : c === activeCategory) ? "active" : ""}" data-cat="${clean(c)}">${clean(c)}</button>`).join("");
+  el.querySelectorAll("button").forEach((btn) => (btn.onclick = () => { activeCategory = btn.dataset.cat === "All" ? "" : btn.dataset.cat; renderCategoryChips(); renderGrid(); }));
+}
+if ($("storeSearch")) $("storeSearch").oninput = (e) => { searchQuery = e.target.value.trim().toLowerCase(); renderGrid(); };
+
 function renderGrid() {
-  $("storeGrid").innerHTML = store.products.map((p) => {
+  $("storeGrid").innerHTML = filteredProducts().map((p) => {
     const outOfStock = p.stock <= 0;
     const images = productImages(p);
     return `<article class="storefront-card" onclick="viewProduct('${p.id}')">
@@ -104,7 +124,7 @@ function renderGrid() {
         </div>
       </div>
     </article>`;
-  }).join("") || `<p class="meta">No products listed yet.</p>`;
+  }).join("") || (store.products.length ? `<p class="meta">No products match your search.</p>` : `<p class="meta">No products listed yet.</p>`);
 }
 
 function setModalImage(src) {
@@ -176,6 +196,65 @@ function renderSocialLinks() {
   $("storeSocial").style.display = "flex";
 }
 
+// Real data only - no fabricated "Verified" badge or follower counts. Member
+// since and completed orders both come straight from the database.
+function renderStats() {
+  const parts = [];
+  if (store.memberSince) parts.push("Serving customers since " + new Date(store.memberSince).getFullYear());
+  if (store.completedOrders) parts.push(store.completedOrders + " completed order" + (store.completedOrders === 1 ? "" : "s"));
+  $("storeStats").textContent = parts.join(" - ");
+}
+
+function renderTrustBar() {
+  const badges = ["🧾 Professional Receipts", "✨ AI-Powered Business", "💬 WhatsApp Ordering"];
+  if (store.completedOrders) badges.push(`📦 ${store.completedOrders} Orders Completed`);
+  $("storeTrustBar").innerHTML = badges.map((b) => `<span>${b}</span>`).join("");
+}
+
+// Seller's own claims, not numbers the app invents - hidden entirely if the
+// seller hasn't written anything.
+function renderWhyBuy() {
+  const lines = (store.whyBuyText || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) { $("storeWhyBuy").style.display = "none"; return; }
+  $("storeWhyBuyList").innerHTML = lines.map((l) => `<li>${clean(l)}</li>`).join("");
+  $("storeWhyBuy").style.display = "block";
+}
+
+function wireQuickActions() {
+  const phone = (store.businessPhone || "").replace(/\D/g, "");
+  if (phone) {
+    $("storeWhatsappBtn").href = `https://wa.me/${phone}`;
+    $("storeWhatsappBtn").style.display = "inline-grid";
+    $("storeCallBtn").href = `tel:+${phone}`;
+    $("storeCallBtn").style.display = "inline-grid";
+  }
+}
+
+function vcfText() {
+  const phone = (store.businessPhone || "").replace(/\D/g, "");
+  return `BEGIN:VCARD\nVERSION:3.0\nFN:${store.businessName}\nORG:${store.businessName}\nTEL:${phone}\nURL:${location.href}\nADR:;;${store.businessAddress || ""}\nEND:VCARD`;
+}
+function renderCard() {
+  const canvas = $("storeQrCanvas");
+  if (window.QRCode && canvas) QRCode.toCanvas(canvas, location.href, { width: 200, margin: 1 }, () => {});
+}
+if ($("storeCardBtn")) $("storeCardBtn").onclick = () => { renderCard(); $("cardModal").showModal(); };
+if ($("closeCard")) $("closeCard").onclick = () => $("cardModal").close();
+if ($("downloadQr")) $("downloadQr").onclick = () => {
+  const canvas = $("storeQrCanvas");
+  if (!canvas) return;
+  const link = document.createElement("a");
+  link.download = "store-qr-code.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+};
+if ($("downloadVcf")) $("downloadVcf").onclick = () => {
+  const link = document.createElement("a");
+  link.download = (store.businessName || "store") + ".vcf";
+  link.href = URL.createObjectURL(new Blob([vcfText()], { type: "text/vcard" }));
+  link.click();
+};
+
 (async () => {
   const slug = getSlug();
   if (!slug) { $("notFound").style.display = "block"; return; }
@@ -199,6 +278,11 @@ function renderSocialLinks() {
     $("storeBanner").classList.add("storefront-banner-has-image");
   }
   renderSocialLinks();
+  renderStats();
+  renderTrustBar();
+  renderWhyBuy();
+  wireQuickActions();
+  renderCategoryChips();
   renderGrid();
   renderCartBar();
   $("storeContent").style.display = "block";

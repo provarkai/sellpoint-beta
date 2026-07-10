@@ -235,6 +235,11 @@ alter table platform_settings add column if not exists pricing_overrides jsonb n
 -- page footer, editable only from the platform-admin backend.
 alter table platform_settings add column if not exists social_links jsonb not null default '{}'::jsonb;
 
+-- Seller-written "Why buy from us" bullets (one per line) shown on the
+-- storefront - the seller's own claims about themselves, not numbers the
+-- app invents.
+alter table businesses add column if not exists why_buy_text text not null default '';
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this

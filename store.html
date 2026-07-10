@@ -17,9 +17,25 @@
       <header class="storefront-header">
         <img id="storeLogo" src="" alt="" style="display:none">
         <div id="storeLogoFallback" class="storefront-logo-fallback"></div>
-        <div class="storefront-header-info"><h1 id="storeName"></h1><p class="meta" id="storeMeta"></p><div id="storeSocial" class="storefront-social" style="display:none"></div></div>
-        <a id="navLink" class="button-link storefront-nav-link" href="/app.html">Open App</a>
+        <div class="storefront-header-info">
+          <h1 id="storeName"></h1>
+          <p class="meta" id="storeMeta"></p>
+          <p class="meta storefront-header-stats" id="storeStats"></p>
+          <div id="storeSocial" class="storefront-social" style="display:none"></div>
+        </div>
+        <div class="storefront-header-actions">
+          <a id="navLink" class="button-link storefront-nav-link" href="/app.html">Open App</a>
+          <a id="storeWhatsappBtn" class="button-link storefront-quick-btn" href="#" target="_blank" rel="noopener" style="display:none">WhatsApp</a>
+          <a id="storeCallBtn" class="button-link storefront-quick-btn" href="#" style="display:none">Call</a>
+          <button id="storeCardBtn" class="storefront-quick-btn">Business Card</button>
+        </div>
       </header>
+      <div id="storeTrustBar" class="storefront-trust-bar"></div>
+      <div id="storeWhyBuy" class="storefront-why-buy" style="display:none"><h2>Why Buy From Us</h2><ul id="storeWhyBuyList"></ul></div>
+      <div class="storefront-toolbar">
+        <input id="storeSearch" type="search" placeholder="Search products...">
+        <div id="storeCategoryChips" class="storefront-chips"></div>
+      </div>
       <section id="storeGrid" class="storefront-grid"></section>
       <p class="meta storefront-footer">Powered by <a href="/signup.html">SellersPoint</a> - create your own free storefront</p>
     </div>
@@ -42,8 +58,19 @@
       <button id="orderWhatsApp">Order via WhatsApp</button>
     </p>
   </dialog>
+  <dialog id="cardModal">
+    <h2>Digital Business Card</h2>
+    <p class="meta">Scan or share this store's link.</p>
+    <div class="storefront-qr-wrap"><canvas id="storeQrCanvas"></canvas></div>
+    <p class="actions">
+      <button id="closeCard">Close</button>
+      <button id="downloadQr">Download QR</button>
+      <button id="downloadVcf">Save Contact</button>
+    </p>
+  </dialog>
   <div id="toast"></div>
   <script type="module" src="/supabase-init.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script defer src="/store.js"></script>
 </body>
 </html>

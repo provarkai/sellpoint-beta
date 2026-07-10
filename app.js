@@ -141,6 +141,7 @@ function renderStorefrontSection(){
   $("openStoreUrl").href=url;
   $("storefrontEnabled").checked=!!state.storefrontEnabled;
   $("storefrontSlug").value=state.slug||"";
+  if($("storefrontWhyBuy"))$("storefrontWhyBuy").value=state.whyBuyText||"";
   const social=state.socialLinks||{};
   if($("socialInstagram"))$("socialInstagram").value=social.instagram||"";
   if($("socialFacebook"))$("socialFacebook").value=social.facebook||"";
@@ -148,7 +149,7 @@ function renderStorefrontSection(){
   if($("socialX"))$("socialX").value=social.x||"";
 }
 if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
-if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
+if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
 
 function renderLogistics(){
   if(!$("logisticsList"))return;
