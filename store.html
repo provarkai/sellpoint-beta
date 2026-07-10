@@ -19,7 +19,10 @@
         <div id="storeLogoFallback" class="storefront-logo-fallback"></div>
         <div class="storefront-header-info">
           <h1 id="storeName"></h1>
-          <p class="meta" id="storeMeta"></p>
+          <div class="storefront-header-details">
+            <span id="storePhoneRow" class="storefront-header-detail" style="display:none">📞 <span id="storePhoneText"></span></span>
+            <span id="storeAddressRow" class="storefront-header-detail" style="display:none">📍 <span id="storeAddressText"></span></span>
+          </div>
           <p class="meta storefront-header-stats" id="storeStats"></p>
           <div id="storeSocial" class="storefront-social" style="display:none"></div>
         </div>
@@ -61,7 +64,7 @@
   <dialog id="cardModal">
     <h2>Digital Business Card</h2>
     <p class="meta">Scan or share this store's link.</p>
-    <div class="storefront-qr-wrap"><canvas id="storeQrCanvas"></canvas></div>
+    <div class="storefront-qr-wrap"><div id="storeQrCanvas"></div></div>
     <p class="actions">
       <button id="closeCard">Close</button>
       <button id="downloadQr">Download QR</button>
@@ -70,7 +73,7 @@
   </dialog>
   <div id="toast"></div>
   <script type="module" src="/supabase-init.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script defer src="/store.js"></script>
 </body>
 </html>

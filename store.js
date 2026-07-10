@@ -234,15 +234,22 @@ function vcfText() {
   const phone = (store.businessPhone || "").replace(/\D/g, "");
   return `BEGIN:VCARD\nVERSION:3.0\nFN:${store.businessName}\nORG:${store.businessName}\nTEL:${phone}\nURL:${location.href}\nADR:;;${store.businessAddress || ""}\nEND:VCARD`;
 }
+// qrcodejs (davidshimjs) renders into a container element (creating its own
+// internal <canvas>), not the toCanvas(canvas, ...) API some other QR
+// libraries use - re-rendering means clearing the container first since the
+// library doesn't expose an update method.
 function renderCard() {
-  const canvas = $("storeQrCanvas");
-  if (window.QRCode && canvas) QRCode.toCanvas(canvas, location.href, { width: 200, margin: 1 }, () => {});
+  const container = $("storeQrCanvas");
+  if (!window.QRCode || !container) return;
+  container.innerHTML = "";
+  new QRCode(container, { text: location.href, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
 }
 if ($("storeCardBtn")) $("storeCardBtn").onclick = () => { renderCard(); $("cardModal").showModal(); };
 if ($("closeCard")) $("closeCard").onclick = () => $("cardModal").close();
 if ($("downloadQr")) $("downloadQr").onclick = () => {
-  const canvas = $("storeQrCanvas");
-  if (!canvas) return;
+  const container = $("storeQrCanvas");
+  const canvas = container?.querySelector("canvas");
+  if (!canvas) return toast("QR code isn't ready yet");
   const link = document.createElement("a");
   link.download = "store-qr-code.png";
   link.href = canvas.toDataURL("image/png");
@@ -265,7 +272,8 @@ if ($("downloadVcf")) $("downloadVcf").onclick = () => {
   loadCart();
 
   $("storeName").textContent = store.businessName;
-  $("storeMeta").textContent = [store.businessPhone, store.businessAddress].filter(Boolean).join(" - ");
+  if (store.businessPhone) { $("storePhoneText").textContent = store.businessPhone; $("storePhoneRow").style.display = "inline-flex"; }
+  if (store.businessAddress) { $("storeAddressText").textContent = store.businessAddress; $("storeAddressRow").style.display = "inline-flex"; }
   if (store.businessLogo) {
     $("storeLogo").src = store.businessLogo;
     $("storeLogo").style.display = "block";

@@ -418,11 +418,38 @@ app.post(
       }
       return `I can help with questions about payments, restocking, and top sellers. Right now: ${state.orders.length} orders, ${money(revenue)} paid revenue, best seller ${bestSeller || "none yet"}, ${pending.length} orders pending payment.`;
     }
+    // "insight" - a single trend-based observation for the dashboard,
+    // comparing each product's units sold in the last 7 days against the
+    // 7 days before that. Real data, not a canned message.
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const recentQty = {}, previousQty = {};
+    state.orders.forEach((o) => {
+      const t = new Date(o.createdAt).getTime();
+      const name = state.products.find((p) => p.id === o.productId)?.name || o.productName;
+      if (!name) return;
+      if (t > now - 7 * DAY_MS) recentQty[name] = (recentQty[name] || 0) + o.qty;
+      else if (t > now - 14 * DAY_MS) previousQty[name] = (previousQty[name] || 0) + o.qty;
+    });
+    let trending = null;
+    for (const name of Object.keys(recentQty)) {
+      const prev = previousQty[name] || 0;
+      const growthPct = prev > 0 ? Math.round(((recentQty[name] - prev) / prev) * 100) : null;
+      if (growthPct !== null && growthPct > 0 && (!trending || growthPct > trending.growthPct)) trending = { name, growthPct };
+    }
+    const insightFallback = trending
+      ? `${trending.name} is selling ${trending.growthPct}% faster than last week. Consider increasing stock before demand outpaces supply.`
+      : lowStock.length
+      ? `${lowStock[0].name} is running low (${lowStock[0].stock} left) - restock soon to avoid missing sales.`
+      : bestSeller
+      ? `${bestSeller} is your best seller so far. Keep it well stocked.`
+      : "Add a few orders to start seeing trend insights here.";
     // Fallback templates - used when GEMINI_API_KEY isn't configured, or if
     // the Gemini call itself fails, so the feature degrades instead of
     // breaking outright.
     const templates = {
       ask: askFallback(question || "summary"),
+      insight: insightFallback,
       caption: `New arrival: ${product?.name || "our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(product?.price || 0)}.\n\nSend a message now to order before stock runs out.`,
       reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
@@ -431,6 +458,7 @@ app.post(
     };
     const prompts = {
       ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
+      insight: `You are an AI business assistant for a Nigerian small business called "${state.businessName}". Write ONE short, specific, actionable insight (1-2 sentences, plain text, no markdown) based ONLY on this real data - never invent numbers: ${trending ? `"${trending.name}" sold ${trending.growthPct}% more units in the last 7 days than the 7 days before that.` : "no clear week-over-week sales trend yet."} Low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Best seller overall: ${bestSeller || "none yet"}. Sound like a sharp business advisor, not a generic tip.`,
       caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
       reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,

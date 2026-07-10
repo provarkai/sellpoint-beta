@@ -289,4 +289,17 @@ if($("logout"))$("logout").onclick=()=>window.Auth.logout();
 
 if($("resetForm"))$("resetForm").onsubmit=async e=>{e.preventDefault();const password=$("resetPassword").value;if(!password)return toast("Enter your password to confirm");if(!confirm("This permanently deletes all your products, customers, and orders. Continue?"))return;try{const supabase=await window.supabaseReady;const{error}=await supabase.auth.signInWithPassword({email:userEmail,password});if(error)return toast("Incorrect password");applyState(await api("POST","/api/reset"));e.target.reset();render();toast("All data reset")}catch(err){toast(err.message)}};
 
-(async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render)})().catch(err=>toast(err.message||"Something went wrong loading this page."));
+async function loadInsight(){
+  if(!$("aiInsightCard"))return;
+  try{
+    const result=await api("POST","/api/ai/generate",{tool:"insight"});
+    $("aiInsightText").textContent=result.text;
+    $("aiInsightCard").style.display="block";
+  }catch(err){
+    // Insight is a nice-to-have on the dashboard, not worth an error toast
+    // interrupting page load (e.g. AI limit already reached this month).
+  }
+}
+if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=loadInsight;
+
+(async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));
