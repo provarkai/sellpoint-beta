@@ -55,7 +55,7 @@ if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   if(!name)return toast("Enter a product name first");
   const btn=$("pGenDescription");btn.disabled=true;btn.textContent="Writing...";
   try{
-    const result=await api("POST","/api/ai/generate",{tool:"description",name,price:+$("pPrice").value||0,category:$("pCat").value.trim(),type:$("pType")?.value||"Product"});
+    const result=await api("POST","/api/ai/generate",{tool:"description",name,price:+$("pPrice").value||0,category:$("pCat").value.trim(),type:$("pType")?.value||"Product",detail:$("pAiContext")?.value.trim()||""});
     $("pDescription").value=result.text;
     toast("Description drafted - review and edit before saving")
   }catch(err){toast(err.message)}

@@ -374,6 +374,7 @@ app.post(
     const draftType = req.body.type || product?.type || "Product";
     const draftCategory = req.body.category || product?.category || "";
     const draftPrice = req.body.price ?? product?.price ?? 0;
+    const draftExtra = (detail || "").trim();
     const revenue = state.orders.reduce((s, o) => s + (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty, 0);
     const tally = {};
     state.orders.forEach((o) => {
@@ -389,14 +390,14 @@ app.post(
       reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
       summary: `Sales summary:\n\nTotal orders: ${state.orders.length}\nTotal recorded revenue: ${money(revenue)}\nBest-selling item: ${bestSeller || "Not enough sales yet"}\nPending payments: ${state.orders.filter((o) => o.status === "Pending payment").length}\n\nSuggested action: follow up pending payments and restock fast-moving products.`,
-      description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}, with fast delivery and great value for the price.`,
+      description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}${draftExtra ? `. ${draftExtra}` : ""}, with fast delivery and great value for the price.`,
     };
     const prompts = {
       caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
       reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
       summary: `Write a short sales summary for a Nigerian small business owner based on this data: ${state.orders.length} total orders, ${money(revenue)} paid revenue, best-selling item "${bestSeller || "none yet"}", ${state.orders.filter((o) => o.status === "Pending payment").length} orders still pending payment. End with one concrete suggested action. 4-5 sentences.`,
-      description: `Write a short storefront product description (2-3 sentences, plain text, no markdown, no hashtags, no emojis) for a Nigerian small business selling "${draftName}"${draftCategory ? ` (category: ${draftCategory})` : ""}, a ${draftType.toLowerCase()} priced at ${money(draftPrice)}. Describe what it is, who it's for, and why it's worth buying.`,
+      description: `Write a short storefront product description (2-3 sentences, plain text, no markdown, no hashtags, no emojis) for a Nigerian small business selling "${draftName}"${draftCategory ? ` (category: ${draftCategory})` : ""}, a ${draftType.toLowerCase()} priced at ${money(draftPrice)}.${draftExtra ? ` Extra details to weave in naturally: ${draftExtra}.` : ""} Describe what it is, who it's for, and why it's worth buying.`,
     };
     if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
     let text = templates[tool];
