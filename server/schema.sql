@@ -231,3 +231,31 @@ create table if not exists platform_settings (
 );
 insert into platform_settings (id) values (1) on conflict (id) do nothing;
 alter table platform_settings add column if not exists pricing_overrides jsonb not null default '{}'::jsonb;
+
+-- Row Level Security -------------------------------------------------------
+-- The server only ever talks to Postgres directly via DATABASE_URL as the
+-- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
+-- costs the app nothing. But Supabase also exposes every `public` table
+-- through PostgREST using the public anon key that ships in the frontend
+-- (supabase-init.js), and PostgREST ignores our Express-level business_id
+-- scoping completely. With RLS off, anyone holding that anon key could
+-- query e.g. GET .../rest/v1/businesses?select=* directly and read every
+-- tenant's data. Enabling RLS with zero policies denies all PostgREST
+-- access for anon/authenticated by default, closing that gap, while leaving
+-- the app's own data access (all of which goes through the Express API,
+-- never PostgREST) completely unaffected.
+alter table businesses enable row level security;
+alter table logistics_providers enable row level security;
+alter table business_members enable row level security;
+alter table business_invites enable row level security;
+alter table branches enable row level security;
+alter table ai_usage enable row level security;
+alter table receipt_usage enable row level security;
+alter table addon_purchases enable row level security;
+alter table products enable row level security;
+alter table customers enable row level security;
+alter table orders enable row level security;
+alter table events enable row level security;
+alter table payments enable row level security;
+alter table owner_payment enable row level security;
+alter table platform_settings enable row level security;
