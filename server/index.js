@@ -135,6 +135,12 @@ app.get(
   })
 );
 
+// Public - powers the social icons in the landing page footer.
+app.get(
+  "/api/social-links",
+  handle(async (req, res) => res.json(await db.getPublicSocialLinks()))
+);
+
 // --- Onboarding -------------------------------------------------------------
 
 app.post(

@@ -67,14 +67,36 @@ $("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("
 }catch(err){toast(err.message)}};
 $("customerForm").onsubmit=async e=>{e.preventDefault();const created=await api("POST","/api/customers",{name:$("cName").value.trim(),phone:$("cPhone").value.replace(/\D/g,""),email:$("cEmail")?.value.trim()||"",location:$("cLoc").value.trim()});state.customers.unshift(created);e.target.reset();render();toast("Customer saved")};
 $("orderForm").onsubmit=async e=>{e.preventDefault();const p=product($("oProduct").value),c=customer($("oCustomer").value),q=+$("oQty").value;if(state.orders.length>=orderLimit()){showPaywall();return}if(!p||!c)return toast("Add product and customer first");if(q>p.stock)return toast("Not enough stock");try{const created=await api("POST","/api/orders",{productId:p.id,customerId:c.id,qty:q,status:$("oStatus").value,deliveryMethod:$("oDeliveryMethod")?.value||"self"});p.stock-=q;state.orders.unshift(created);e.target.reset();$("oQty").value=1;render();toast("Order created")}catch(err){toast(err.message)}};
+function numberToWords(num){
+  if(num===0)return "Zero";
+  const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  function chunk(n){let s="";if(n>=100){s+=ones[Math.floor(n/100)]+" Hundred ";n%=100}if(n>=20){s+=tens[Math.floor(n/10)]+" ";n%=10}if(n>0){s+=ones[n]+" "}return s.trim()}
+  const scales=["","Thousand","Million","Billion"];
+  let result="",scaleIdx=0;
+  while(num>0){const chunkVal=num%1000;if(chunkVal){const words=chunk(chunkVal)+(scales[scaleIdx]?" "+scales[scaleIdx]:"");result=words.trim()+(result?" "+result:"")}num=Math.floor(num/1000);scaleIdx++}
+  return result.trim();
+}
+function amountInWords(amount){
+  const whole=Math.floor(amount);
+  const kobo=Math.round((amount-whole)*100);
+  let text=numberToWords(whole)+" Naira";
+  if(kobo>0)text+=" "+numberToWords(kobo)+" Kobo";
+  return text+" Only";
+}
 function watermarkHtml(text){const t=clean(text||"SellersPoint");return `<div class="receipt-watermark">${Array(48).fill(`<span>${t}</span>`).join("")}</div>`}
 function renderInvoice(){
   const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];
   if(!o){$("invoiceBox").textContent="Create an order first.";return}
   $("invSelect").value=o.id;
   const c=customer(o.customerId),p=product(o.productId);
-  const docType=["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice";
-  $("invoiceBox").innerHTML=`${watermarkHtml(state.businessName)}<div class="receipt-doc-head">${state.businessLogo?`<img class="invoice-logo" src="${state.businessLogo}" alt="Business logo">`:""}<div><strong class="receipt-biz-name">${clean(state.businessName)}</strong>${state.businessPhone?`<div class="meta">${clean(state.businessPhone)}</div>`:""}${state.businessAddress?`<div class="meta">${clean(state.businessAddress)}</div>`:""}</div><div class="receipt-doc-meta"><span class="meta">${docType}</span><span class="meta">${date(o.createdAt)}</span></div></div><div class="row"><span>Billed to</span><b>${clean(c?.name||"")}</b></div>${c?.phone?`<div class="row"><span>Phone</span><b>${clean(c.phone)}</b></div>`:""}<table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody><tr><td>${clean(p?.name||o.productName)}</td><td>${o.qty}</td><td>${money(p?.price||o.price||0)}</td><td>${money(total(o))}</td></tr></tbody></table><div class="row"><span>Status</span><b>${clean(o.status)}</b></div>${digitalDeliveryHtml(o,p)}<div class="row receipt-total"><span>Total</span><b>${money(total(o))}</b></div><div class="row"><span>Payment</span><b>${clean(state.paymentDetails||"Add payment details in Settings")}</b></div>`
+  const isReceipt=["Paid","Delivered"].includes(o.status);
+  const docType=isReceipt?"Receipt":"Invoice";
+  // Receipts are proof of a completed payment - no bank details belong on
+  // them. Invoices are the pre-payment bill, so they carry payment details
+  // for the customer to pay into.
+  const paymentRow=isReceipt?"":`<div class="row"><span>Payment</span><b>${clean(state.paymentDetails||"Add payment details in Settings")}</b></div>`;
+  $("invoiceBox").innerHTML=`${watermarkHtml(state.businessName)}<div class="receipt-doc-head">${state.businessLogo?`<img class="invoice-logo" src="${state.businessLogo}" alt="Business logo">`:""}<div><strong class="receipt-biz-name">${clean(state.businessName)}</strong>${state.businessPhone?`<div class="meta">${clean(state.businessPhone)}</div>`:""}${state.businessAddress?`<div class="meta">${clean(state.businessAddress)}</div>`:""}</div><div class="receipt-doc-meta"><span class="meta">${docType}</span><span class="meta">${date(o.createdAt)}</span></div></div><div class="row"><span>Billed to</span><b>${clean(c?.name||"")}</b></div>${c?.phone?`<div class="row"><span>Phone</span><b>${clean(c.phone)}</b></div>`:""}<table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody><tr><td>${clean(p?.name||o.productName)}</td><td>${o.qty}</td><td>${money(p?.price||o.price||0)}</td><td>${money(total(o))}</td></tr></tbody></table><div class="row"><span>Status</span><b>${clean(o.status)}</b></div>${digitalDeliveryHtml(o,p)}<div class="row receipt-total"><span>Total</span><b>${money(total(o))}</b></div><div class="row"><span>Amount in words</span><b>${amountInWords(total(o))}</b></div>${paymentRow}`
 }
 function invoiceText(){const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return "";const c=customer(o.customerId),p=product(o.productId);return `${["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice"} from ${state.businessName}\nDate: ${date(o.createdAt)}\nCustomer: ${c?.name||""}\nProduct: ${p?.name||o.productName}\nQuantity: ${o.qty}\nStatus: ${o.status}\nTotal: ${money(total(o))}\nThank you for your order.`}
 function orderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId);const paymentBlock=o.status==="Pending payment"&&state.paymentDetails?`\n\nPlease pay to:\n${state.paymentDetails}`:"";return `Hello, your order for ${p?.name||o.productName} x ${o.qty} is ${o.status}. Total: ${money(total(o))}.${paymentBlock}\n\nThank you.`}
@@ -149,10 +171,12 @@ function renderProfile(){
   if($("reportsTab"))$("reportsTab").style.display=(pricing[state.plan]?.reportsTier||"none")!=="none"?"block":"none";
 }
 
+let lastReport=null;
 async function loadReports(){
   if(!$("repRevenue"))return;
   try{
     const r=await api("GET","/api/reports");
+    lastReport=r;
     $("repRevenue").innerHTML=r.revenueByMonth.map(x=>`<div class="item"><strong>${clean(x.month)}</strong><span class="meta">${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No revenue yet</span></div>`;
     const upgradeHint=`<div class="item"><span class="meta">Upgrade to Pro or above to see this</span></div>`;
     $("repProducts").innerHTML=r.tier==="basic"?upgradeHint:r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
@@ -160,6 +184,18 @@ async function loadReports(){
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
   }catch(err){toast(err.message)}
 }
+if($("repExportExcel"))$("repExportExcel").onclick=()=>{
+  if(!lastReport)return toast("Load reports first");
+  if(!window.XLSX)return toast("Excel export isn't available right now - try again in a moment.");
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Month","Revenue"],...lastReport.revenueByMonth.map(x=>[x.month,x.revenue])]),"Revenue by Month");
+  if(lastReport.tier!=="basic"){
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Product","Units Sold","Revenue"],...lastReport.topProducts.map(x=>[x.name,x.units,x.revenue])]),"Top Products");
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Customer","Total Spend","Orders"],...lastReport.topCustomers.map(x=>[x.name,x.spend,x.orders])]),"Top Customers");
+  }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Status","Count"],...lastReport.statusBreakdown.map(x=>[x.status,x.count])]),"Order Status");
+  XLSX.writeFile(wb,"sellerspoint-reports.xlsx");
+};
 
 function renderTeamVisibility(){
   if(!$("teamSection"))return;
@@ -227,8 +263,8 @@ if($("copyReport"))$("copyReport").onclick=()=>copy(backendReport());if($("expor
 const renderForBackend=render;render=function(){renderForBackend();renderBackend()};
 
 if($("openUpgrade"))$("openUpgrade").onclick=()=>open("upgrade.html","_blank","noopener");
-function receiptText(o){if(!o)return "";const c=customer(o.customerId),p=product(o.productId);return "Receipt from "+state.businessName+"\nDate: "+date(new Date().toISOString())+"\nCustomer: "+(c?.name||"")+"\nItem: "+(p?.name||o.productName)+"\nQuantity: "+o.qty+"\nAmount paid: "+money(total(o))+"\nPayment status: Paid"+digitalDeliveryText(o,p)+"\nThank you for your payment."}
-function showReceipt(id){const o=state.orders.find(x=>x.id===id);if(!o)return;const c=customer(o.customerId),p=product(o.productId);if($("receiptBox"))$("receiptBox").innerHTML=(state.businessLogo?"<img class=\"invoice-logo\" src=\""+state.businessLogo+"\" alt=\"Business logo\">":"")+"<h2>Receipt</h2><div class=\"row\"><span>Business</span><b>"+clean(state.businessName)+"</b></div><div class=\"row\"><span>Customer</span><b>"+clean(c?.name||"")+"</b></div><div class=\"row\"><span>Item</span><b>"+clean(p?.name||o.productName)+"</b></div><div class=\"row\"><span>Quantity</span><b>"+o.qty+"</b></div><div class=\"row\"><span>Amount paid</span><b>"+money(total(o))+"</b></div><div class=\"row\"><span>Status</span><b>Paid</b></div>"+digitalDeliveryHtml(o,p);window.currentReceiptOrderId=id;if($("receiptModal")?.showModal)$("receiptModal").showModal()}
+function receiptText(o){if(!o)return "";const c=customer(o.customerId),p=product(o.productId);return "Receipt from "+state.businessName+"\nDate: "+date(new Date().toISOString())+"\nCustomer: "+(c?.name||"")+"\nItem: "+(p?.name||o.productName)+"\nQuantity: "+o.qty+"\nAmount paid: "+money(total(o))+" ("+amountInWords(total(o))+")\nPayment status: Paid"+digitalDeliveryText(o,p)+"\nThank you for your payment."}
+function showReceipt(id){const o=state.orders.find(x=>x.id===id);if(!o)return;const c=customer(o.customerId),p=product(o.productId);if($("receiptBox"))$("receiptBox").innerHTML=(state.businessLogo?"<img class=\"invoice-logo\" src=\""+state.businessLogo+"\" alt=\"Business logo\">":"")+"<h2>Receipt</h2><div class=\"row\"><span>Business</span><b>"+clean(state.businessName)+"</b></div><div class=\"row\"><span>Customer</span><b>"+clean(c?.name||"")+"</b></div><div class=\"row\"><span>Item</span><b>"+clean(p?.name||o.productName)+"</b></div><div class=\"row\"><span>Quantity</span><b>"+o.qty+"</b></div><div class=\"row\"><span>Amount paid</span><b>"+money(total(o))+"</b></div><div class=\"row\"><span>Amount in words</span><b>"+amountInWords(total(o))+"</b></div><div class=\"row\"><span>Status</span><b>Paid</b></div>"+digitalDeliveryHtml(o,p);window.currentReceiptOrderId=id;if($("receiptModal")?.showModal)$("receiptModal").showModal()}
 if($("closeReceipt"))$("closeReceipt").onclick=()=>$("receiptModal").close();
 if($("copyReceipt"))$("copyReceipt").onclick=()=>copy(receiptText(state.orders.find(x=>x.id===window.currentReceiptOrderId)));
 if($("waReceipt"))$("waReceipt").onclick=()=>{const o=state.orders.find(x=>x.id===window.currentReceiptOrderId);wa(receiptText(o),customer(o?.customerId)?.phone||"")}

@@ -433,16 +433,31 @@ async function updateOwner(fields) {
   return toOwnerJson(updated[0]);
 }
 
+const PLATFORM_SOCIAL_KEYS = ["instagram", "facebook", "tiktok", "x", "whatsapp", "linkedin"];
+
 async function getPlatformSettings() {
-  const { rows } = await query("SELECT extended_pricing_enabled, pricing_overrides FROM platform_settings WHERE id = 1");
-  return { extendedPricingEnabled: !!rows[0]?.extended_pricing_enabled, pricingOverrides: rows[0]?.pricing_overrides || {} };
+  const { rows } = await query("SELECT extended_pricing_enabled, pricing_overrides, social_links FROM platform_settings WHERE id = 1");
+  return { extendedPricingEnabled: !!rows[0]?.extended_pricing_enabled, pricingOverrides: rows[0]?.pricing_overrides || {}, socialLinks: rows[0]?.social_links || {} };
 }
 
 async function updatePlatformSettings(fields) {
   const current = await getPlatformSettings();
   const enabled = fields.extendedPricingEnabled !== undefined ? !!fields.extendedPricingEnabled : current.extendedPricingEnabled;
-  await query("UPDATE platform_settings SET extended_pricing_enabled = $1 WHERE id = 1", [enabled]);
-  return { ...current, extendedPricingEnabled: enabled };
+  let socialLinks = current.socialLinks;
+  if (fields.socialLinks !== undefined) {
+    socialLinks = {};
+    for (const key of PLATFORM_SOCIAL_KEYS) {
+      const value = (fields.socialLinks[key] || "").trim();
+      if (value) socialLinks[key] = value;
+    }
+  }
+  await query("UPDATE platform_settings SET extended_pricing_enabled = $1, social_links = $2 WHERE id = 1", [enabled, JSON.stringify(socialLinks)]);
+  return { ...current, extendedPricingEnabled: enabled, socialLinks };
+}
+
+async function getPublicSocialLinks() {
+  const { rows } = await query("SELECT social_links FROM platform_settings WHERE id = 1");
+  return rows[0]?.social_links || {};
 }
 
 async function updatePricingOverrides(overrides) {
@@ -854,13 +869,21 @@ async function deleteBusiness(businessId) {
 }
 
 async function listAllBusinesses() {
-  const { rows } = await query(`
-    SELECT b.*,
+  const month = currentMonth();
+  const { rows } = await query(
+    `SELECT b.*,
       (SELECT COUNT(*) FROM orders o WHERE o.business_id = b.id) AS order_count,
-      (SELECT COUNT(*) FROM customers c WHERE c.business_id = b.id) AS customer_count
-    FROM businesses b ORDER BY b.created_at DESC
-  `);
-  return rows.map((b) => ({ ...toBusinessJson(b), orderCount: Number(b.order_count), customerCount: Number(b.customer_count) }));
+      (SELECT COUNT(*) FROM customers c WHERE c.business_id = b.id) AS customer_count,
+      COALESCE((SELECT count FROM ai_usage a WHERE a.business_id = b.id AND a.month = $1), 0) AS ai_used,
+      COALESCE((SELECT COUNT(*)::int FROM addon_purchases ap WHERE ap.business_id = b.id AND ap.type = 'ai_credits' AND ap.month = $1), 0) AS ai_addon_count
+    FROM businesses b ORDER BY b.created_at DESC`,
+    [month]
+  );
+  return rows.map((b) => {
+    const baseLimit = aiLimitFor(effectivePlan(b));
+    const aiLimit = baseLimit === Infinity ? null : baseLimit + Number(b.ai_addon_count) * ADDON_AI_CREDITS;
+    return { ...toBusinessJson(b), orderCount: Number(b.order_count), customerCount: Number(b.customer_count), aiUsed: Number(b.ai_used), aiLimit };
+  });
 }
 
 async function listAllPayments() {
@@ -890,6 +913,7 @@ module.exports = {
   updateOwner,
   getPlatformSettings,
   updatePlatformSettings,
+  getPublicSocialLinks,
   updatePricingOverrides,
   createProduct,
   updateProduct,

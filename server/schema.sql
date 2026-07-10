@@ -231,6 +231,9 @@ create table if not exists platform_settings (
 );
 insert into platform_settings (id) values (1) on conflict (id) do nothing;
 alter table platform_settings add column if not exists pricing_overrides jsonb not null default '{}'::jsonb;
+-- Platform-wide social media links shown as icons in the public landing
+-- page footer, editable only from the platform-admin backend.
+alter table platform_settings add column if not exists social_links jsonb not null default '{}'::jsonb;
 
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the

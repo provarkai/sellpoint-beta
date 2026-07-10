@@ -53,6 +53,29 @@ function buildReceiptLocally({ businessName, customerName, businessPhone, busine
   };
 }
 
+function numberToWords(num) {
+  if (num === 0) return "Zero";
+  const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  function chunk(n) { let s = ""; if (n >= 100) { s += ones[Math.floor(n / 100)] + " Hundred "; n %= 100; } if (n >= 20) { s += tens[Math.floor(n / 10)] + " "; n %= 10; } if (n > 0) { s += ones[n] + " "; } return s.trim(); }
+  const scales = ["", "Thousand", "Million", "Billion"];
+  let result = "", scaleIdx = 0;
+  while (num > 0) {
+    const chunkVal = num % 1000;
+    if (chunkVal) { const words = chunk(chunkVal) + (scales[scaleIdx] ? " " + scales[scaleIdx] : ""); result = words.trim() + (result ? " " + result : ""); }
+    num = Math.floor(num / 1000);
+    scaleIdx++;
+  }
+  return result.trim();
+}
+function amountInWords(amount) {
+  const whole = Math.floor(amount);
+  const kobo = Math.round((amount - whole) * 100);
+  let text = numberToWords(whole) + " Naira";
+  if (kobo > 0) text += " " + numberToWords(kobo) + " Kobo";
+  return text + " Only";
+}
+
 // Tiled diagonal watermark (many small repeats rather than one giant word),
 // matching the style of the bank/payment-app receipts this was modeled on.
 function watermarkHtml(text) {
@@ -75,6 +98,7 @@ function renderReceipt(r) {
     <table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
     ${r.vat ? `<div class="row"><span>Subtotal</span><b>${money(r.subtotal)}</b></div><div class="row"><span>VAT (7.5%)</span><b>${money(r.vat)}</b></div>` : ""}
     <div class="row receipt-total"><span>Total</span><b>${money(r.total)}</b></div>
+    <div class="row"><span>Amount in words</span><b>${amountInWords(r.total)}</b></div>
     <div class="receipt-doc-footer">Powered by <a href="${brandUrl}" target="_blank" rel="noopener">SellersPoint</a> - create your own free branded receipts</div>
   `;
 }
