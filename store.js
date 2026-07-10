@@ -59,6 +59,11 @@ function setQty(id, qty) {
   renderCartModal();
 }
 
+const NO_PHOTO_SVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-4 4-2-2-5 5"/></svg>`;
+function productImages(p) {
+  return p.images && p.images.length ? p.images : p.image ? [p.image] : [];
+}
+
 function productUrl(id) {
   return location.origin + location.pathname + "?product=" + encodeURIComponent(id);
 }
@@ -79,8 +84,13 @@ function shareProduct(id) {
 function renderGrid() {
   $("storeGrid").innerHTML = store.products.map((p) => {
     const outOfStock = p.stock <= 0;
+    const images = productImages(p);
     return `<article class="storefront-card" onclick="viewProduct('${p.id}')">
-      ${p.image ? `<img class="storefront-card-img" src="${p.image}" alt="${clean(p.name)}">` : `<div class="storefront-card-img storefront-card-noimg">No photo</div>`}
+      <div class="storefront-card-img-wrap">
+        ${images[0] ? `<img class="storefront-card-img" src="${images[0]}" alt="${clean(p.name)}">` : `<div class="storefront-card-img storefront-card-noimg">${NO_PHOTO_SVG}</div>`}
+        ${images.length > 1 ? `<span class="storefront-photo-count">${images.length} photos</span>` : ""}
+        ${outOfStock ? `<span class="storefront-oos-badge">Out of stock</span>` : ""}
+      </div>
       <div class="storefront-card-body">
         <strong>${clean(p.name)}</strong>
         <span class="meta">${clean(p.category || p.type || "")}</span>
@@ -94,13 +104,22 @@ function renderGrid() {
   }).join("") || `<p class="meta">No products listed yet.</p>`;
 }
 
+function setModalImage(src) {
+  const img = document.getElementById("modalMainImg");
+  if (img) img.src = src;
+}
+
 function viewProduct(id) {
   const p = product(id);
   if (!p) return;
   viewingProductId = id;
   const outOfStock = p.stock <= 0;
+  const images = productImages(p);
   $("productModalBody").innerHTML = `
-    ${p.image ? `<img class="storefront-modal-img" src="${p.image}" alt="${clean(p.name)}">` : `<div class="storefront-modal-img storefront-card-noimg">No photo</div>`}
+    ${images.length
+      ? `<img id="modalMainImg" class="storefront-modal-img" src="${images[0]}" alt="${clean(p.name)}">`
+      : `<div class="storefront-modal-img storefront-card-noimg">${NO_PHOTO_SVG}</div>`}
+    ${images.length > 1 ? `<div class="storefront-thumb-row">${images.map((src) => `<img src="${src}" class="storefront-thumb" onclick="setModalImage('${src}')" alt="">`).join("")}</div>` : ""}
     <h2>${clean(p.name)}</h2>
     <p class="meta">${clean(p.category || p.type || "")}</p>
     <p class="storefront-price">${money(p.price)}</p>

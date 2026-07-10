@@ -63,4 +63,4 @@ function requirePlatformAdmin(req, res, next) {
     .catch(next);
 }
 
-module.exports = { requireAuthOnly, requireAuth, requirePlatformAdmin };
+module.exports = { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin };

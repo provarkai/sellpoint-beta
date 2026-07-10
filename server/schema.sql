@@ -137,22 +137,30 @@ create table if not exists products (
   delivery_link text not null default '',
   delivery_note text not null default '',
   image text not null default '',
+  images jsonb not null default '[]'::jsonb,
   description text not null default '',
   created_at timestamptz not null default now()
 );
 create index if not exists products_business_id_idx on products(business_id);
 alter table products add column if not exists image text not null default '';
 alter table products add column if not exists description text not null default '';
+-- images is a jsonb array of up to 5 base64 photos (same pattern as logo/
+-- banner) - image (singular) stays in sync as images[0] for anything still
+-- reading the old field (e.g. cached storefront responses, the item list
+-- thumbnail).
+alter table products add column if not exists images jsonb not null default '[]'::jsonb;
 
 create table if not exists customers (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,
   name text not null,
   phone text not null default '',
+  email text not null default '',
   location text not null default '',
   created_at timestamptz not null default now()
 );
 create index if not exists customers_business_id_idx on customers(business_id);
+alter table customers add column if not exists email text not null default '';
 
 create table if not exists orders (
   id text primary key,
@@ -165,9 +173,11 @@ create table if not exists orders (
   price numeric not null default 0,
   status text not null default 'Pending payment',
   created_at timestamptz not null default now(),
-  delivered boolean not null default false
+  delivered boolean not null default false,
+  delivery_method text not null default 'self'
 );
 create index if not exists orders_business_id_idx on orders(business_id);
+alter table orders add column if not exists delivery_method text not null default 'self';
 
 create table if not exists events (
   id text primary key,

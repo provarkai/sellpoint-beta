@@ -82,11 +82,12 @@ function toProductJson(p) {
     deliveryLink: p.delivery_link,
     deliveryNote: p.delivery_note,
     image: p.image,
+    images: p.images || [],
     description: p.description,
   };
 }
 function toCustomerJson(c) {
-  return { id: c.id, name: c.name, phone: c.phone, location: c.location };
+  return { id: c.id, name: c.name, phone: c.phone, email: c.email, location: c.location };
 }
 function toOrderJson(o) {
   return {
@@ -100,6 +101,7 @@ function toOrderJson(o) {
     status: o.status,
     createdAt: o.created_at,
     delivered: !!o.delivered,
+    deliveryMethod: o.delivery_method,
   };
 }
 function toEventJson(e) {
@@ -361,7 +363,7 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
 }
 
 function toStorefrontProductJson(p) {
-  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image, description: p.description };
+  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image, images: p.images || [], description: p.description };
 }
 
 // Public - no auth. Returns null (server/index.js 404s) unless the business
@@ -615,6 +617,14 @@ async function deleteBranch(businessId, id) {
 
 // --- Products / customers ------------------------------------------------
 
+const MAX_PRODUCT_IMAGES = 5;
+function normalizeImages(images) {
+  if (!Array.isArray(images)) return [];
+  const clean = images.filter((s) => typeof s === "string" && s.trim());
+  if (clean.length > MAX_PRODUCT_IMAGES) throw new OrderError(`A product can have at most ${MAX_PRODUCT_IMAGES} photos`);
+  return clean;
+}
+
 async function createProduct(businessId, data) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM products WHERE business_id = $1", [businessId]);
@@ -623,10 +633,11 @@ async function createProduct(businessId, data) {
   const name = requireString(data.name, "Product name");
   const price = requireNumber(data.price, "Price", { min: 0 });
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
+  const images = normalizeImages(data.images);
   const id = uid("p");
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image, description)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image, images, description)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [
       id,
       businessId,
@@ -637,7 +648,8 @@ async function createProduct(businessId, data) {
       data.type || "Product",
       data.deliveryLink || "",
       data.deliveryNote || "",
-      data.image || "",
+      images[0] || data.image || "",
+      JSON.stringify(images),
       data.description || "",
     ]
   );
@@ -652,9 +664,11 @@ async function updateProduct(businessId, id, data) {
   const name = data.name !== undefined ? requireString(data.name, "Product name") : current.name;
   const price = data.price !== undefined ? requireNumber(data.price, "Price", { min: 0 }) : Number(current.price);
   const stock = data.stock !== undefined ? requireNumber(data.stock, "Stock", { min: 0, integer: true }) : current.stock;
+  const images = data.images !== undefined ? normalizeImages(data.images) : current.images;
+  const image = data.images !== undefined ? images[0] || "" : data.image !== undefined ? data.image : current.image;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8, description=$9
-     WHERE id = $10 AND business_id = $11 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8, images=$9, description=$10
+     WHERE id = $11 AND business_id = $12 RETURNING *`,
     [
       name,
       price,
@@ -663,7 +677,8 @@ async function updateProduct(businessId, id, data) {
       data.type !== undefined ? data.type : current.type,
       data.deliveryLink !== undefined ? data.deliveryLink : current.delivery_link,
       data.deliveryNote !== undefined ? data.deliveryNote : current.delivery_note,
-      data.image !== undefined ? data.image : current.image,
+      image,
+      JSON.stringify(images),
       data.description !== undefined ? data.description : current.description,
       id,
       businessId,
@@ -680,12 +695,13 @@ async function createCustomer(businessId, data) {
   const name = requireString(data.name, "Customer name");
   const id = uid("c");
   const phone = String(data.phone || "").replace(/\D/g, "");
+  const email = String(data.email || "").trim();
   await query(
-    "INSERT INTO customers (id, business_id, name, phone, location) VALUES ($1,$2,$3,$4,$5)",
-    [id, businessId, name, phone, data.location || ""]
+    "INSERT INTO customers (id, business_id, name, phone, email, location) VALUES ($1,$2,$3,$4,$5,$6)",
+    [id, businessId, name, phone, email, data.location || ""]
   );
   await logEvent(businessId, "customer_created", name);
-  return toCustomerJson({ id, name, phone, location: data.location || "" });
+  return toCustomerJson({ id, name, phone, email, location: data.location || "" });
 }
 
 async function deleteCustomer(businessId, id) {
@@ -712,10 +728,11 @@ async function createOrder(businessId, data) {
 
   await query("UPDATE products SET stock = $1 WHERE id = $2", [product.stock - qty, product.id]);
   const id = uid("o");
+  const deliveryMethod = ["self", "rider", "sellerspoint"].includes(data.deliveryMethod) ? data.deliveryMethod : "self";
   const { rows } = await query(
-    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, product.price, data.status || "Pending payment"]
+    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING *`,
+    [id, businessId, product.id, product.name, product.type, data.customerId, qty, product.price, data.status || "Pending payment", deliveryMethod]
   );
   await logEvent(businessId, "order_created", `${product.name} x ${qty}`);
   return toOrderJson(rows[0]);
@@ -804,6 +821,18 @@ async function getPaymentByReference(reference) {
 
 // --- Platform-admin (cross-tenant) -------------------------------------------
 
+// Everything under a business (products/customers/orders/branches/staff/
+// invites/usage counters/payments) cascades via "on delete cascade" FKs -
+// this is deliberately just the one statement. Returns the member user_ids
+// first so the caller (server/index.js, which has the Supabase admin
+// client) can optionally delete the actual auth accounts too - db.js has
+// no Supabase Auth access of its own.
+async function deleteBusiness(businessId) {
+  const { rows: members } = await query("SELECT user_id FROM business_members WHERE business_id = $1", [businessId]);
+  await query("DELETE FROM businesses WHERE id = $1", [businessId]);
+  return members.map((m) => m.user_id);
+}
+
 async function listAllBusinesses() {
   const { rows } = await query(`
     SELECT b.*,
@@ -857,6 +886,7 @@ module.exports = {
   getPaymentByReference,
   listAllBusinesses,
   listAllPayments,
+  deleteBusiness,
   listStaff,
   inviteStaff,
   revokeInvite,

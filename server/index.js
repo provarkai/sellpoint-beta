@@ -3,9 +3,10 @@ const crypto = require("node:crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const db = require("./db");
-const { requireAuthOnly, requireAuth, requirePlatformAdmin } = require("./auth");
+const { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin } = require("./auth");
 const payments = require("./payments");
 const pricing = require("./pricing");
+const ai = require("./ai");
 
 const app = express();
 const ROOT = path.join(__dirname, "..");
@@ -373,14 +374,30 @@ app.post(
       if (n) tally[n] = (tally[n] || 0) + o.qty;
     });
     const bestSeller = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const texts = {
+    // Fallback templates - used when GEMINI_API_KEY isn't configured, or if
+    // the Gemini call itself fails, so the feature degrades instead of
+    // breaking outright.
+    const templates = {
       caption: `New arrival: ${product?.name || "our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(product?.price || 0)}.\n\nSend a message now to order before stock runs out.`,
       reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
       summary: `Sales summary:\n\nTotal orders: ${state.orders.length}\nTotal recorded revenue: ${money(revenue)}\nBest-selling item: ${bestSeller || "Not enough sales yet"}\nPending payments: ${state.orders.filter((o) => o.status === "Pending payment").length}\n\nSuggested action: follow up pending payments and restock fast-moving products.`,
     };
-    const text = texts[tool];
-    if (!text) return res.status(400).json({ error: "Unknown AI tool" });
+    const prompts = {
+      caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
+      reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
+      reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
+      summary: `Write a short sales summary for a Nigerian small business owner based on this data: ${state.orders.length} total orders, ${money(revenue)} paid revenue, best-selling item "${bestSeller || "none yet"}", ${state.orders.filter((o) => o.status === "Pending payment").length} orders still pending payment. End with one concrete suggested action. 4-5 sentences.`,
+    };
+    if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
+    let text = templates[tool];
+    if (ai.isConfigured()) {
+      try {
+        text = await ai.generateText(prompts[tool]);
+      } catch (err) {
+        console.error("Gemini generation failed, falling back to template:", err.message);
+      }
+    }
     const used = await db.incrementAiUsage(req.businessId);
     res.json({ text, used, limit: await db.effectiveAiLimit(req.businessId) });
   })
@@ -575,6 +592,23 @@ app.get(
   "/api/admin/payments",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.listAllPayments()))
+);
+
+// Permanently deletes a business and everything under it (products,
+// customers, orders, staff, invites, usage counters) - meant for clearing
+// out test/throwaway accounts created while building/verifying features,
+// not for real customer offboarding. Also removes the owner/staff Supabase
+// Auth accounts so nothing orphaned is left able to log in.
+app.delete(
+  "/api/admin/businesses/:id",
+  requirePlatformAdmin,
+  handle(async (req, res) => {
+    const userIds = await db.deleteBusiness(req.params.id);
+    for (const userId of userIds) {
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+    }
+    res.status(204).end();
+  })
 );
 
 app.get(
