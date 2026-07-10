@@ -26,6 +26,7 @@ function showStep(id) {
   if (id === "stepDone") burstConfetti();
 }
 function nextStep() { showStep(STEPS[stepIndex + 1] || "stepDone"); }
+function prevStep() { if (stepIndex > 0) showStep(STEPS[stepIndex - 1]); }
 
 function burstConfetti() {
   const host = $("confettiBurst");
@@ -46,6 +47,7 @@ async function api(method, url, body) {
 }
 
 document.querySelectorAll(".wizard-skip").forEach((btn) => (btn.onclick = () => nextStep()));
+document.querySelectorAll(".wizard-back").forEach((btn) => (btn.onclick = () => prevStep()));
 
 $("stepProfile").onsubmit = async (e) => {
   e.preventDefault();
@@ -53,6 +55,10 @@ $("stepProfile").onsubmit = async (e) => {
     const file = $("oLogo").files?.[0];
     const businessLogo = file ? await readFileAsDataUrl(file) : undefined;
     const body = { businessAddress: $("oAddress").value.trim(), paymentDetails: $("oPayment").value.trim() };
+    const businessName = $("oBusinessName").value.trim();
+    const businessPhone = $("oBusinessPhone").value.trim();
+    if (businessName) body.businessName = businessName;
+    if (businessPhone) body.businessPhone = businessPhone.replace(/\D/g, "");
     if (businessLogo) body.businessLogo = businessLogo;
     await api("PUT", "/api/business", body);
     nextStep();
@@ -108,6 +114,13 @@ async function boot() {
   const ctx = await window.Auth.requireSession();
   if (!ctx) return;
   token = ctx.session.access_token;
+  try {
+    const me = await api("GET", "/api/me");
+    if (me.business?.businessName && me.business.businessName !== "Your Business") $("oBusinessName").value = me.business.businessName;
+    if (me.business?.businessPhone) $("oBusinessPhone").value = me.business.businessPhone;
+  } catch (err) {
+    // Non-fatal - prefill is a convenience, not a requirement to proceed.
+  }
   if (!createdProductId || !createdCustomerId) {
     $("orderStepNote").textContent = "You skipped a product or customer earlier, so there's nothing to build a first order from yet - that's fine, just continue.";
   }

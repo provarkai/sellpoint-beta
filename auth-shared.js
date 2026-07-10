@@ -44,7 +44,35 @@
     location.href = "login.html";
   }
 
-  window.Auth = { ensureBusiness, requireSession, logout };
+  // Google/Apple both go through the same OAuth redirect flow - Supabase
+  // handles the provider-specific details once enabled in the project's
+  // Auth settings. login.html's boot() already knows how to pick up a
+  // returning session and run ensureBusiness(), so every provider redirects
+  // back there rather than duplicating that logic per provider.
+  async function signInWithProvider(provider) {
+    const supabase = await window.supabaseReady;
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + "/login.html" } });
+    if (error) throw error;
+  }
+
+  // Phone auth is two calls: request a code, then verify it. Supabase treats
+  // an unrecognized phone number as a new signup automatically, so this one
+  // flow covers both signup.html and login.html.
+  async function sendPhoneOtp(phone) {
+    const supabase = await window.supabaseReady;
+    const formatted = phone.startsWith("+") ? phone : "+" + phone.replace(/\D/g, "");
+    const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
+    if (error) throw error;
+    return formatted;
+  }
+  async function verifyPhoneOtp(phone, token) {
+    const supabase = await window.supabaseReady;
+    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
+    if (error) throw error;
+    return data.session;
+  }
+
+  window.Auth = { ensureBusiness, requireSession, logout, signInWithProvider, sendPhoneOtp, verifyPhoneOtp };
 
   // Wires up any <button class="pw-toggle" data-for="fieldId"> next to a
   // password input - shared across login/signup/reset-password so the
@@ -62,4 +90,51 @@
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wirePasswordToggles);
   else wirePasswordToggles();
+
+  // Wires the Google/Apple/Phone auth block that's identical markup on both
+  // login.html and signup.html, so neither page's own script needs to repeat
+  // this. No-ops if the elements aren't on the page.
+  function wireAuthExtras() {
+    const google = document.getElementById("googleAuth");
+    const apple = document.getElementById("appleAuth");
+    if (google) google.onclick = () => signInWithProvider("google").catch((err) => toastFallback(err.message));
+    if (apple) apple.onclick = () => signInWithProvider("apple").catch((err) => toastFallback(err.message));
+
+    const showPhone = document.getElementById("showPhoneAuth");
+    const phoneForm = document.getElementById("phoneForm");
+    const otpForm = document.getElementById("phoneOtpForm");
+    if (!showPhone || !phoneForm || !otpForm) return;
+    showPhone.onclick = () => { phoneForm.style.display = "grid"; showPhone.style.display = "none"; };
+    let pendingPhone = "";
+    phoneForm.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        pendingPhone = await sendPhoneOtp(document.getElementById("phoneNumber").value.trim());
+        phoneForm.style.display = "none";
+        otpForm.style.display = "grid";
+        toastFallback("Code sent");
+      } catch (err) {
+        toastFallback(err.message);
+      }
+    };
+    otpForm.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const session = await verifyPhoneOtp(pendingPhone, document.getElementById("phoneOtp").value.trim());
+        const justCreated = await ensureBusiness(session);
+        location.href = justCreated ? "onboarding.html" : "app.html";
+      } catch (err) {
+        toastFallback(err.message);
+      }
+    };
+  }
+  function toastFallback(m) {
+    const t = document.getElementById("toast");
+    if (!t) return;
+    t.textContent = m;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireAuthExtras);
+  else wireAuthExtras();
 })();

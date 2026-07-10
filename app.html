@@ -8,20 +8,21 @@
 </head>
 <body>
   <aside>
-    <div class="brand"><b id="brandLogo">SP</b><span><strong>SellersPoint Beta</strong><small>AI business manager</small></span></div>
-    <button class="tab active" data-tab="dash">Dashboard</button>
-    <button class="tab" data-tab="products">Products</button>
-    <button class="tab" data-tab="customers">Customers</button>
-    <button class="tab" data-tab="orders">Orders</button>
-    <button class="tab" data-tab="invoice">Receipt</button>
-    <button class="tab" data-tab="ai">AI Tools</button>
-    <button class="tab" data-tab="reports" id="reportsTab" style="display:none">Reports</button>
-    <button class="tab" data-tab="logistics">Logistics</button>
-    <button class="tab" data-tab="settings">Settings</button>
+    <div class="brand"><b id="brandLogo">SP</b><span><strong>SellersPoint Beta</strong><small>AI business manager</small></span><button id="logout">Log Out</button></div>
+    <div class="tab-rows">
+      <button class="tab active" data-tab="dash">Dashboard</button>
+      <button class="tab" data-tab="products">Products</button>
+      <button class="tab" data-tab="customers">Customers</button>
+      <button class="tab" data-tab="orders">Orders</button>
+      <button class="tab" data-tab="invoice">Receipt</button>
+      <button class="tab" data-tab="ai">AI Tools</button>
+      <button class="tab" data-tab="reports" id="reportsTab" style="display:none">Reports</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </div>
     <div class="plan"><small><span id="planName">Free</span> plan</small><b><span id="used">0</span>/<span id="orderLimit">30</span> orders</b><button id="upgrade">Upgrade</button></div>
   </aside>
   <main>
-    <header><div><h1 id="title">Dashboard</h1></div><div class="top-actions"><button id="logout">Log Out</button></div></header>
+    <header><div><h1 id="title">Dashboard</h1></div></header>
     <section id="dash" class="page active"><article class="profile-card"><img id="profileLogo" src="" alt="Business logo" style="display:none"><div id="profileLogoFallback" class="profile-logo-fallback">SP</div><div><strong id="profileName">Your Business</strong><span class="meta" id="profilePhone"></span><span class="meta" id="profileRole"></span></div><div class="profile-plan"><span id="profilePlan">Starter</span></div></article><article id="activationChecklist" class="activation-checklist" style="display:none"><div class="activation-checklist-head"><h2>Get set up</h2><span class="meta" id="activationChecklistCount"></span></div><div id="activationChecklistItems" class="list"></div></article><div class="metrics"><div><small>Revenue</small><b id="rev">NGN 0</b></div><div><small>Orders</small><b id="ordMetric">0</b></div><div><small>Customers</small><b id="custMetric">0</b></div><div><small>Low Stock</small><b id="lowMetric">0</b></div></div><div class="grid"><article><h2>Today</h2><p id="summary"></p></article><article><h2>Restock alerts</h2><div id="restock" class="list"></div></article></div><article><h2>Follow up on payments <small id="followUpCount"></small></h2><p class="meta">Orders pending payment for over 24 hours - one tap to remind on WhatsApp.</p><div id="followUp" class="list"></div></article></section>
     <section id="products" class="page"><div class="grid"><form id="productForm"><h2 id="pFormTitle">Add product / service</h2><label>Type<select id="pType"><option>Product</option><option>Service</option><option>Digital product</option></select></label><label>Name<input id="pName" required></label><label>Price<input id="pPrice" type="number" min="0" required></label><label>Stock / slots / licenses<input id="pStock" type="number" min="0" required></label><label>Category<input id="pCat"></label><label>Description <span class="meta">(shows on your storefront)</span><textarea id="pDescription" rows="3" placeholder="What is this, who is it for, what makes it good"></textarea></label><label>Product photos <span class="meta">(up to 5, shown on your storefront)</span><input id="pImage" type="file" accept="image/*" multiple></label><div id="pImagePreview" class="product-photo-preview"></div><div id="pDeliveryLinkField" style="display:none"><label>Digital delivery link<input id="pDelivery" placeholder="https://drive.google.com/... or download page"></label></div><div id="pNoteField" style="display:none"><label><span id="pNoteLabel">Delivery note</span><textarea id="pNote" rows="3" placeholder="Access instructions, license key note, support contact"></textarea></label></div><p class="actions"><button id="pSubmitBtn">Save Item</button><button type="button" id="pCancelEdit" style="display:none">Cancel Edit</button></p></form><article><h2>Products & Services <small id="pCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="pImportCsv" type="file" accept=".csv" style="display:none"></label><button id="pExportPdf">Export PDF</button><button id="pExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, price, stock, category, type</p><div id="pList" class="list"></div></article></div></section>
     <section id="customers" class="page"><div class="grid"><form id="customerForm"><h2>Add customer</h2><label>Name<input id="cName" required></label><label>Phone<input id="cPhone" required placeholder="2348012345678"></label><label>Email<input id="cEmail" type="email" placeholder="Optional"></label><label>Location<input id="cLoc"></label><button>Save Customer</button></form><article><h2>Customers <small id="cCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="cImportCsv" type="file" accept=".csv" style="display:none"></label><button id="cExportPdf">Export PDF</button><button id="cExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, phone, email, location</p><div id="cList" class="list"></div></article></div></section>

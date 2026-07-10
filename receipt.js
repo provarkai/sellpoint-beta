@@ -53,12 +53,19 @@ function buildReceiptLocally({ businessName, customerName, businessPhone, busine
   };
 }
 
+// Tiled diagonal watermark (many small repeats rather than one giant word),
+// matching the style of the bank/payment-app receipts this was modeled on.
+function watermarkHtml(text) {
+  const t = clean(text || "SellersPoint");
+  return `<div class="receipt-watermark">${Array(48).fill(`<span>${t}</span>`).join("")}</div>`;
+}
+
 function renderReceipt(r) {
   const dateStr = new Date(r.issuedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
   const itemRows = r.items.map((it) => `<tr><td>${clean(it.name)}</td><td>${it.qty}</td><td>${money(it.price)}</td><td>${money(it.qty * it.price)}</td></tr>`).join("");
   const brandUrl = location.origin + "/receipt.html";
   $("receiptBox").innerHTML = `
-    <div class="receipt-watermark"><span>${clean(r.businessName)}</span></div>
+    ${watermarkHtml(r.businessName)}
     <div class="receipt-doc-head">
       ${r.businessLogo ? `<img class="invoice-logo" src="${r.businessLogo}" alt="Business logo">` : ""}
       <div><strong class="receipt-biz-name">${clean(r.businessName)}</strong>${r.businessPhone ? `<div class="meta">${clean(r.businessPhone)}</div>` : ""}${r.businessAddress ? `<div class="meta">${clean(r.businessAddress)}</div>` : ""}</div>

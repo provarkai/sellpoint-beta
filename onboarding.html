@@ -16,6 +16,8 @@
     <div class="wizard-progress"><div id="wizardProgressBar" class="wizard-progress-bar"></div></div>
 
     <form id="stepProfile" class="wizard-step">
+      <label>Business name<input id="oBusinessName" placeholder="Your Business"></label>
+      <label>Phone number<input id="oBusinessPhone" placeholder="2348012345678"></label>
       <label>Business logo<input id="oLogo" type="file" accept="image/*"></label>
       <label>Address<input id="oAddress" placeholder="123 Market Street, Lagos"></label>
       <label>Payment details <span class="meta">(shown on invoices and sent to customers)</span><textarea id="oPayment" rows="4" placeholder="Bank: Example Bank
@@ -28,18 +30,18 @@ Name: Your Business"></textarea></label>
       <label>What do you sell? <span class="meta">(product, service, or digital item)</span><input id="wProductName" placeholder="e.g. Ankara Fabric"></label>
       <label>Price<input id="wProductPrice" type="number" min="0" placeholder="5000"></label>
       <label>Stock / slots<input id="wProductStock" type="number" min="0" value="10"></label>
-      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepProduct">Skip</button><button>Add Product</button></p>
+      <p class="actions"><button type="button" class="wizard-back" data-back="stepProduct">Back</button><button type="button" class="wizard-skip" data-skip="stepProduct">Skip</button><button>Add Product</button></p>
     </form>
 
     <form id="stepCustomer" class="wizard-step" style="display:none">
       <label>A customer's name<input id="wCustomerName" placeholder="e.g. Amina Bello"></label>
       <label>Phone<input id="wCustomerPhone" placeholder="2348012345678"></label>
-      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepCustomer">Skip</button><button>Add Customer</button></p>
+      <p class="actions"><button type="button" class="wizard-back" data-back="stepCustomer">Back</button><button type="button" class="wizard-skip" data-skip="stepCustomer">Skip</button><button>Add Customer</button></p>
     </form>
 
     <form id="stepOrder" class="wizard-step" style="display:none">
       <p class="meta" id="orderStepNote">Create your first order to see how it flows through the app.</p>
-      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepOrder">Skip</button><button id="createOrderBtn">Create First Order</button></p>
+      <p class="actions"><button type="button" class="wizard-back" data-back="stepOrder">Back</button><button type="button" class="wizard-skip" data-skip="stepOrder">Skip</button><button id="createOrderBtn">Create First Order</button></p>
     </form>
 
     <div id="stepDone" class="wizard-step" style="display:none">
