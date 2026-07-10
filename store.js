@@ -30,12 +30,15 @@ function saveCart() {
 function product(id) {
   return store.products.find((p) => p.id === id);
 }
+function effectivePrice(p) {
+  return p.discountPrice || p.price;
+}
 
 function cartCount() {
   return Object.values(cart).reduce((s, q) => s + q, 0);
 }
 function cartTotal() {
-  return Object.entries(cart).reduce((s, [id, q]) => s + (product(id)?.price || 0) * q, 0);
+  return Object.entries(cart).reduce((s, [id, q]) => s + (product(id) ? effectivePrice(product(id)) : 0) * q, 0);
 }
 
 function renderCartBar() {
@@ -72,7 +75,7 @@ function shareProduct(id) {
   const p = product(id);
   if (!p) return;
   const url = productUrl(id);
-  const text = `${p.name} - ${money(p.price)}`;
+  const text = `${p.name} - ${money(effectivePrice(p))}`;
   if (navigator.share) {
     navigator.share({ title: p.name, text, url }).catch(() => {});
   } else {
@@ -94,7 +97,7 @@ function renderGrid() {
       <div class="storefront-card-body">
         <strong>${clean(p.name)}</strong>
         <span class="meta">${clean(p.category || p.type || "")}</span>
-        <span class="storefront-price">${money(p.price)}</span>
+        <span class="storefront-price">${p.discountPrice?`<s class="meta">${money(p.price)}</s> ${money(p.discountPrice)}`:money(p.price)}</span>
         <div class="storefront-card-actions">
           <button ${outOfStock ? "disabled" : ""} onclick="event.stopPropagation();addToCart('${p.id}')">${outOfStock ? "Out of stock" : "Add to Cart"}</button>
           <button type="button" class="storefront-share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')" title="Share this product">Share</button>
@@ -122,7 +125,7 @@ function viewProduct(id) {
     ${images.length > 1 ? `<div class="storefront-thumb-row">${images.map((src) => `<img src="${src}" class="storefront-thumb" onclick="setModalImage('${src}')" alt="">`).join("")}</div>` : ""}
     <h2>${clean(p.name)}</h2>
     <p class="meta">${clean(p.category || p.type || "")}</p>
-    <p class="storefront-price">${money(p.price)}</p>
+    <p class="storefront-price">${p.discountPrice?`<s class="meta">${money(p.price)}</s> ${money(p.discountPrice)}`:money(p.price)}</p>
     ${p.description ? `<p>${clean(p.description)}</p>` : ""}
     <p class="meta">${outOfStock ? "Out of stock" : p.type === "Service" ? `${p.stock} slot${p.stock === 1 ? "" : "s"} available` : p.type === "Digital product" ? `${p.stock} license${p.stock === 1 ? "" : "s"} available` : `${p.stock} in stock`}</p>
   `;
@@ -143,7 +146,7 @@ function renderCartModal() {
   $("cartItems").innerHTML = entries.map(([id, qty]) => {
     const p = product(id);
     if (!p) return "";
-    return `<div class="item"><div class="item-top"><strong>${clean(p.name)}</strong><span>${money(p.price * qty)}</span></div><div class="item-actions"><button onclick="setQty('${id}',${qty - 1})">-</button><span>${qty}</span><button onclick="setQty('${id}',${qty + 1})">+</button><button onclick="setQty('${id}',0)">Remove</button></div></div>`;
+    return `<div class="item"><div class="item-top"><strong>${clean(p.name)}</strong><span>${money(effectivePrice(p) * qty)}</span></div><div class="item-actions"><button onclick="setQty('${id}',${qty - 1})">-</button><span>${qty}</span><button onclick="setQty('${id}',${qty + 1})">+</button><button onclick="setQty('${id}',0)">Remove</button></div></div>`;
   }).join("") || `<div class="item"><span class="meta">Your cart is empty</span></div>`;
   $("cartTotal").textContent = money(cartTotal());
 }
@@ -154,7 +157,7 @@ $("orderWhatsApp").onclick = () => {
   const entries = Object.entries(cart);
   if (!entries.length) return toast("Your cart is empty");
   const buyerName = $("buyerName").value.trim();
-  const lines = entries.map(([id, qty]) => { const p = product(id); return `${p.name} x ${qty} - ${money(p.price * qty)}`; }).join("\n");
+  const lines = entries.map(([id, qty]) => { const p = product(id); return `${p.name} x ${qty} - ${money(effectivePrice(p) * qty)}`; }).join("\n");
   const msg = `Hello ${clean(store.businessName)}, I'd like to order:\n\n${lines}\n\nTotal: ${money(cartTotal())}${buyerName ? "\n\nFrom: " + buyerName : ""}`;
   const phone = (store.businessPhone || "").replace(/\D/g, "");
   open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");

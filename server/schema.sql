@@ -149,6 +149,11 @@ alter table products add column if not exists description text not null default 
 -- reading the old field (e.g. cached storefront responses, the item list
 -- thumbnail).
 alter table products add column if not exists images jsonb not null default '[]'::jsonb;
+-- Nullable: no discount unless explicitly set. Stored as the discounted
+-- price itself (not a percentage) so display/order math is one comparison
+-- ("is discount_price set and lower than price?") instead of recomputing a
+-- percentage everywhere it's used.
+alter table products add column if not exists discount_price numeric;
 
 create table if not exists customers (
   id text primary key,

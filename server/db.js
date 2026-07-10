@@ -72,10 +72,12 @@ function effectivePlan(b) {
   return b.plan;
 }
 function toProductJson(p) {
+  const discountPrice = p.discount_price == null ? null : Number(p.discount_price);
   return {
     id: p.id,
     name: p.name,
     price: Number(p.price),
+    discountPrice: discountPrice != null && discountPrice < Number(p.price) ? discountPrice : null,
     stock: p.stock,
     category: p.category,
     type: p.type,
@@ -363,7 +365,8 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
 }
 
 function toStorefrontProductJson(p) {
-  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image, images: p.images || [], description: p.description };
+  const discountPrice = p.discount_price == null ? null : Number(p.discount_price);
+  return { id: p.id, name: p.name, price: Number(p.price), discountPrice: discountPrice != null && discountPrice < Number(p.price) ? discountPrice : null, stock: p.stock, category: p.category, type: p.type, image: p.image, images: p.images || [], description: p.description };
 }
 
 // Public - no auth. Returns null (server/index.js 404s) unless the business
@@ -625,6 +628,15 @@ function normalizeImages(images) {
   return clean;
 }
 
+// Unset (undefined/null/"") clears the discount rather than erroring, since
+// that's how a seller removes a discount via the same field they set it in.
+function parseDiscountPrice(value, price) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = requireNumber(value, "Discount price", { min: 0 });
+  if (n >= price) throw new OrderError("Discount price must be lower than the regular price");
+  return n;
+}
+
 async function createProduct(businessId, data) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM products WHERE business_id = $1", [businessId]);
@@ -633,16 +645,18 @@ async function createProduct(businessId, data) {
   const name = requireString(data.name, "Product name");
   const price = requireNumber(data.price, "Price", { min: 0 });
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
+  const discountPrice = parseDiscountPrice(data.discountPrice, price);
   const images = normalizeImages(data.images);
   const id = uid("p");
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image, images, description)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
     [
       id,
       businessId,
       name,
       price,
+      discountPrice,
       stock,
       data.category || "",
       data.type || "Product",
@@ -664,14 +678,16 @@ async function updateProduct(businessId, id, data) {
   const name = data.name !== undefined ? requireString(data.name, "Product name") : current.name;
   const price = data.price !== undefined ? requireNumber(data.price, "Price", { min: 0 }) : Number(current.price);
   const stock = data.stock !== undefined ? requireNumber(data.stock, "Stock", { min: 0, integer: true }) : current.stock;
+  const discountPrice = data.discountPrice !== undefined ? parseDiscountPrice(data.discountPrice, price) : current.discount_price;
   const images = data.images !== undefined ? normalizeImages(data.images) : current.images;
   const image = data.images !== undefined ? images[0] || "" : data.image !== undefined ? data.image : current.image;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8, images=$9, description=$10
-     WHERE id = $11 AND business_id = $12 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11
+     WHERE id = $12 AND business_id = $13 RETURNING *`,
     [
       name,
       price,
+      discountPrice,
       stock,
       data.category !== undefined ? data.category : current.category,
       data.type !== undefined ? data.type : current.type,
@@ -729,10 +745,14 @@ async function createOrder(businessId, data) {
   await query("UPDATE products SET stock = $1 WHERE id = $2", [product.stock - qty, product.id]);
   const id = uid("o");
   const deliveryMethod = ["self", "rider", "sellerspoint"].includes(data.deliveryMethod) ? data.deliveryMethod : "self";
+  // Orders bill at the discounted price when one's active - the discount is
+  // a real selling price, not just a display label.
+  const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
+  const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : product.price;
   const { rows } = await query(
     `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, product.price, data.status || "Pending payment", deliveryMethod]
+    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod]
   );
   await logEvent(businessId, "order_created", `${product.name} x ${qty}`);
   return toOrderJson(rows[0]);
