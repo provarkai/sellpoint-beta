@@ -23,7 +23,11 @@ function showStep(id) {
   if ($("wizardSub")) $("wizardSub").textContent = sub;
   stepIndex = STEPS.indexOf(id);
   if ($("wizardProgressBar")) $("wizardProgressBar").style.width = Math.round((stepIndex / (STEPS.length - 1)) * 100) + "%";
-  if (id === "stepDone") burstConfetti();
+  if (id === "stepDone") {
+    burstConfetti();
+    toast("Welcome to SellersPoint! 🎉");
+    setTimeout(() => { location.href = "app.html"; }, 2200);
+  }
 }
 function nextStep() { showStep(STEPS[stepIndex + 1] || "stepDone"); }
 function prevStep() { if (stepIndex > 0) showStep(STEPS[stepIndex - 1]); }

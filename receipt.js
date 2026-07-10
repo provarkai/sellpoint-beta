@@ -128,10 +128,38 @@ $("receiptForm").onsubmit = async (e) => {
 };
 $("printReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); print(); };
 $("waReceipt").onclick = () => { if (!lastReceipt) return toast("Generate a receipt first"); open("https://wa.me/?text=" + encodeURIComponent(receiptText(lastReceipt)), "_blank", "noopener"); };
+$("shareReceiptImage").onclick = async () => {
+  if (!lastReceipt) return toast("Generate a receipt first");
+  try {
+    const canvas = await renderCanvas();
+    await shareImageViaWhatsApp(canvas, (lastReceipt.reference || "receipt") + ".png");
+  } catch (err) {
+    if (err.name !== "AbortError") toast(err.message);
+  }
+};
 
 async function renderCanvas() {
   if (!window.html2canvas) throw new Error("Image export isn't available right now - try again in a moment.");
   return html2canvas($("receiptBox"), { backgroundColor: "#ffffff", scale: 2 });
+}
+
+// The wa.me link only ever supports plain text - WhatsApp has no URL
+// scheme for pre-attaching a file. The Web Share API (mobile Chrome/Safari)
+// is the only way to hand WhatsApp an actual image file via the native
+// share sheet; desktop browsers without file-share support fall back to
+// downloading the image so it can be attached manually.
+async function shareImageViaWhatsApp(canvas, filename) {
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const file = new File([blob], filename, { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file] });
+    return;
+  }
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+  toast("Image downloaded - attach it in WhatsApp (your browser doesn't support direct file sharing)");
 }
 $("downloadImage").onclick = async () => {
   if (!lastReceipt) return toast("Generate a receipt first");
