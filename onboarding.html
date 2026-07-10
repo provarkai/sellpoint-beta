@@ -7,22 +7,47 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="single-page premium-page">
-  <main class="premium-main premium-auth">
+  <main class="premium-main premium-auth wizard-main">
     <div class="premium-hero">
-      <span class="premium-kicker">Welcome to SellersPoint</span>
-      <h1>Let's set up your business</h1>
-      <p class="premium-sub">Two minutes now saves confusion later - you can always change this in Settings.</p>
+      <span class="premium-kicker" id="wizardStepLabel">Step 1 of 4</span>
+      <h1 id="wizardTitle">Let's set up your business</h1>
+      <p class="premium-sub" id="wizardSub">Two minutes now saves confusion later - every step can be changed in Settings.</p>
     </div>
-    <form id="onboardingForm">
+    <div class="wizard-progress"><div id="wizardProgressBar" class="wizard-progress-bar"></div></div>
+
+    <form id="stepProfile" class="wizard-step">
       <label>Business logo<input id="oLogo" type="file" accept="image/*"></label>
       <label>Address<input id="oAddress" placeholder="123 Market Street, Lagos"></label>
-      <label>Paystack payment link <span class="meta">(optional)</span><input id="oPaymentLink" placeholder="https://paystack.shop/your-link"></label>
-      <label>Payment details <span class="meta">(shown on invoices)</span><textarea id="oPayment" rows="4" placeholder="Bank: Example Bank
+      <label>Payment details <span class="meta">(shown on invoices and sent to customers)</span><textarea id="oPayment" rows="4" placeholder="Bank: Example Bank
 Account: 1234567890
 Name: Your Business"></textarea></label>
-      <button>Finish Setup</button>
-      <p class="meta"><a href="index.html">Skip for now</a></p>
+      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepProfile">Skip</button><button>Continue</button></p>
     </form>
+
+    <form id="stepProduct" class="wizard-step" style="display:none">
+      <label>What do you sell? <span class="meta">(product, service, or digital item)</span><input id="wProductName" placeholder="e.g. Ankara Fabric"></label>
+      <label>Price<input id="wProductPrice" type="number" min="0" placeholder="5000"></label>
+      <label>Stock / slots<input id="wProductStock" type="number" min="0" value="10"></label>
+      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepProduct">Skip</button><button>Add Product</button></p>
+    </form>
+
+    <form id="stepCustomer" class="wizard-step" style="display:none">
+      <label>A customer's name<input id="wCustomerName" placeholder="e.g. Amina Bello"></label>
+      <label>Phone<input id="wCustomerPhone" placeholder="2348012345678"></label>
+      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepCustomer">Skip</button><button>Add Customer</button></p>
+    </form>
+
+    <form id="stepOrder" class="wizard-step" style="display:none">
+      <p class="meta" id="orderStepNote">Create your first order to see how it flows through the app.</p>
+      <p class="actions"><button type="button" class="wizard-skip" data-skip="stepOrder">Skip</button><button id="createOrderBtn">Create First Order</button></p>
+    </form>
+
+    <div id="stepDone" class="wizard-step" style="display:none">
+      <div id="confettiBurst" class="confetti-burst"></div>
+      <h2>Congratulations! 🎉</h2>
+      <p class="meta">Your business is ready. You can find everything you just added in the dashboard.</p>
+      <p class="actions"><a class="button-link" href="app.html">Continue to Dashboard</a></p>
+    </div>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>

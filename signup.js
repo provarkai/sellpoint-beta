@@ -16,7 +16,7 @@ async function boot() {
       // Email confirmation is off on this Supabase project - session is
       // already valid, so create the business now and go straight in.
       const justCreated = await window.Auth.ensureBusiness(data.session);
-      location.href = justCreated ? "onboarding.html" : "index.html";
+      location.href = justCreated ? "onboarding.html" : "app.html";
     } else {
       toast("Check your email to confirm your account, then log in.");
       setTimeout(() => (location.href = "login.html"), 2500);
