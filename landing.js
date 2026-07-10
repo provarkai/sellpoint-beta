@@ -14,7 +14,7 @@ async function loadPricing() {
       const t = pricing[key];
       const isFree = !t.monthly;
       const price = isFree ? '<p class="premium-price">Free</p>' : `<p class="premium-price">${money(t.monthly)}<span>/month</span></p>`;
-      const featured = key === "growth";
+      const featured = key === "pro";
       return `<article class="premium-card${featured ? " premium-card-featured" : ""}">${featured ? '<span class="landing-pricing-badge">Most Popular</span>' : ""}<h2>${t.name}</h2>${price}<p class="meta">${t.tagline}</p><a class="button-link" href="signup.html">${isFree ? "Start Free" : "Get Started"}</a></article>`;
     }).join("");
   } catch {
@@ -22,3 +22,12 @@ async function loadPricing() {
   }
 }
 loadPricing();
+
+// Duplicate the testimonial cards once so the CSS marquee (translateX -50%
+// to 0%) has a seamless second copy to hand off to - keeps the source HTML
+// to a single set of 9 real cards instead of hand-duplicating markup.
+const track = $("testimonialTrack");
+if (track) {
+  const clone = track.innerHTML;
+  track.innerHTML = clone + clone;
+}

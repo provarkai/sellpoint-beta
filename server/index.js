@@ -382,10 +382,41 @@ app.post(
       if (n) tally[n] = (tally[n] || 0) + o.qty;
     });
     const bestSeller = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
+    // "ask" answers free-form questions about the business ("Who owes me
+    // money?", "What should I restock?") using real state, not a canned
+    // message - this backs the AI Assistant chat, matching what the landing
+    // page's chat mockup demonstrates.
+    const question = (req.body.question || "").trim();
+    const pending = state.orders.filter((o) => o.status === "Pending payment");
+    const owedByCustomer = {};
+    pending.forEach((o) => {
+      const name = state.customers.find((c) => c.id === o.customerId)?.name || "a customer";
+      const amt = (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty;
+      owedByCustomer[name] = (owedByCustomer[name] || 0) + amt;
+    });
+    const lowStock = state.products.filter((p) => p.stock < 5);
+    function askFallback(q) {
+      const lower = q.toLowerCase();
+      if (/owe|pending|unpaid/.test(lower)) {
+        const entries = Object.entries(owedByCustomer);
+        return entries.length ? "Customers who owe you money: " + entries.map(([n, a]) => `${n} (${money(a)})`).join(", ") + "." : "No one currently owes you money - all orders are paid up.";
+      }
+      if (/restock|low stock|running out/.test(lower)) {
+        return lowStock.length ? "Restock soon: " + lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") + "." : "Nothing is low on stock right now.";
+      }
+      if (/best.?sell|top product|sold best|popular/.test(lower)) {
+        return bestSeller ? `Your best-selling item is ${bestSeller}.` : "Not enough sales yet to tell what's selling best.";
+      }
+      if (/summar|how.*(doing|business)|today|revenue/.test(lower)) {
+        return `You have ${state.orders.length} orders on record and ${money(revenue)} in paid revenue so far.`;
+      }
+      return `I can help with questions about payments, restocking, and top sellers. Right now: ${state.orders.length} orders, ${money(revenue)} paid revenue, best seller ${bestSeller || "none yet"}, ${pending.length} orders pending payment.`;
+    }
     // Fallback templates - used when GEMINI_API_KEY isn't configured, or if
     // the Gemini call itself fails, so the feature degrades instead of
     // breaking outright.
     const templates = {
+      ask: askFallback(question || "summary"),
       caption: `New arrival: ${product?.name || "our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(product?.price || 0)}.\n\nSend a message now to order before stock runs out.`,
       reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
@@ -393,6 +424,7 @@ app.post(
       description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}${draftExtra ? `. ${draftExtra}` : ""}, with fast delivery and great value for the price.`,
     };
     const prompts = {
+      ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
       caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
       reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
