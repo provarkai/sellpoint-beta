@@ -45,4 +45,21 @@
   }
 
   window.Auth = { ensureBusiness, requireSession, logout };
+
+  // Wires up any <button class="pw-toggle" data-for="fieldId"> next to a
+  // password input - shared across login/signup/reset-password so the
+  // show/hide behavior and label stay consistent everywhere.
+  function wirePasswordToggles() {
+    document.querySelectorAll(".pw-toggle").forEach((btn) => {
+      const input = document.getElementById(btn.dataset.for);
+      if (!input) return;
+      btn.onclick = () => {
+        const showing = input.type === "text";
+        input.type = showing ? "password" : "text";
+        btn.textContent = showing ? "Show" : "Hide";
+      };
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wirePasswordToggles);
+  else wirePasswordToggles();
 })();

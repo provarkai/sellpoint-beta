@@ -28,6 +28,25 @@ alter table businesses add column if not exists storefront_enabled boolean not n
 update businesses set slug = 'shop-' || substr(id::text, 1, 8) where slug is null;
 alter table businesses alter column slug set not null;
 create unique index if not exists businesses_slug_idx on businesses(lower(slug));
+-- Storefront branding: banner image (base64, same pattern as logo/product
+-- photos) and a small fixed set of social links shown on the public page.
+alter table businesses add column if not exists storefront_banner text not null default '';
+alter table businesses add column if not exists social_links jsonb not null default '{}'::jsonb;
+
+-- Logistics: dispatch/courier provider credentials the seller has entered.
+-- Deliberately generic (name + tracking API base + API key) rather than
+-- per-carrier integrations - no specific dispatch rider API is wired up
+-- yet, this just gives sellers a place to store the details until one is.
+create table if not exists logistics_providers (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  api_key text not null default '',
+  api_base text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists logistics_providers_business_id_idx on logistics_providers(business_id);
 
 -- One row per (Supabase Auth user, business). user_id is unique for now since
 -- a user belongs to exactly one business (owner or staff) - multi-business
@@ -118,10 +137,12 @@ create table if not exists products (
   delivery_link text not null default '',
   delivery_note text not null default '',
   image text not null default '',
+  description text not null default '',
   created_at timestamptz not null default now()
 );
 create index if not exists products_business_id_idx on products(business_id);
 alter table products add column if not exists image text not null default '';
+alter table products add column if not exists description text not null default '';
 
 create table if not exists customers (
   id text primary key,

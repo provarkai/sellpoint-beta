@@ -15,12 +15,13 @@
     </div>
     <form id="loginForm">
       <label>Admin email<input id="email" type="email" required autocomplete="username"></label>
-      <label>Password<input id="password" type="password" required autocomplete="current-password"></label>
+      <label>Password<div class="pw-wrap"><input id="password" type="password" required autocomplete="current-password"><button type="button" class="pw-toggle" data-for="password">Show</button></div></label>
       <button>Log In</button>
     </form>
   </main>
   <div id="toast"></div>
   <script type="module" src="supabase-init.js"></script>
+  <script defer src="auth-shared.js"></script>
   <script defer src="admin-login.js"></script>
 </body>
 </html>

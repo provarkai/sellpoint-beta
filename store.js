@@ -59,6 +59,23 @@ function setQty(id, qty) {
   renderCartModal();
 }
 
+function productUrl(id) {
+  return location.origin + location.pathname + "?product=" + encodeURIComponent(id);
+}
+
+function shareProduct(id) {
+  const p = product(id);
+  if (!p) return;
+  const url = productUrl(id);
+  const text = `${p.name} - ${money(p.price)}`;
+  if (navigator.share) {
+    navigator.share({ title: p.name, text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(`${text}\n${url}`);
+    toast("Product link copied");
+  }
+}
+
 function renderGrid() {
   $("storeGrid").innerHTML = store.products.map((p) => {
     const outOfStock = p.stock <= 0;
@@ -68,7 +85,10 @@ function renderGrid() {
         <strong>${clean(p.name)}</strong>
         <span class="meta">${clean(p.category || p.type || "")}</span>
         <span class="storefront-price">${money(p.price)}</span>
-        <button ${outOfStock ? "disabled" : ""} onclick="event.stopPropagation();addToCart('${p.id}')">${outOfStock ? "Out of stock" : "Add to Cart"}</button>
+        <div class="storefront-card-actions">
+          <button ${outOfStock ? "disabled" : ""} onclick="event.stopPropagation();addToCart('${p.id}')">${outOfStock ? "Out of stock" : "Add to Cart"}</button>
+          <button type="button" class="storefront-share-btn" onclick="event.stopPropagation();shareProduct('${p.id}')" title="Share this product">Share</button>
+        </div>
       </div>
     </article>`;
   }).join("") || `<p class="meta">No products listed yet.</p>`;
@@ -84,6 +104,7 @@ function viewProduct(id) {
     <h2>${clean(p.name)}</h2>
     <p class="meta">${clean(p.category || p.type || "")}</p>
     <p class="storefront-price">${money(p.price)}</p>
+    ${p.description ? `<p>${clean(p.description)}</p>` : ""}
     <p class="meta">${outOfStock ? "Out of stock" : p.type === "Service" ? `${p.stock} slot${p.stock === 1 ? "" : "s"} available` : p.type === "Digital product" ? `${p.stock} license${p.stock === 1 ? "" : "s"} available` : `${p.stock} in stock`}</p>
   `;
   $("productModalAdd").disabled = outOfStock;
@@ -96,6 +117,7 @@ $("productModalAdd").onclick = () => {
   addToCart(viewingProductId);
   $("productModal").close();
 };
+$("productModalShare").onclick = () => { if (viewingProductId) shareProduct(viewingProductId); };
 
 function renderCartModal() {
   const entries = Object.entries(cart);
@@ -123,6 +145,15 @@ $("orderWhatsApp").onclick = () => {
   $("cartModal").close();
 };
 
+const SOCIAL_LABELS = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", x: "X", whatsapp: "WhatsApp" };
+function renderSocialLinks() {
+  const links = store.socialLinks || {};
+  const entries = Object.entries(links).filter(([, v]) => v);
+  if (!entries.length) { $("storeSocial").style.display = "none"; return; }
+  $("storeSocial").innerHTML = entries.map(([k, v]) => `<a href="${clean(v)}" target="_blank" rel="noopener">${SOCIAL_LABELS[k] || k}</a>`).join("");
+  $("storeSocial").style.display = "flex";
+}
+
 (async () => {
   const slug = getSlug();
   if (!slug) { $("notFound").style.display = "block"; return; }
@@ -141,9 +172,19 @@ $("orderWhatsApp").onclick = () => {
     $("storeLogoFallback").textContent = (store.businessName || "SP").slice(0, 2).toUpperCase();
     $("storeLogoFallback").style.display = "flex";
   }
+  if (store.businessBanner) {
+    $("storeBanner").style.backgroundImage = `url(${store.businessBanner})`;
+    $("storeBanner").classList.add("storefront-banner-has-image");
+  }
+  renderSocialLinks();
   renderGrid();
   renderCartBar();
   $("storeContent").style.display = "block";
+
+  // A direct link to one product (from the Share button) opens straight
+  // into that product's detail view instead of just the catalog.
+  const productParam = new URLSearchParams(location.search).get("product");
+  if (productParam && product(productParam)) viewProduct(productParam);
 
   // Anyone signed in gets a straight link back to their own dashboard;
   // everyone else sees a lead-gen link into signup instead, same "quiet

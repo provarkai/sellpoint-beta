@@ -201,6 +201,31 @@ app.get(
   })
 );
 
+// --- Logistics providers (dispatch/courier credentials, generic) -----------
+
+app.get(
+  "/api/logistics",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listLogisticsProviders(req.businessId)))
+);
+app.post(
+  "/api/logistics",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage logistics providers" });
+    res.status(201).json(await db.createLogisticsProvider(req.businessId, req.body || {}));
+  })
+);
+app.delete(
+  "/api/logistics/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage logistics providers" });
+    await db.deleteLogisticsProvider(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+
 app.get(
   "/api/owner",
   handle(async (req, res) => res.json(await db.getOwner()))

@@ -63,6 +63,8 @@ function toBusinessJson(b) {
     slug: b.slug,
     storefrontEnabled: b.storefront_enabled,
     storefrontEligible: storefrontEnabledFor(effectivePlan(b)),
+    storefrontBanner: b.storefront_banner,
+    socialLinks: b.social_links || {},
   };
 }
 function effectivePlan(b) {
@@ -80,6 +82,7 @@ function toProductJson(p) {
     deliveryLink: p.delivery_link,
     deliveryNote: p.delivery_note,
     image: p.image,
+    description: p.description,
   };
 }
 function toCustomerJson(c) {
@@ -324,7 +327,11 @@ async function downgradeToStarter(businessId) {
 // server-side plan check before allowing enabled=true - a tenant flipping
 // this on with dev tools shouldn't work if they're on Starter, the same way
 // they can't grant themselves a paid plan through the profile endpoint.
-async function updateStorefrontSettings(businessId, { enabled, slug }) {
+// Recognized keys only - an arbitrary object here would otherwise let
+// anything be stashed in social_links, unbounded.
+const SOCIAL_KEYS = ["instagram", "facebook", "tiktok", "x", "whatsapp"];
+
+async function updateStorefrontSettings(businessId, { enabled, slug, banner, socialLinks }) {
   const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const current = rows[0];
   if (!current) throw new OrderError("Business not found");
@@ -339,15 +346,22 @@ async function updateStorefrontSettings(businessId, { enabled, slug }) {
       nextSlug = cleanSlug;
     }
   }
+  const nextBanner = banner !== undefined ? banner : current.storefront_banner;
+  let nextSocial = current.social_links;
+  if (socialLinks !== undefined && socialLinks && typeof socialLinks === "object") {
+    nextSocial = Object.fromEntries(
+      SOCIAL_KEYS.filter((k) => socialLinks[k]).map((k) => [k, String(socialLinks[k]).trim().slice(0, 200)])
+    );
+  }
   const { rows: updated } = await query(
-    "UPDATE businesses SET storefront_enabled=$1, slug=$2 WHERE id = $3 RETURNING *",
-    [nextEnabled, nextSlug, businessId]
+    "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4 WHERE id = $5 RETURNING *",
+    [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), businessId]
   );
   return toBusinessJson(updated[0]);
 }
 
 function toStorefrontProductJson(p) {
-  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image };
+  return { id: p.id, name: p.name, price: Number(p.price), stock: p.stock, category: p.category, type: p.type, image: p.image, description: p.description };
 }
 
 // Public - no auth. Returns null (server/index.js 404s) unless the business
@@ -365,10 +379,36 @@ async function getStorefront(slug) {
   return {
     businessName: business.name,
     businessLogo: business.logo,
+    businessBanner: business.storefront_banner,
     businessPhone: business.phone,
     businessAddress: business.address,
+    socialLinks: business.social_links || {},
     products: products.map(toStorefrontProductJson),
   };
+}
+
+// --- Logistics providers (dispatch/courier credentials, generic) -----------
+
+function toLogisticsJson(l) {
+  return { id: l.id, name: l.name, apiKey: l.api_key, apiBase: l.api_base, notes: l.notes, createdAt: l.created_at };
+}
+
+async function listLogisticsProviders(businessId) {
+  const { rows } = await query("SELECT * FROM logistics_providers WHERE business_id = $1 ORDER BY created_at", [businessId]);
+  return rows.map(toLogisticsJson);
+}
+
+async function createLogisticsProvider(businessId, data) {
+  const name = requireString(data.name, "Provider name");
+  const { rows } = await query(
+    "INSERT INTO logistics_providers (business_id, name, api_key, api_base, notes) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+    [businessId, name, data.apiKey || "", data.apiBase || "", data.notes || ""]
+  );
+  return toLogisticsJson(rows[0]);
+}
+
+async function deleteLogisticsProvider(businessId, id) {
+  await query("DELETE FROM logistics_providers WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
 
 // --- SellersPoint's own payout details (genuine singleton) -----------------
@@ -585,8 +625,8 @@ async function createProduct(businessId, data) {
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
   const id = uid("p");
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, stock, category, type, delivery_link, delivery_note, image, description)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     [
       id,
       businessId,
@@ -598,6 +638,7 @@ async function createProduct(businessId, data) {
       data.deliveryLink || "",
       data.deliveryNote || "",
       data.image || "",
+      data.description || "",
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -612,8 +653,8 @@ async function updateProduct(businessId, id, data) {
   const price = data.price !== undefined ? requireNumber(data.price, "Price", { min: 0 }) : Number(current.price);
   const stock = data.stock !== undefined ? requireNumber(data.stock, "Stock", { min: 0, integer: true }) : current.stock;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8
-     WHERE id = $9 AND business_id = $10 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, stock=$3, category=$4, type=$5, delivery_link=$6, delivery_note=$7, image=$8, description=$9
+     WHERE id = $10 AND business_id = $11 RETURNING *`,
     [
       name,
       price,
@@ -623,6 +664,7 @@ async function updateProduct(businessId, id, data) {
       data.deliveryLink !== undefined ? data.deliveryLink : current.delivery_link,
       data.deliveryNote !== undefined ? data.deliveryNote : current.delivery_note,
       data.image !== undefined ? data.image : current.image,
+      data.description !== undefined ? data.description : current.description,
       id,
       businessId,
     ]
@@ -792,6 +834,9 @@ module.exports = {
   downgradeToStarter,
   updateStorefrontSettings,
   getStorefront,
+  listLogisticsProviders,
+  createLogisticsProvider,
+  deleteLogisticsProvider,
   getOwner,
   updateOwner,
   getPlatformSettings,

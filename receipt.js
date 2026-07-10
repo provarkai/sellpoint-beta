@@ -112,8 +112,8 @@ $("receiptForm").onsubmit = async (e) => {
       lastReceipt = buildReceiptLocally({ ...shared, businessName });
     }
     renderReceipt(lastReceipt);
-    const cta = $("continueCta");
-    if (cta) cta.style.display = "block";
+    const panel = $("afterGeneratePanel");
+    if (panel) panel.style.display = "block";
     toast("Receipt generated");
   } catch (err) {
     toast(err.message);
