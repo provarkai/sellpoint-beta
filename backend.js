@@ -4,6 +4,7 @@ let businesses = [];
 let payments = [];
 let pricing = {};
 let authToken = null;
+let confirmDeleteId = null;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const clean = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
 const date = (d) => new Intl.DateTimeFormat("en-NG", { month: "short", day: "numeric", year: "numeric" }).format(new Date(d));
@@ -27,7 +28,14 @@ function render() {
   $("totalBusinesses").textContent = businesses.length;
   $("totalPayments").textContent = payments.length;
   $("totalRevenue").textContent = money(payments.filter((p) => p.status === "success").reduce((s, p) => s + p.amount, 0));
-  $("businessList").innerHTML = businesses.map((b) => '<div class="item"><div class="item-top"><strong>' + clean(b.businessName) + '</strong><span>' + clean(b.plan) + '</span></div><div class="meta">' + b.orderCount + ' orders, ' + b.customerCount + ' customers - joined ' + date(b.createdAt) + '</div></div>').join("");
+  $("businessList").innerHTML = businesses.map((b) => {
+    const confirming = confirmDeleteId === b.id;
+    return '<div class="item"><div class="item-top"><strong>' + clean(b.businessName) + '</strong><span>' + clean(b.plan) + '</span></div><div class="meta">' + b.orderCount + ' orders, ' + b.customerCount + ' customers - joined ' + date(b.createdAt) + '</div>' +
+      (confirming
+        ? '<div class="item-actions"><input id="confirmDeleteInput" placeholder="Type \'' + clean(b.businessName) + '\' to confirm"><button class="danger" onclick="confirmDeleteBusiness(\'' + b.id + '\',' + JSON.stringify(b.businessName) + ')">Permanently Delete</button><button onclick="cancelDeleteBusiness()">Cancel</button></div>'
+        : '<div class="item-actions"><button class="danger" onclick="startDeleteBusiness(\'' + b.id + '\')">Delete</button></div>') +
+      '</div>';
+  }).join("");
   $("paymentLog").innerHTML = payments.slice(0, 20).map((p) => '<div class="item"><div class="item-top"><strong>' + clean(p.businessName) + '</strong><span>' + money(p.amount) + '</span></div><div class="meta">' + clean(p.plan) + ' (' + clean(p.billingCycle) + ') - ' + clean(p.status) + ' - ' + clean(p.reference) + ' - ' + date(p.createdAt) + '</div></div>').join("");
   $("ownerName").value = owner.name;
   $("ownerLink").value = owner.link;
@@ -53,6 +61,26 @@ $("pricingForm").onsubmit = async (e) => {
     toast(err.message);
   }
 };
+// Deletion is permanent and cascades through every product/customer/order/
+// staff account under the business (plus their login) - typing the exact
+// name is deliberate friction so this can't happen from a stray click,
+// after an earlier one-click version was flagged as too easy to misfire.
+function startDeleteBusiness(id) { confirmDeleteId = id; render(); }
+function cancelDeleteBusiness() { confirmDeleteId = null; render(); }
+async function confirmDeleteBusiness(id, businessName) {
+  const typed = $("confirmDeleteInput").value;
+  if (typed !== businessName) return toast("Name doesn't match - nothing was deleted");
+  try {
+    await api("DELETE", "/api/admin/businesses/" + id);
+    businesses = businesses.filter((b) => b.id !== id);
+    confirmDeleteId = null;
+    render();
+    toast("Business deleted");
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
 $("logout").onclick = async () => {
   const supabase = await window.supabaseReady;
   await supabase.auth.signOut();
