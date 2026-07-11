@@ -302,6 +302,33 @@ app.post(
   })
 );
 
+// Generates a one-off Paystack payment link for an existing order created
+// directly in the dashboard (not through the public storefront cart), so
+// the seller can send it over WhatsApp alongside/instead of manual bank
+// details on the "Pending payment" message.
+app.post(
+  "/api/orders/:id/payment-link",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
+    const info = await db.getOrderForPaymentLink(req.businessId, req.params.id);
+    const reference = `spord_link_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
+    const callbackUrl = `${req.protocol}://${req.get("host")}/app.html`;
+    const initialized = await payments.initializeStorefrontCheckout({
+      email: info.email,
+      amountNaira: info.amountNaira,
+      absorbFees: info.absorbFees,
+      subaccountCode: info.subaccountCode,
+      reference,
+      callbackUrl,
+      businessId: req.businessId,
+      orderId: req.params.id,
+      plan: info.plan,
+    });
+    res.json({ authorizationUrl: initialized.authorizationUrl });
+  })
+);
+
 // --- Logistics providers (dispatch/courier credentials, generic) -----------
 
 app.get(
@@ -538,9 +565,9 @@ app.post(
       : bestSeller
       ? `${bestSeller} is your best seller so far. Keep it well stocked.`
       : "Add a few orders to start seeing trend insights here.";
-    // Fallback templates - used when GEMINI_API_KEY isn't configured, or if
-    // the Gemini call itself fails, so the feature degrades instead of
-    // breaking outright.
+    // Fallback templates - used when OPENROUTER_API_KEY isn't configured, or
+    // if the OpenRouter call itself fails, so the feature degrades instead
+    // of breaking outright.
     const templates = {
       ask: askFallback(question || "summary"),
       insight: insightFallback,

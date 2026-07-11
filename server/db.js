@@ -464,6 +464,35 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
   return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, plan: effectivePlan(business), orderIds, total, email };
 }
 
+// Looks up a single business-owned order (created directly in the
+// dashboard, not through the public storefront cart) plus its customer's
+// email, for generating an ad-hoc Paystack payment link to send over
+// WhatsApp - separate from checkoutStorefront since there's no cart/slug
+// involved here, just one existing order.
+async function getOrderForPaymentLink(businessId, orderId) {
+  const { rows } = await query(
+    `SELECT o.id, o.price, o.qty, o.status, c.email AS customer_email
+     FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+     WHERE o.id = $1 AND o.business_id = $2`,
+    [orderId, businessId]
+  );
+  const row = rows[0];
+  if (!row) throw new OrderError("Order not found");
+  if (!row.customer_email) throw new OrderError("This customer has no email on file - add one to generate a payment link");
+  const { rows: bizRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const business = bizRows[0];
+  if (business.payment_mode !== "paystack" || !business.paystack_subaccount_code) {
+    throw new OrderError("Online payments are not set up for this business");
+  }
+  return {
+    amountNaira: Number(row.price) * row.qty,
+    email: row.customer_email,
+    subaccountCode: business.paystack_subaccount_code,
+    absorbFees: !!business.absorb_fees,
+    plan: effectivePlan(business),
+  };
+}
+
 // --- Logistics providers (dispatch/courier credentials, generic) -----------
 
 function toLogisticsJson(l) {
@@ -981,6 +1010,7 @@ module.exports = {
   updatePaymentSettings,
   saveSubaccountDetails,
   checkoutStorefront,
+  getOrderForPaymentLink,
   listLogisticsProviders,
   createLogisticsProvider,
   deleteLogisticsProvider,
