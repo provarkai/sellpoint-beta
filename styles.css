@@ -64,7 +64,9 @@ main{padding:28px;overflow:auto}header{display:flex;justify-content:space-betwee
 .confetti-burst{position:absolute;inset:0;pointer-events:none;overflow:hidden}.confetti-burst span{position:absolute;top:-10px;width:8px;height:14px;opacity:.9;animation:confetti-fall 1.6s ease-in forwards;border-radius:2px}
 @keyframes confetti-fall{to{transform:translateY(340px) rotate(540deg);opacity:0}}
 .landing-main{max-width:1080px}
-.landing-nav{display:flex;justify-content:space-between;align-items:center;padding:8px 0 20px}.landing-logo{font-size:16px;margin:0}
+.landing-nav{display:flex;justify-content:space-between;align-items:center;padding:8px 0 20px}.landing-logo{height:32px;margin:0}
+.premium-logo{height:44px;display:block;margin:0 auto 14px}.premium-logo-left{margin:0 0 10px}
+.admin-header-brand{display:flex;align-items:center;gap:14px}.admin-logo{height:40px}
 .landing-nav-links{display:flex;align-items:center;gap:20px}.landing-nav-links a:not(.button-link){color:#b8cbbf;text-decoration:none;font-weight:600;font-size:14px}.landing-nav-links a:not(.button-link):hover{color:#fff}
 .landing-hero{max-width:760px;margin:40px auto 56px}.landing-hero-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:22px}.landing-secondary{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16)}
 .landing-features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:56px}.landing-features article{padding:22px;transition:transform .15s,box-shadow .15s}.landing-features article:hover{transform:translateY(-4px);box-shadow:0 24px 48px rgba(0,0,0,.35)}.landing-features h2{font-size:17px;margin:0 0 8px;color:#fff}.landing-feature-icon{font-size:26px;display:block;margin-bottom:10px}
