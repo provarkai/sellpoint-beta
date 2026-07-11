@@ -181,8 +181,9 @@ $("orderWhatsApp").onclick = () => {
   const entries = Object.entries(cart);
   if (!entries.length) return toast("Your cart is empty");
   const buyerName = $("buyerName").value.trim();
+  const buyerLocation = $("buyerLocation").value.trim();
   const lines = entries.map(([id, qty]) => { const p = product(id); return `${p.name} x ${qty} - ${money(effectivePrice(p) * qty)}`; }).join("\n");
-  const msg = `Hello ${clean(store.businessName)}, I'd like to order:\n\n${lines}\n\nTotal: ${money(cartTotal())}${buyerName ? "\n\nFrom: " + buyerName : ""}`;
+  const msg = `Hello ${clean(store.businessName)}, I'd like to order:\n\n${lines}\n\nTotal: ${money(cartTotal())}${buyerName ? "\n\nFrom: " + buyerName : ""}${buyerLocation ? "\nDelivery location: " + buyerLocation : ""}`;
   const phone = (store.businessPhone || "").replace(/\D/g, "");
   open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   cart = {};
@@ -211,6 +212,7 @@ if ($("payOnline")) $("payOnline").onclick = async () => {
         buyerName,
         buyerEmail,
         buyerPhone: $("buyerPhone").value.trim(),
+        buyerLocation: $("buyerLocation").value.trim(),
       }),
     });
     const json = await res.json();

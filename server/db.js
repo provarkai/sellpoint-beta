@@ -440,7 +440,7 @@ async function saveSubaccountDetails(businessId, { subaccountCode, bankCode, ban
 // Public checkout path (no session) - looks the business up by slug the same
 // way the storefront itself does, re-checking storefront eligibility so a
 // downgraded/disabled store can't still take payments through a stale link.
-async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail }) {
+async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation }) {
   const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
   const business = rows[0];
   if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) {
@@ -453,7 +453,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
   const name = requireString(buyerName, "Your name");
   const email = requireString(buyerEmail, "Your email");
 
-  const customer = await createCustomer(business.id, { name, phone: buyerPhone || "", email });
+  const customer = await createCustomer(business.id, { name, phone: buyerPhone || "", email, location: buyerLocation || "" });
   const orderIds = [];
   let total = 0;
   for (const item of items) {

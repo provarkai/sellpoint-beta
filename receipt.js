@@ -99,6 +99,7 @@ function renderReceipt(r) {
     ${r.vat ? `<div class="row"><span>Subtotal</span><b>${money(r.subtotal)}</b></div><div class="row"><span>VAT (7.5%)</span><b>${money(r.vat)}</b></div>` : ""}
     <div class="row receipt-total"><span>Total</span><b>${money(r.total)}</b></div>
     <div class="row"><span>Amount in words</span><b>${amountInWords(r.total)}</b></div>
+    <div class="receipt-signature">Signed by ${clean(r.businessName)}</div>
     <div class="receipt-doc-footer">Powered by <a href="${brandUrl}" target="_blank" rel="noopener">SellersPoint</a> - create your own free branded receipts</div>
   `;
 }

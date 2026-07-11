@@ -283,8 +283,8 @@ app.post(
   "/api/store/:slug/checkout",
   handle(async (req, res) => {
     if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
-    const { items, buyerName, buyerPhone, buyerEmail } = req.body || {};
-    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail });
+    const { items, buyerName, buyerPhone, buyerEmail, buyerLocation } = req.body || {};
+    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation });
     const reference = `spord_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/store/${req.params.slug}?reference=${reference}`;
     const initialized = await payments.initializeStorefrontCheckout({
