@@ -588,15 +588,20 @@ app.post(
     };
     if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
     let text = templates[tool];
-    if (ai.isConfigured()) {
+    let used = await db.getAiUsage(req.businessId);
+    const limit = await db.effectiveAiLimit(req.businessId);
+    // Only a genuine AI call counts against the monthly quota - a template
+    // fallback (no key configured, over quota, or the API call itself
+    // failing) costs nothing and always still works, degraded.
+    if (ai.isConfigured() && used < limit) {
       try {
         text = await ai.generateText(prompts[tool]);
+        used = await db.incrementAiUsage(req.businessId);
       } catch (err) {
-        console.error("Gemini generation failed, falling back to template:", err.message);
+        console.error("OpenRouter generation failed, falling back to template:", err.message);
       }
     }
-    const used = await db.incrementAiUsage(req.businessId);
-    res.json({ text, used, limit: await db.effectiveAiLimit(req.businessId) });
+    res.json({ text, used, limit });
   })
 );
 
