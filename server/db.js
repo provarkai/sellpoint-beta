@@ -849,16 +849,21 @@ async function createOrder(businessId, data) {
   const limit = orderLimitFor(effectivePlan(business));
   if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
 
-  const { rows: productRows } = await query("SELECT * FROM products WHERE id = $1 AND business_id = $2", [
-    data.productId,
-    businessId,
-  ]);
-  const product = productRows[0];
-  if (!product) throw new OrderError("Product not found");
   const qty = requireNumber(data.qty ?? 1, "Quantity", { min: 1, integer: true });
-  if (qty > product.stock) throw new OrderError("Not enough stock");
 
-  await query("UPDATE products SET stock = $1 WHERE id = $2", [product.stock - qty, product.id]);
+  // Atomic check-and-decrement: baking "enough stock?" into the UPDATE's
+  // WHERE clause (instead of reading stock, checking it in JS, then writing
+  // a computed value back) closes a race where two concurrent checkouts for
+  // the same product could both pass a stale read and oversell it.
+  const { rows: productRows } = await query(
+    "UPDATE products SET stock = stock - $1 WHERE id = $2 AND business_id = $3 AND stock >= $1 RETURNING *",
+    [qty, data.productId, businessId]
+  );
+  const product = productRows[0];
+  if (!product) {
+    const { rows: existing } = await query("SELECT 1 FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
+    throw new OrderError(existing[0] ? "Not enough stock" : "Product not found");
+  }
   const id = uid("o");
   const deliveryMethod = ["self", "rider", "sellerspoint"].includes(data.deliveryMethod) ? data.deliveryMethod : "self";
   // Orders bill at the discounted price when one's active - the discount is
