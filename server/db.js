@@ -960,6 +960,71 @@ async function getPaymentByReference(reference) {
   return rows[0] ? toPaymentJson(rows[0]) : null;
 }
 
+// --- Founding Members waitlist (pre-launch growth capture) -----------------
+// Deliberately separate from the real business/auth flow - signup.html
+// already creates a working account today. This just captures a lead plus a
+// shareable referral code for the founding-member growth program.
+
+function toWaitlistJson(w) {
+  return {
+    id: w.id,
+    businessName: w.business_name,
+    ownerName: w.owner_name,
+    email: w.email,
+    referralCode: w.referral_code,
+    createdAt: w.created_at,
+  };
+}
+
+async function uniqueReferralCode() {
+  for (let i = 0; i < 20; i++) {
+    const candidate = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const { rows } = await query("SELECT 1 FROM waitlist WHERE referral_code = $1", [candidate]);
+    if (!rows.length) return candidate;
+  }
+  return Date.now().toString(36).toUpperCase();
+}
+
+async function createWaitlistEntry(data) {
+  const businessName = requireString(data.businessName, "Business name");
+  const ownerName = requireString(data.ownerName, "Owner name");
+  const email = requireString(data.email, "Email").toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new OrderError("Enter a valid email address");
+  const { rows: existing } = await query("SELECT 1 FROM waitlist WHERE lower(email) = $1", [email]);
+  if (existing.length) throw new OrderError("This email is already on the waitlist");
+  const referralCode = await uniqueReferralCode();
+  const { rows } = await query(
+    `INSERT INTO waitlist (business_name, owner_name, email, phone, country, state, business_category, business_size, years_in_business, current_challenges, referral_code, referred_by_code, newsletter_opt_in)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [
+      businessName,
+      ownerName,
+      email,
+      data.phone || "",
+      data.country || "",
+      data.state || "",
+      data.businessCategory || "",
+      data.businessSize || "",
+      data.yearsInBusiness || "",
+      data.currentChallenges || "",
+      referralCode,
+      data.referredByCode || "",
+      !!data.newsletterOptIn,
+    ]
+  );
+  return toWaitlistJson(rows[0]);
+}
+
+async function getWaitlistStats() {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS total,
+      COUNT(DISTINCT NULLIF(country, ''))::int AS countries,
+      COUNT(DISTINCT NULLIF(business_category, ''))::int AS categories
+     FROM waitlist`
+  );
+  return { total: rows[0].total, countries: rows[0].countries, categories: rows[0].categories };
+}
+
 // --- Platform-admin (cross-tenant) -------------------------------------------
 
 // Everything under a business (products/customers/orders/branches/staff/
@@ -1040,6 +1105,8 @@ module.exports = {
   getPaymentByReference,
   listAllBusinesses,
   listAllPayments,
+  createWaitlistEntry,
+  getWaitlistStats,
   deleteBusiness,
   listStaff,
   inviteStaff,

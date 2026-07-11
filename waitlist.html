@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Become a Founding Member - SellersPoint</title>
+  <meta name="description" content="Join the SellersPoint Founding Members program - lifetime launch pricing, priority access, and exclusive rewards for early businesses.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single-page premium-page">
+  <main class="premium-main premium-auth">
+    <div class="premium-topbar"><img src="/assets/branding/logo/logo_1_main-real.png" alt="SellersPoint" class="premium-logo"></div>
+    <div class="premium-hero">
+      <span class="premium-kicker">Founding Members</span>
+      <h1>Become a Founding Member</h1>
+      <p class="premium-sub">Reserve your spot before public launch - lifetime pricing, priority access, and a free Growth plan for early businesses.</p>
+    </div>
+    <form id="waitlistForm">
+      <label>Business name<input id="wBusinessName" required placeholder="Your Business"></label>
+      <label>Owner name<input id="wOwnerName" required placeholder="Your full name"></label>
+      <label>Email<input id="wEmail" type="email" required></label>
+      <label>Phone<input id="wPhone" placeholder="2348012345678"></label>
+      <label>Country<input id="wCountry" placeholder="Nigeria"></label>
+      <label>State<input id="wState" placeholder="Lagos"></label>
+      <label>Business category<select id="wCategory">
+        <option value="">Select a category</option>
+        <option>Fashion</option>
+        <option>Restaurant</option>
+        <option>Digital Products</option>
+        <option>Electronics</option>
+        <option>Pharmacy</option>
+        <option>Salon</option>
+        <option>Furniture</option>
+        <option>Wholesale</option>
+        <option>Mini Mart</option>
+        <option>Service Business</option>
+        <option>Other</option>
+      </select></label>
+      <label>Business size<select id="wSize">
+        <option value="">Select a size</option>
+        <option>Just me</option>
+        <option>2-5 employees</option>
+        <option>6-20 employees</option>
+        <option>20+ employees</option>
+      </select></label>
+      <label>Years in business<select id="wYears">
+        <option value="">Select an option</option>
+        <option>Just starting</option>
+        <option>Less than 1 year</option>
+        <option>1-3 years</option>
+        <option>3-5 years</option>
+        <option>5+ years</option>
+      </select></label>
+      <label>What's your biggest business challenge right now? <span class="meta">(optional)</span><textarea id="wChallenges" rows="3" placeholder="e.g. tracking stock, following up on payments, staying organized"></textarea></label>
+      <label><input type="checkbox" id="wNewsletter" checked> Send me product updates and launch news</label>
+      <p class="meta" id="wReferralNote" style="display:none"></p>
+      <button>Become a Founding Member</button>
+    </form>
+    <p class="meta premium-hint">Already have an account? <a href="login.html">Log in</a> - or <a href="signup.html">create one now</a>, no waiting required.</p>
+  </main>
+  <div id="toast"></div>
+  <script defer src="waitlist.js"></script>
+</body>
+</html>

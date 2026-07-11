@@ -34,6 +34,8 @@ const apiLimiter = rateLimit({
 });
 // Business/account creation is the highest-value target for spam signups.
 const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
+// Public, unauthenticated form - same spam-resistance shape as account creation.
+const waitlistLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many submissions from this device - try again later." } });
 
 app.use(
   express.json({
@@ -165,6 +167,22 @@ app.get(
 app.get(
   "/api/social-links",
   handle(async (req, res) => res.json(await db.getPublicSocialLinks()))
+);
+
+// --- Founding Members waitlist (pre-launch growth capture) -----------------
+
+app.post(
+  "/api/waitlist",
+  waitlistLimiter,
+  handle(async (req, res) => {
+    const entry = await db.createWaitlistEntry(req.body || {});
+    res.status(201).json(entry);
+  })
+);
+
+app.get(
+  "/api/waitlist/stats",
+  handle(async (req, res) => res.json(await db.getWaitlistStats()))
 );
 
 // --- Onboarding -------------------------------------------------------------

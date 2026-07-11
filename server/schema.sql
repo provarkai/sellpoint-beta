@@ -254,6 +254,34 @@ alter table businesses add column if not exists paystack_bank_name text not null
 alter table businesses add column if not exists paystack_account_number text not null default '';
 alter table businesses add column if not exists paystack_account_name text not null default '';
 
+-- Founding Members waitlist (pre-launch growth capture) --------------------
+-- Deliberately separate from `businesses`/auth - this is a marketing lead
+-- capture, not an account. The product already has a working self-serve
+-- signup (signup.html); registering here doesn't create a login, it just
+-- reserves a spot and a referral code. referral_code is this entrant's own
+-- shareable code; referred_by_code is whoever's link they came in on (both
+-- text, not a self-FK, since the referrer may not exist yet when a link is
+-- shared before its owner's row does).
+create table if not exists waitlist (
+  id uuid primary key default gen_random_uuid(),
+  business_name text not null,
+  owner_name text not null,
+  email text not null,
+  phone text not null default '',
+  country text not null default '',
+  state text not null default '',
+  business_category text not null default '',
+  business_size text not null default '',
+  years_in_business text not null default '',
+  current_challenges text not null default '',
+  referral_code text not null unique,
+  referred_by_code text not null default '',
+  newsletter_opt_in boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists waitlist_email_idx on waitlist(lower(email));
+create index if not exists waitlist_referral_code_idx on waitlist(referral_code);
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
@@ -281,3 +309,4 @@ alter table events enable row level security;
 alter table payments enable row level security;
 alter table owner_payment enable row level security;
 alter table platform_settings enable row level security;
+alter table waitlist enable row level security;
