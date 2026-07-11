@@ -169,7 +169,58 @@ function renderStorefrontSection(){
   if($("socialFacebook"))$("socialFacebook").value=social.facebook||"";
   if($("socialTiktok"))$("socialTiktok").value=social.tiktok||"";
   if($("socialX"))$("socialX").value=social.x||"";
+  renderOnlinePaymentSection();
 }
+let banksLoaded=false;
+async function loadBanksOnce(){
+  if(banksLoaded||!$("paymentBank"))return;
+  try{
+    const banks=await api("GET","/api/paystack/banks");
+    $("paymentBank").innerHTML='<option value="">Select your bank</option>'+banks.map(b=>`<option value="${b.code}" data-name="${clean(b.name)}">${clean(b.name)}</option>`).join("");
+    banksLoaded=true;
+  }catch(err){$("paymentBank").innerHTML='<option value="">Could not load banks</option>'}
+}
+function renderOnlinePaymentSection(){
+  if(!$("onlinePaymentSection"))return;
+  const eligible=!!state.storefrontEligible&&myRole==="owner";
+  $("onlinePaymentSection").style.display=eligible?"block":"none";
+  if(!eligible)return;
+  loadBanksOnce();
+  if(state.hasPaystackSubaccount){
+    $("subaccountStatus").innerHTML=`<div class="item"><strong>${clean(state.paystackBankName)}</strong><span class="meta">${clean(state.paystackAccountName)} - ${clean(state.paystackAccountNumberMasked)}</span></div>`;
+    $("subaccountForm").style.display="none";
+    $("paymentModeForm").style.display="grid";
+    $("paymentModeEnabled").checked=state.paymentMode==="paystack";
+    $("absorbFeesToggle").checked=!!state.absorbFees;
+  }else{
+    $("subaccountStatus").innerHTML="";
+    $("subaccountForm").style.display="grid";
+    $("paymentModeForm").style.display="none";
+  }
+}
+if($("verifyAccountBtn"))$("verifyAccountBtn").onclick=async()=>{
+  const bankCode=$("paymentBank").value;
+  const bankName=$("paymentBank").selectedOptions[0]?.dataset.name||"";
+  const accountNumber=$("paymentAccountNumber").value.trim();
+  if(!bankCode||!accountNumber)return toast("Choose your bank and enter your account number");
+  const btn=$("verifyAccountBtn");btn.disabled=true;btn.textContent="Verifying...";
+  try{
+    const updated=await api("POST","/api/business/paystack-subaccount",{bankCode,bankName,accountNumber});
+    Object.assign(state,updated);
+    renderOnlinePaymentSection();
+    toast("Bank account verified - online payments are set up")
+  }catch(err){toast(err.message)}
+  finally{btn.disabled=false;btn.textContent="Verify & Set Up"}
+};
+if($("paymentModeForm"))$("paymentModeForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const updated=await api("PUT","/api/business/payment-settings",{paymentMode:$("paymentModeEnabled").checked?"paystack":"manual",absorbFees:$("absorbFeesToggle").checked});
+    Object.assign(state,updated);
+    renderOnlinePaymentSection();
+    toast("Payment settings saved")
+  }catch(err){toast(err.message)}
+};
 if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("dashCopyStoreUrl"))$("dashCopyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};

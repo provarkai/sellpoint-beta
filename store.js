@@ -169,6 +169,10 @@ function renderCartModal() {
     return `<div class="item"><div class="item-top"><strong>${clean(p.name)}</strong><span>${money(effectivePrice(p) * qty)}</span></div><div class="item-actions"><button onclick="setQty('${id}',${qty - 1})">-</button><span>${qty}</span><button onclick="setQty('${id}',${qty + 1})">+</button><button onclick="setQty('${id}',0)">Remove</button></div></div>`;
   }).join("") || `<div class="item"><span class="meta">Your cart is empty</span></div>`;
   $("cartTotal").textContent = money(cartTotal());
+  if (store.onlinePaymentEnabled) {
+    $("payOnlineFields").style.display = "block";
+    $("payOnline").style.display = "inline-grid";
+  }
 }
 
 $("viewCart").onclick = () => { renderCartModal(); $("cartModal").showModal(); };
@@ -185,6 +189,40 @@ $("orderWhatsApp").onclick = () => {
   saveCart();
   renderCartBar();
   $("cartModal").close();
+};
+
+// Optional alternative to the WhatsApp flow above - only shown when the
+// seller has set up Paystack subaccount payments (store.onlinePaymentEnabled).
+if ($("payOnline")) $("payOnline").onclick = async () => {
+  const entries = Object.entries(cart);
+  if (!entries.length) return toast("Your cart is empty");
+  const buyerName = $("buyerName").value.trim();
+  const buyerEmail = $("buyerEmail").value.trim();
+  if (!buyerName || !buyerEmail) return toast("Enter your name and email to pay online");
+  const btn = $("payOnline");
+  btn.disabled = true;
+  btn.textContent = "Redirecting...";
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(getSlug())}/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: entries.map(([productId, qty]) => ({ productId, qty })),
+        buyerName,
+        buyerEmail,
+        buyerPhone: $("buyerPhone").value.trim(),
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Could not start payment");
+    cart = {};
+    saveCart();
+    location.href = json.authorizationUrl;
+  } catch (err) {
+    toast(err.message);
+    btn.disabled = false;
+    btn.textContent = "Pay Online";
+  }
 };
 
 const SOCIAL_LABELS = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", x: "X", whatsapp: "WhatsApp" };

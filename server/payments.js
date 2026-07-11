@@ -84,11 +84,90 @@ async function verifyTransaction(reference) {
   return body.data; // { status: "success"|..., amount, reference, metadata, customer, ... }
 }
 
+// --- Seller online payments (Paystack subaccounts) -------------------------
+// SellersPoint takes no cut of a seller's storefront sales, so every
+// subaccount is created with percentage_charge: 0 - Paystack still deducts
+// its own processing fee regardless, which is a separate concern from our
+// 0% platform cut.
+
+async function listBanks() {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/bank?country=nigeria&currency=NGN`, {
+    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+  });
+  const body = await res.json();
+  if (!res.ok || !body.status) throw new Error(body.message || "Could not load bank list");
+  return body.data.map((b) => ({ name: b.name, code: b.code }));
+}
+
+async function resolveAccount(accountNumber, bankCode) {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`, {
+    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+  });
+  const body = await res.json();
+  if (!res.ok || !body.status) throw new Error(body.message || "Could not verify account - check the account number and bank");
+  return { accountName: body.data.account_name };
+}
+
+async function createSubaccount({ businessName, bankCode, accountNumber }) {
+  const res = await fetch(`${PAYSTACK_BASE_URL}/subaccount`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      business_name: businessName,
+      settlement_bank: bankCode,
+      account_number: accountNumber,
+      percentage_charge: 0,
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.status) throw new Error(body.message || "Could not set up online payments with this bank account");
+  return { subaccountCode: body.data.subaccount_code };
+}
+
+// Real Paystack Nigeria card fees: 1.5% + NGN100 (fee waived under NGN2500,
+// capped at NGN2000). This is only used to estimate what to add on top when
+// the seller chooses to pass the fee to the customer - the fee actually
+// deducted from the seller's settlement is whatever Paystack calculates,
+// this is not authoritative.
+function estimatePaystackFee(amountNaira) {
+  let fee = amountNaira * 0.015;
+  if (amountNaira > 2500) fee += 100;
+  return Math.round(Math.min(fee, 2000));
+}
+
+// bearer: "subaccount" always - the seller's own payout nets minus
+// Paystack's real fee either way; absorbFees only controls whether we ask
+// the customer to cover an estimate of that fee up front.
+async function initializeStorefrontCheckout({ email, amountNaira, absorbFees, subaccountCode, reference, callbackUrl, businessId, orderId }) {
+  const chargeAmount = absorbFees ? amountNaira : amountNaira + estimatePaystackFee(amountNaira);
+  const res = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      amount: Math.round(chargeAmount * 100),
+      reference,
+      callback_url: callbackUrl,
+      subaccount: subaccountCode,
+      bearer: "subaccount",
+      metadata: { businessId, orderId },
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok || !body.status) throw new Error(body.message || "Paystack initialize failed");
+  return { authorizationUrl: body.data.authorization_url, amount: chargeAmount };
+}
+
 module.exports = {
   isConfigured,
   initializeTransaction,
   initializeAddonTransaction,
   verifyWebhookSignature,
   verifyTransaction,
+  listBanks,
+  resolveAccount,
+  createSubaccount,
+  estimatePaystackFee,
+  initializeStorefrontCheckout,
   PAYSTACK_PUBLIC_KEY,
 };

@@ -107,6 +107,28 @@ async function finalizeIfSuccessful(txData) {
     return isNew;
   }
 
+  // A storefront customer paying for their own cart online - orderId here
+  // is a comma-joined list (a cart can be several products/orders in one
+  // Paystack transaction). Marks each one Paid; doesn't touch plan/billing.
+  if (metadata?.orderId) {
+    const isNew = await db.recordPayment({
+      businessId,
+      provider: "paystack",
+      reference,
+      plan: "storefront_order",
+      billingCycle: "onetime",
+      amount: (amount || 0) / 100,
+      status: "success",
+      rawPayload: txData,
+    });
+    if (isNew) {
+      for (const orderId of metadata.orderId.split(",")) {
+        await db.updateOrder(businessId, orderId, { markPaid: true }).catch(() => {});
+      }
+    }
+    return isNew;
+  }
+
   const plan = metadata?.plan;
   if (!plan) return false;
   const billingCycle = metadata?.billingCycle === "yearly" ? "yearly" : "monthly";
@@ -205,6 +227,77 @@ app.get(
     const storefront = await db.getStorefront(req.params.slug);
     if (!storefront) return res.status(404).json({ error: "Storefront not found" });
     res.json(storefront);
+  })
+);
+
+// --- Seller online payments (optional - manual bank transfer stays the ------
+// --- default and always available) ------------------------------------------
+
+app.get(
+  "/api/paystack/banks",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    res.json(await payments.listBanks());
+  })
+);
+
+app.post(
+  "/api/paystack/resolve-account",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set up online payments" });
+    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    const { accountNumber, bankCode } = req.body || {};
+    if (!accountNumber || !bankCode) return res.status(400).json({ error: "Account number and bank are required" });
+    res.json(await payments.resolveAccount(accountNumber, bankCode));
+  })
+);
+
+app.post(
+  "/api/business/paystack-subaccount",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set up online payments" });
+    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    const { bankCode, bankName, accountNumber } = req.body || {};
+    if (!bankCode || !bankName || !accountNumber) return res.status(400).json({ error: "Bank, account number, and bank name are required" });
+    const business = await db.getBusiness(req.businessId);
+    const { accountName } = await payments.resolveAccount(accountNumber, bankCode);
+    const { subaccountCode } = await payments.createSubaccount({ businessName: business.businessName, bankCode, accountNumber });
+    res.json(await db.saveSubaccountDetails(req.businessId, { subaccountCode, bankCode, bankName, accountNumber, accountName }));
+  })
+);
+
+app.put(
+  "/api/business/payment-settings",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change payment settings" });
+    res.json(await db.updatePaymentSettings(req.businessId, req.body || {}));
+  })
+);
+
+// Public, no auth - a storefront visitor paying for their cart online.
+app.post(
+  "/api/store/:slug/checkout",
+  handle(async (req, res) => {
+    if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
+    const { items, buyerName, buyerPhone, buyerEmail } = req.body || {};
+    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail });
+    const reference = `spord_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
+    const callbackUrl = `${req.protocol}://${req.get("host")}/store/${req.params.slug}?reference=${reference}`;
+    const initialized = await payments.initializeStorefrontCheckout({
+      email: result.email,
+      amountNaira: result.total,
+      absorbFees: result.absorbFees,
+      subaccountCode: result.subaccountCode,
+      reference,
+      callbackUrl,
+      businessId: result.businessId,
+      orderId: result.orderIds.join(","),
+    });
+    res.json({ authorizationUrl: initialized.authorizationUrl, amount: initialized.amount, reference });
   })
 );
 

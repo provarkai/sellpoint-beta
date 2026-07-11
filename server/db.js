@@ -66,6 +66,12 @@ function toBusinessJson(b) {
     storefrontBanner: b.storefront_banner,
     socialLinks: b.social_links || {},
     whyBuyText: b.why_buy_text || "",
+    paymentMode: b.payment_mode || "manual",
+    absorbFees: !!b.absorb_fees,
+    hasPaystackSubaccount: !!b.paystack_subaccount_code,
+    paystackBankName: b.paystack_bank_name || "",
+    paystackAccountName: b.paystack_account_name || "",
+    paystackAccountNumberMasked: b.paystack_account_number ? "•••• " + b.paystack_account_number.slice(-4) : "",
   };
 }
 function effectivePlan(b) {
@@ -397,8 +403,65 @@ async function getStorefront(slug) {
     memberSince: business.created_at,
     completedOrders: completedRows[0].n,
     whyBuyText: business.why_buy_text || "",
+    onlinePaymentEnabled: business.payment_mode === "paystack" && !!business.paystack_subaccount_code,
     products: products.map(toStorefrontProductJson),
   };
+}
+
+// --- Seller online payments (Paystack subaccounts) --------------------------
+
+async function updatePaymentSettings(businessId, { paymentMode, absorbFees }) {
+  const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Business not found");
+  const nextMode = paymentMode !== undefined ? paymentMode : current.payment_mode;
+  if (!["manual", "paystack"].includes(nextMode)) throw new OrderError("Invalid payment mode");
+  if (nextMode === "paystack" && !current.paystack_subaccount_code) {
+    throw new OrderError("Set up your bank account for online payments first");
+  }
+  const nextAbsorb = absorbFees !== undefined ? !!absorbFees : current.absorb_fees;
+  const { rows: updated } = await query(
+    "UPDATE businesses SET payment_mode=$1, absorb_fees=$2 WHERE id = $3 RETURNING *",
+    [nextMode, nextAbsorb, businessId]
+  );
+  return toBusinessJson(updated[0]);
+}
+
+async function saveSubaccountDetails(businessId, { subaccountCode, bankCode, bankName, accountNumber, accountName }) {
+  const { rows } = await query(
+    `UPDATE businesses SET paystack_subaccount_code=$1, paystack_bank_code=$2, paystack_bank_name=$3,
+       paystack_account_number=$4, paystack_account_name=$5 WHERE id = $6 RETURNING *`,
+    [subaccountCode, bankCode, bankName, accountNumber, accountName, businessId]
+  );
+  if (!rows[0]) throw new OrderError("Business not found");
+  return toBusinessJson(rows[0]);
+}
+
+// Public checkout path (no session) - looks the business up by slug the same
+// way the storefront itself does, re-checking storefront eligibility so a
+// downgraded/disabled store can't still take payments through a stale link.
+async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail }) {
+  const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
+  const business = rows[0];
+  if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) {
+    throw new OrderError("This storefront is not available");
+  }
+  if (business.payment_mode !== "paystack" || !business.paystack_subaccount_code) {
+    throw new OrderError("Online payment is not enabled for this store");
+  }
+  if (!Array.isArray(items) || !items.length) throw new OrderError("Your cart is empty");
+  const name = requireString(buyerName, "Your name");
+  const email = requireString(buyerEmail, "Your email");
+
+  const customer = await createCustomer(business.id, { name, phone: buyerPhone || "", email });
+  const orderIds = [];
+  let total = 0;
+  for (const item of items) {
+    const order = await createOrder(business.id, { productId: item.productId, customerId: customer.id, qty: item.qty || 1, status: "Pending payment" });
+    orderIds.push(order.id);
+    total += Number(order.price) * order.qty;
+  }
+  return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, orderIds, total, email };
 }
 
 // --- Logistics providers (dispatch/courier credentials, generic) -----------
@@ -915,6 +978,9 @@ module.exports = {
   downgradeToStarter,
   updateStorefrontSettings,
   getStorefront,
+  updatePaymentSettings,
+  saveSubaccountDetails,
+  checkoutStorefront,
   listLogisticsProviders,
   createLogisticsProvider,
   deleteLogisticsProvider,

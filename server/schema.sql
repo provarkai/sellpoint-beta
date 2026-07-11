@@ -240,6 +240,20 @@ alter table platform_settings add column if not exists social_links jsonb not nu
 -- app invents.
 alter table businesses add column if not exists why_buy_text text not null default '';
 
+-- Seller online payments (Paystack subaccounts) - entirely optional, off by
+-- default. payment_mode 'manual' is the existing WhatsApp + bank transfer
+-- flow (via payment_details above); 'paystack' means storefront customers
+-- can pay online directly into the seller's own subaccount. absorb_fees
+-- controls who covers Paystack's transaction fee: true = seller absorbs it
+-- from their payout, false = it's added to what the customer pays.
+alter table businesses add column if not exists payment_mode text not null default 'manual';
+alter table businesses add column if not exists absorb_fees boolean not null default false;
+alter table businesses add column if not exists paystack_subaccount_code text not null default '';
+alter table businesses add column if not exists paystack_bank_code text not null default '';
+alter table businesses add column if not exists paystack_bank_name text not null default '';
+alter table businesses add column if not exists paystack_account_number text not null default '';
+alter table businesses add column if not exists paystack_account_name text not null default '';
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
