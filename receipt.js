@@ -162,9 +162,22 @@ $("shareReceiptImage").onclick = async () => {
   }
 };
 
+// Renders a narrow, receipt-style portrait layout for export/sharing (not
+// the wider on-screen preview) - captured from an off-screen clone so the
+// visible page never flashes into the narrow layout mid-capture.
 async function renderCanvas() {
   if (!window.html2canvas) throw new Error("Image export isn't available right now - try again in a moment.");
-  return html2canvas($("receiptBox"), { backgroundColor: "#ffffff", scale: 2 });
+  const clone = $("receiptBox").cloneNode(true);
+  clone.classList.add("receipt-doc-narrow");
+  clone.style.position = "fixed";
+  clone.style.left = "-9999px";
+  clone.style.top = "0";
+  document.body.appendChild(clone);
+  try {
+    return await html2canvas(clone, { backgroundColor: "#ffffff", scale: 2 });
+  } finally {
+    document.body.removeChild(clone);
+  }
 }
 
 // The wa.me link only ever supports plain text - WhatsApp has no URL
