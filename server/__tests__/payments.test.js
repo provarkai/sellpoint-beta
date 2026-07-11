@@ -37,8 +37,8 @@ test("platformCutFor charges starter (free plan) sellers 2.5% + NGN50", () => {
   assert.equal(platformCutFor(10000, "starter"), 300); // 250 + 50
 });
 
-test("platformCutFor charges paid-plan sellers 1% + NGN50", () => {
-  assert.equal(platformCutFor(10000, "growth"), 150); // 100 + 50
-  assert.equal(platformCutFor(10000, "pro"), 150);
-  assert.equal(platformCutFor(10000, "business"), 150);
+test("platformCutFor charges paid-plan sellers 1.5% + NGN50", () => {
+  assert.equal(platformCutFor(10000, "growth"), 200); // 150 + 50
+  assert.equal(platformCutFor(10000, "pro"), 200);
+  assert.equal(platformCutFor(10000, "business"), 200);
 });

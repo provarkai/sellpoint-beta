@@ -186,10 +186,11 @@ function renderOnlinePaymentSection(){
   $("onlinePaymentSection").style.display=eligible?"block":"none";
   if(!eligible)return;
   loadBanksOnce();
+  const totalCutPct=state.plan==="starter"?"4%":"3%";
   if($("platformCutNote")){
-    const cutPct=state.plan==="starter"?"2.5%":"1%";
-    $("platformCutNote").textContent=`SellersPoint takes ${cutPct} + NGN 50 per order from online payments${state.plan==="starter"?" on the free Starter plan - upgrade to lower this to 1%":""}. Manual/WhatsApp bank transfer orders are never charged.`;
+    $("platformCutNote").textContent=`SellersPoint takes ${totalCutPct} + NGN 50 per order from online payments processing${state.plan==="starter"?" on the free Starter plan - upgrade to lower this to 3%":""}. Manual bank transfer orders are never charged.`;
   }
+  if($("absorbFeesLabel"))$("absorbFeesLabel").textContent=`I'll absorb the ~${totalCutPct} +50 payment processing fee myself`;
   if(state.hasPaystackSubaccount){
     $("subaccountStatus").innerHTML=`<div class="item"><strong>${clean(state.paystackBankName)}</strong><span class="meta">${clean(state.paystackAccountName)} - ${clean(state.paystackAccountNumberMasked)}</span></div>`;
     $("subaccountForm").style.display="none";

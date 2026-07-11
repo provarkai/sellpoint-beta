@@ -96,7 +96,7 @@ async function verifyTransaction(reference) {
 // every paid tier pays the same lower cut. Both add a flat NGN50 per order.
 const PLATFORM_CUT_FLAT_NAIRA = 50;
 function platformCutFor(amountNaira, plan) {
-  const pct = plan === "starter" ? 0.025 : 0.01;
+  const pct = plan === "starter" ? 0.025 : 0.015;
   return Math.round(amountNaira * pct + PLATFORM_CUT_FLAT_NAIRA);
 }
 
