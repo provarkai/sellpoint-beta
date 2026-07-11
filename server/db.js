@@ -391,6 +391,8 @@ async function listAllPayments() {
 
 module.exports = {
   OrderError,
+  query,
+  uid,
   getMembership,
   createBusiness,
   getBusiness,

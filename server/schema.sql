@@ -101,3 +101,40 @@ create table if not exists owner_payment (
   details text not null default ''
 );
 insert into owner_payment (id) values (1) on conflict (id) do nothing;
+
+-- Founding Members waitlist (founding-members.html) - pre-launch signups,
+-- separate from the real `businesses` tenants created via signup.html.
+-- referral_code is short/shareable by design (not the long uid() ids used
+-- elsewhere), referred_by is unenforced text (not a FK) since a signup can
+-- be referred by a code that hasn't been created yet in a race, and we'd
+-- rather keep the row than reject the signup.
+create table if not exists waitlist_signups (
+  id uuid primary key default gen_random_uuid(),
+  business_name text not null,
+  owner_name text not null,
+  email text not null unique,
+  phone text not null default '',
+  country text not null default '',
+  business_category text not null default '',
+  business_size text not null default '',
+  challenge text not null default '',
+  readiness_score integer,
+  referral_code text not null unique,
+  referred_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists waitlist_signups_country_idx on waitlist_signups(country);
+
+-- Scaffold for the founder's-story/product-sneak-peek/etc drip sequence.
+-- Rows are enqueued at signup time; sent_at stays null until a future
+-- scheduled dispatcher sends them (not built yet - see CLAUDE_HANDOFF.md).
+create table if not exists waitlist_email_queue (
+  id uuid primary key default gen_random_uuid(),
+  signup_id uuid not null references waitlist_signups(id) on delete cascade,
+  sequence integer not null,
+  subject text not null,
+  send_at timestamptz not null,
+  sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists waitlist_email_queue_due_idx on waitlist_email_queue(send_at) where sent_at is null;

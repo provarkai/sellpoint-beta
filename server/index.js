@@ -5,6 +5,8 @@ const db = require("./db");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin } = require("./auth");
 const payments = require("./payments");
 const { PRICING } = require("./pricing");
+const waitlist = require("./waitlist");
+const email = require("./email");
 
 const app = express();
 const ROOT = path.join(__dirname, "..");
@@ -194,6 +196,33 @@ app.post(
 app.get(
   "/api/pricing",
   handle(async (req, res) => res.json(PRICING))
+);
+
+// --- Founding Members waitlist (founding-members.html, public) --------------
+// Pre-launch signups, separate from real tenants created via signup.html.
+// No auth - this page is meant to be shared before anyone has an account.
+
+app.post(
+  "/api/waitlist",
+  handle(async (req, res) => {
+    const { signup, alreadyJoined } = await waitlist.createSignup(req.body || {});
+    if (!alreadyJoined) {
+      const siteUrl = process.env.PUBLIC_SITE_URL || `${req.protocol}://${req.get("host")}`;
+      await email.sendWaitlistWelcomeEmail({
+        to: signup.email,
+        ownerName: signup.ownerName,
+        businessName: signup.businessName,
+        referralCode: signup.referralCode,
+        siteUrl,
+      });
+    }
+    res.status(alreadyJoined ? 200 : 201).json({ signup, alreadyJoined });
+  })
+);
+
+app.get(
+  "/api/waitlist/stats",
+  handle(async (req, res) => res.json(await waitlist.getStats()))
 );
 
 // --- Payments ----------------------------------------------------------------
