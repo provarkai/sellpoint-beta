@@ -20,13 +20,17 @@ app.set("trust proxy", 1);
 
 // General ceiling across the whole API (well above real usage, just a
 // backstop against scraping/abuse) - the webhook is excluded since Paystack
-// is a legitimate high-volume caller, not a user.
+// is a legitimate high-volume caller, not a user. req.path inside a
+// middleware mounted via app.use("/api", apiLimiter) is relative to that
+// mount point (e.g. "/payments/webhook", not "/api/payments/webhook") -
+// req.originalUrl still has the full path regardless of mounting, so that's
+// what this must compare against or the skip silently never matches.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === "/api/payments/webhook",
+  skip: (req) => req.originalUrl === "/api/payments/webhook",
 });
 // Business/account creation is the highest-value target for spam signups.
 const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
