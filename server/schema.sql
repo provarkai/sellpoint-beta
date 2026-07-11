@@ -277,10 +277,16 @@ create table if not exists waitlist (
   referral_code text not null unique,
   referred_by_code text not null default '',
   newsletter_opt_in boolean not null default false,
+  readiness_score integer,
   created_at timestamptz not null default now()
 );
 create index if not exists waitlist_email_idx on waitlist(lower(email));
 create index if not exists waitlist_referral_code_idx on waitlist(referral_code);
+-- Score from the landing page's inline Business Readiness Assessment,
+-- captured alongside signup when a visitor completes it first. CREATE TABLE
+-- IF NOT EXISTS above is a no-op once the table already exists, so this
+-- column needs its own idempotent ALTER like every other schema addition.
+alter table waitlist add column if not exists readiness_score integer;
 
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the

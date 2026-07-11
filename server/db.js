@@ -972,6 +972,7 @@ function toWaitlistJson(w) {
     ownerName: w.owner_name,
     email: w.email,
     referralCode: w.referral_code,
+    readinessScore: w.readiness_score,
     createdAt: w.created_at,
   };
 }
@@ -993,9 +994,16 @@ async function createWaitlistEntry(data) {
   const { rows: existing } = await query("SELECT 1 FROM waitlist WHERE lower(email) = $1", [email]);
   if (existing.length) throw new OrderError("This email is already on the waitlist");
   const referralCode = await uniqueReferralCode();
+  // Accepts both this project's original field names and the landing page
+  // template's shorter ones (challenge/readinessScore/referredBy) so the
+  // template's own JS doesn't need reshaping to match the API.
+  const currentChallenges = data.currentChallenges || data.challenge || "";
+  const referredByCode = data.referredByCode || data.referredBy || "";
+  const readinessScoreRaw = data.readinessScore;
+  const readinessScore = readinessScoreRaw === null || readinessScoreRaw === undefined || readinessScoreRaw === "" ? null : Math.round(Number(readinessScoreRaw));
   const { rows } = await query(
-    `INSERT INTO waitlist (business_name, owner_name, email, phone, country, state, business_category, business_size, years_in_business, current_challenges, referral_code, referred_by_code, newsletter_opt_in)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO waitlist (business_name, owner_name, email, phone, country, state, business_category, business_size, years_in_business, current_challenges, referral_code, referred_by_code, newsletter_opt_in, readiness_score)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
     [
       businessName,
       ownerName,
@@ -1006,10 +1014,11 @@ async function createWaitlistEntry(data) {
       data.businessCategory || "",
       data.businessSize || "",
       data.yearsInBusiness || "",
-      data.currentChallenges || "",
+      currentChallenges,
       referralCode,
-      data.referredByCode || "",
+      referredByCode,
       !!data.newsletterOptIn,
+      Number.isFinite(readinessScore) ? readinessScore : null,
     ]
   );
   return toWaitlistJson(rows[0]);
