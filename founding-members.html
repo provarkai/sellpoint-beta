@@ -35,7 +35,7 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    { "@type": "Question", "name": "When is launch?", "acceptedAnswer": { "@type": "Answer", "text": "Founding Member registration is open now. Private Beta and Public Beta follow before official launch — see the Launch Timeline section for current estimates." } },
+    { "@type": "Question", "name": "When is launch?", "acceptedAnswer": { "@type": "Answer", "text": "Founding Member registration is open now. Private Beta and Public Beta follow before official launch." } },
     { "@type": "Question", "name": "Is there a free plan?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. SellersPoint has a free Starter plan, and Founding Members get extra launch benefits on top of it." } },
     { "@type": "Question", "name": "Can I import Excel?", "acceptedAnswer": { "@type": "Answer", "text": "Bulk import of products and customers from Excel/CSV is planned for launch." } },
     { "@type": "Question", "name": "Does it work offline?", "acceptedAnswer": { "@type": "Answer", "text": "SellersPoint is a web-based platform and needs an internet connection today; offline-first support is on the roadmap." } },
@@ -157,23 +157,6 @@ form.signup-form{display:grid;gap:12px}
 .benefit-card h3{font-size:16px;font-weight:800}
 .benefit-card p{color:var(--muted);font-size:13px;margin-top:6px}
 
-/* ===== Product preview ===== */
-.preview-section{background:var(--dark);color:#fff}
-.preview-section .h2{color:#fff}
-.preview-section .lede{color:#b9ccc3}
-.preview-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:48px;align-items:center;margin-top:44px}
-@media(max-width:900px){.preview-wrap{grid-template-columns:1fr}}
-.tab-list{display:flex;flex-direction:column;gap:6px}
-.tab-btn{text-align:left;background:transparent;color:#cfe3da;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;border:1px solid transparent}
-.tab-btn.active{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.14)}
-.phone{width:280px;margin:0 auto;background:#0a2620;border:8px solid #0a2620;border-radius:36px;box-shadow:0 30px 70px rgba(0,0,0,.4);overflow:hidden}
-.phone-screen{background:#fff;color:var(--ink);min-height:420px;padding:18px;border-radius:28px}
-.phone-screen h4{font-size:13px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
-.phone-row{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0;font-size:12px}
-.phone-metric{background:#f0faf6;border-radius:10px;padding:10px;margin-bottom:8px}
-.phone-metric b{display:block;font-size:16px}
-.phone-metric small{color:var(--muted)}
-
 /* ===== Interactive demo ===== */
 .demo-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:30px 0}
 .demo-tab{padding:10px 18px;border-radius:999px;border:1.5px solid var(--line);font-weight:800;font-size:13px;background:var(--surface)}
@@ -215,20 +198,6 @@ form.signup-form{display:grid;gap:12px}
 .cat-row.weak{color:var(--accent)}
 .result-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:30px}
 
-/* ===== Before / after ===== */
-.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:44px}
-@media(max-width:760px){.ba-grid{grid-template-columns:1fr}}
-.ba-card{border-radius:var(--radius);padding:28px}
-.ba-before{background:#faf5f2;border:1px solid #f0e4dc}
-.ba-after{background:var(--dark);color:#fff}
-.ba-card h3{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px}
-.ba-before h3{color:#b46a3f}
-.ba-after h3{color:#7fe0bd}
-.ba-list{display:grid;gap:10px;list-style:none;padding:0;margin:0;font-weight:700;font-size:14px}
-.ba-list li{display:flex;gap:10px;align-items:center}
-.ba-before li::before{content:'✕';color:#c4633a}
-.ba-after li::before{content:'✓';color:#3fd69a}
-
 /* ===== Features ===== */
 .feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:44px}
 @media(max-width:900px){.feat-grid{grid-template-columns:repeat(2,1fr)}}
@@ -251,31 +220,6 @@ form.signup-form{display:grid;gap:12px}
 .bubble.ai{background:rgba(255,255,255,.08);color:#eafff5;border-bottom-left-radius:4px}
 .prompt-chip{display:inline-block;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#eafff5;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:700;margin:5px 6px 0 0}
 .prompt-chip:hover{border-color:var(--primary-light)}
-
-/* ===== Social proof ===== */
-.counter-row{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;margin-top:44px}
-.counter{text-align:center}
-.counter b{font-size:36px;font-weight:800;color:var(--primary);display:block}
-.counter small{color:var(--muted);font-weight:700;font-size:13px}
-
-/* ===== Timeline ===== */
-.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:44px;position:relative}
-@media(max-width:760px){.timeline{grid-template-columns:1fr}}
-.tl-step{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;position:relative}
-.tl-step.active{border-color:var(--primary);box-shadow:0 0 0 3px rgba(20,125,100,.12)}
-.tl-dot{width:12px;height:12px;border-radius:50%;background:var(--line);margin-bottom:12px}
-.tl-step.active .tl-dot{background:var(--primary)}
-.tl-step h4{font-size:15px;font-weight:800}
-.tl-step small{color:var(--muted);font-weight:700;display:block;margin-top:4px}
-
-/* ===== Referral ===== */
-.referral-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px}
-@media(max-width:760px){.referral-grid{grid-template-columns:1fr}}
-.tier-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;text-align:center}
-.tier-card b{display:block;font-size:22px;color:var(--primary)}
-.tier-card small{color:var(--muted);font-weight:700}
-.tier-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:640px){.tier-row{grid-template-columns:1fr}}
 
 /* ===== Free gift ===== */
 .gift-card{background:linear-gradient(135deg,rgba(20,125,100,.08),rgba(211,107,44,.08));border:1px solid var(--line);border-radius:var(--radius);padding:32px;margin-top:40px;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center}
@@ -420,19 +364,6 @@ footer{padding:48px 0 32px;color:var(--muted);font-size:13px}
   </div>
 </section>
 
-<!-- ===== PRODUCT PREVIEW ===== -->
-<section class="preview-section">
-  <div class="wrap">
-    <span class="eyebrow" style="background:rgba(255,255,255,.1);color:#fff">Product Preview</span>
-    <h2 class="h2">See SellersPoint in action.</h2>
-    <p class="lede">A quick look at every screen that runs your business.</p>
-    <div class="preview-wrap">
-      <div class="tab-list" id="previewTabs"></div>
-      <div class="phone"><div class="phone-screen" id="phoneScreen"></div></div>
-    </div>
-  </div>
-</section>
-
 <!-- ===== INTERACTIVE DEMO ===== -->
 <section id="demo">
   <div class="wrap">
@@ -479,21 +410,6 @@ footer{padding:48px 0 32px;color:var(--muted);font-size:13px}
   </div>
 </section>
 
-<!-- ===== BEFORE / AFTER ===== -->
-<section>
-  <div class="wrap">
-    <h2 class="h2 center">From scattered to systemized.</h2>
-    <div class="ba-grid">
-      <div class="ba-card ba-before"><h3>Before</h3>
-        <ul class="ba-list"><li>Notebook</li><li>Calculator</li><li>Memory</li><li>Loose Receipts</li><li>Excel</li><li>Manual WhatsApp</li><li>Stress</li></ul>
-      </div>
-      <div class="ba-card ba-after"><h3>With SellersPoint</h3>
-        <ul class="ba-list"><li>Inventory</li><li>Customers</li><li>AI</li><li>Receipts</li><li>Reports</li><li>Online Store</li><li>Business Insights</li></ul>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ===== FEATURES ===== -->
 <section style="background:var(--surface)">
   <div class="wrap">
@@ -520,44 +436,6 @@ footer{padding:48px 0 32px;color:var(--muted);font-size:13px}
         <span class="prompt-chip" data-reply="Today: 14 orders, ₦212,000 revenue, 3 low-stock items. Best seller: Glow Body Cream.">Summarize today's sales</span>
         <span class="prompt-chip" data-reply="Based on this week's sales pace, Wireless Earbuds will run out in 4 days — restock soon.">Predict stock shortages</span>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===== SOCIAL PROOF (live counter only — no fabricated testimonials) ===== -->
-<section style="background:var(--surface)">
-  <div class="wrap center">
-    <h2 class="h2 center">Growing every day.</h2>
-    <div class="counter-row">
-      <div class="counter"><b id="cBusinesses">—</b><small>Businesses Waiting</small></div>
-      <div class="counter"><b id="cCountries">—</b><small>Countries</small></div>
-    </div>
-    <p class="lede center" id="counterNote" style="margin-top:16px;font-size:13px"></p>
-  </div>
-</section>
-
-<!-- ===== TIMELINE ===== -->
-<section>
-  <div class="wrap">
-    <h2 class="h2 center">Launch timeline.</h2>
-    <div class="timeline">
-      <div class="tl-step active"><div class="tl-dot"></div><h4>Founding Members</h4><small>Open now</small></div>
-      <div class="tl-step"><div class="tl-dot"></div><h4>Private Beta</h4><small>Estimated Sep 2026</small></div>
-      <div class="tl-step"><div class="tl-dot"></div><h4>Public Beta</h4><small>Estimated Nov 2026</small></div>
-      <div class="tl-step"><div class="tl-dot"></div><h4>Official Launch</h4><small>Estimated Jan 2027</small></div>
-    </div>
-  </div>
-</section>
-
-<!-- ===== REFERRAL ===== -->
-<section style="background:var(--surface)">
-  <div class="wrap">
-    <h2 class="h2 center">Invite founders, unlock more.</h2>
-    <p class="lede center">Every Founding Member gets a unique referral link.</p>
-    <div class="tier-row" style="margin-top:36px">
-      <div class="tier-card"><b>Invite 3</b><small>Unlock 1 Month Growth</small></div>
-      <div class="tier-card"><b>Invite 10</b><small>Unlock 6 Months Pro</small></div>
-      <div class="tier-card"><b>Invite 25</b><small>Become a SellersPoint Ambassador</small></div>
     </div>
   </div>
 </section>
@@ -606,7 +484,7 @@ footer{padding:48px 0 32px;color:var(--muted);font-size:13px}
     <div class="foot-flags"><span>Built in Lagos 🇳🇬</span><span>Designed for Africa 🌍</span><span>Ready for the World 🌎</span></div>
     <div class="foot-links">
       <a href="#top">About</a>
-      <a href="#" class="tl-anchor">Roadmap</a>
+      <span class="disabled">Roadmap</span>
       <span class="disabled">Careers</span>
       <span class="disabled">Privacy</span>
       <span class="disabled">Terms</span>
@@ -644,51 +522,6 @@ const io = new IntersectionObserver((entries) => {
   entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in-view"); io.unobserve(e.target); } });
 }, { threshold: 0.12 });
 document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-
-/* ============================================================
-   PRODUCT PREVIEW (rotating phone mockup)
-   ============================================================ */
-const PREVIEW_TABS = [
-  { id:"dash", label:"Dashboard", render:() => `<h4>Dashboard</h4>
-    <div class="phone-metric"><small>Revenue Today</small><b>₦212,000</b></div>
-    <div class="phone-metric"><small>Orders</small><b>14</b></div>
-    <div class="phone-metric"><small>Low Stock</small><b>3 items</b></div>` },
-  { id:"inv", label:"Inventory", render:() => `<h4>Inventory</h4>
-    <div class="phone-row"><span>Glow Body Cream</span><b>12 left</b></div>
-    <div class="phone-row"><span>Mini Handbag</span><b>4 left</b></div>
-    <div class="phone-row"><span>Wireless Earbuds</span><b>8 left</b></div>` },
-  { id:"cust", label:"Customers", render:() => `<h4>Customers</h4>
-    <div class="phone-row"><span>Amina Bello</span><b>Lagos</b></div>
-    <div class="phone-row"><span>Chidi Okafor</span><b>Abuja</b></div>
-    <div class="phone-row"><span>Ngozi Eze</span><b>Enugu</b></div>` },
-  { id:"rec", label:"Receipts", render:() => `<h4>Receipts</h4>
-    <div class="phone-row"><span>#SP-1042</span><b>Paid</b></div>
-    <div class="phone-row"><span>#SP-1041</span><b>Paid</b></div>
-    <div class="phone-row"><span>#SP-1040</span><b>Pending</b></div>` },
-  { id:"invoice", label:"Invoices", render:() => `<h4>Invoice</h4>
-    <div class="phone-row"><span>Wireless Earbuds x2</span><b>₦37,000</b></div>
-    <div class="phone-row"><span>Delivery</span><b>₦1,500</b></div>
-    <div class="phone-row"><span>Total</span><b>₦38,500</b></div>` },
-  { id:"reports", label:"Reports", render:() => `<h4>Reports</h4>
-    <div class="phone-metric"><small>This Week</small><b>₦1,240,000</b></div>
-    <div class="phone-metric"><small>Best Seller</small><b>Glow Body Cream</b></div>` },
-  { id:"aiTab", label:"AI", render:() => `<h4>AI Tools</h4>
-    <div class="phone-row"><span>Product caption</span><b>Ready</b></div>
-    <div class="phone-row"><span>Payment reminder</span><b>Ready</b></div>` },
-  { id:"store", label:"Storefront", render:() => `<h4>Storefront</h4>
-    <div class="phone-row"><span>Live products</span><b>24</b></div>
-    <div class="phone-row"><span>Store visits (7d)</span><b>318</b></div>` },
-];
-let previewIndex = 0;
-const previewTabsEl = $("previewTabs"), phoneScreenEl = $("phoneScreen");
-function renderPreview(i){
-  previewIndex = i;
-  previewTabsEl.innerHTML = PREVIEW_TABS.map((t,idx)=>`<button class="tab-btn ${idx===i?'active':''}" data-i="${idx}">${t.label}</button>`).join("");
-  phoneScreenEl.innerHTML = PREVIEW_TABS[i].render();
-}
-previewTabsEl.addEventListener("click",(e)=>{ const b=e.target.closest(".tab-btn"); if(b) renderPreview(Number(b.dataset.i)); });
-renderPreview(0);
-setInterval(()=>renderPreview((previewIndex+1)%PREVIEW_TABS.length), 5000);
 
 /* ============================================================
    INTERACTIVE DEMO
@@ -831,7 +664,7 @@ $("downloadReport").addEventListener("click",()=>{
    FAQ
    ============================================================ */
 const FAQS = [
-  ["When is launch?","Founding Member registration is open now. Private Beta and Public Beta follow before official launch — see the Launch Timeline above for current estimates."],
+  ["When is launch?","Founding Member registration is open now. Private Beta and Public Beta follow before official launch."],
   ["Is there a free plan?","Yes. SellersPoint has a free Starter plan, and Founding Members get extra launch benefits on top of it."],
   ["Can I import Excel?","Bulk import of products and customers from Excel/CSV is planned for launch."],
   ["Does it work offline?","SellersPoint is a web-based platform and needs an internet connection today; offline-first support is on the roadmap."],
@@ -850,28 +683,6 @@ $("faqList").addEventListener("click",(e)=>{
   document.querySelectorAll(".faq-item").forEach(i=>{ i.classList.remove("open"); i.querySelector(".faq-a").style.maxHeight = null; });
   if (!open){ item.classList.add("open"); const a=item.querySelector(".faq-a"); a.style.maxHeight = a.scrollHeight+"px"; }
 });
-
-/* ============================================================
-   LIVE COUNTERS — real numbers only. If no backend is configured,
-   we show honest placeholder copy instead of a fabricated count.
-   ============================================================ */
-async function loadStats(){
-  if (!CONFIG.WAITLIST_API_URL){
-    $("cBusinesses").textContent = "You";
-    $("cCountries").textContent = "1";
-    $("counterNote").textContent = "Be the first — connect a backend (see CONFIG.WAITLIST_API_URL) to show a live, real count here.";
-    return;
-  }
-  try{
-    const res = await fetch(CONFIG.WAITLIST_API_URL.replace(/\/waitlist$/, "/waitlist/stats"));
-    const data = await res.json();
-    $("cBusinesses").textContent = data.businesses ?? "0";
-    $("cCountries").textContent = data.countries ?? "0";
-  }catch{
-    $("counterNote").textContent = "Live count temporarily unavailable.";
-  }
-}
-loadStats();
 
 /* ============================================================
    SIGNUP FORM
@@ -985,9 +796,6 @@ $("copyReferral").addEventListener("click", async ()=>{
   toast("Referral link copied");
 });
 $("downloadKit").addEventListener("click",()=> downloadText("sellerspoint-starter-kit.txt", STARTER_KIT));
-
-/* footer roadmap anchor */
-document.querySelector(".tl-anchor").addEventListener("click",(e)=>{ e.preventDefault(); document.querySelector(".timeline").scrollIntoView({behavior:"smooth"}); });
 
 })();
 </script>
