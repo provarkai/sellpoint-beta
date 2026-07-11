@@ -277,7 +277,9 @@ if ($("downloadVcf")) $("downloadVcf").onclick = () => {
   if (store.businessLogo) {
     $("storeLogo").src = store.businessLogo;
     $("storeLogo").style.display = "block";
+    $("storeLogoFallback").style.display = "none";
   } else {
+    $("storeLogo").style.display = "none";
     $("storeLogoFallback").textContent = (store.businessName || "SP").slice(0, 2).toUpperCase();
     $("storeLogoFallback").style.display = "flex";
   }

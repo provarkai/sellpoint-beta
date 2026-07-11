@@ -128,9 +128,18 @@ if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();co
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
 if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to Starter now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to Starter")}catch(err){toast(err.message)}};
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("brandLogo"))$("brandLogo").innerHTML=state.businessLogo?`<img src="${state.businessLogo}" alt="Logo">`:"SP"}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection()};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||""}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection()};
 
 function renderStorefrontSection(){
+  if($("dashStoreLink")){
+    const showOnDash=!!state.storefrontEligible&&!!state.storefrontEnabled;
+    $("dashStoreLink").style.display=showOnDash?"block":"none";
+    if(showOnDash){
+      const dashUrl=`${location.origin}/store/${state.slug||""}`;
+      $("dashStoreUrl").textContent=dashUrl;
+      $("dashOpenStoreUrl").href=dashUrl;
+    }
+  }
   if(!$("storefrontSection"))return;
   const eligible=!!state.storefrontEligible;
   $("storefrontLocked").style.display=eligible?"none":(myRole==="owner"?"block":"none");
@@ -149,6 +158,7 @@ function renderStorefrontSection(){
   if($("socialX"))$("socialX").value=social.x||"";
 }
 if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
+if($("dashCopyStoreUrl"))$("dashCopyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
 
 function renderLogistics(){
