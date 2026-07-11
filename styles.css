@@ -105,3 +105,4 @@ main{padding:28px;overflow:auto}header{display:flex;justify-content:space-betwee
 .item-details{background:#fbfcfb;border:1px solid var(--line);border-radius:8px;padding:4px 12px;margin-top:4px}.item-details .row:last-child{border-bottom:0}
 .smart-alerts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
 @media(max-width:900px){.smart-alerts-grid{grid-template-columns:1fr}}
+.coming-soon{text-align:center;padding:60px 24px;color:var(--muted)}.coming-soon h2{margin:0 0 8px;color:var(--ink)}
