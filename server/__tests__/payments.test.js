@@ -33,12 +33,12 @@ test("verifyWebhookSignature rejects a garbage signature of different length", (
   assert.equal(verifyWebhookSignature(rawBody, "not-a-real-signature"), false);
 });
 
-test("platformCutFor charges starter (free plan) sellers 5% + NGN50", () => {
-  assert.equal(platformCutFor(10000, "starter"), 550); // 500 + 50
+test("platformCutFor charges starter (free plan) sellers 2.5% + NGN50", () => {
+  assert.equal(platformCutFor(10000, "starter"), 300); // 250 + 50
 });
 
-test("platformCutFor charges paid-plan sellers 3% + NGN50", () => {
-  assert.equal(platformCutFor(10000, "growth"), 350); // 300 + 50
-  assert.equal(platformCutFor(10000, "pro"), 350);
-  assert.equal(platformCutFor(10000, "business"), 350);
+test("platformCutFor charges paid-plan sellers 1% + NGN50", () => {
+  assert.equal(platformCutFor(10000, "growth"), 150); // 100 + 50
+  assert.equal(platformCutFor(10000, "pro"), 150);
+  assert.equal(platformCutFor(10000, "business"), 150);
 });
