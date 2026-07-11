@@ -193,15 +193,21 @@ function renderOnlinePaymentSection(){
   if(state.hasPaystackSubaccount){
     $("subaccountStatus").innerHTML=`<div class="item"><strong>${clean(state.paystackBankName)}</strong><span class="meta">${clean(state.paystackAccountName)} - ${clean(state.paystackAccountNumberMasked)}</span></div>`;
     $("subaccountForm").style.display="none";
+    $("changeBankWrap").style.display="block";
     $("paymentModeForm").style.display="grid";
     $("paymentModeEnabled").checked=state.paymentMode==="paystack";
     $("absorbFeesToggle").checked=!!state.absorbFees;
   }else{
     $("subaccountStatus").innerHTML="";
     $("subaccountForm").style.display="grid";
+    $("changeBankWrap").style.display="none";
     $("paymentModeForm").style.display="none";
   }
 }
+if($("changeBankBtn"))$("changeBankBtn").onclick=()=>{
+  $("subaccountForm").style.display="grid";
+  $("changeBankWrap").style.display="none";
+};
 if($("verifyAccountBtn"))$("verifyAccountBtn").onclick=async()=>{
   const bankCode=$("paymentBank").value;
   const bankName=$("paymentBank").selectedOptions[0]?.dataset.name||"";
