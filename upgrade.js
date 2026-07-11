@@ -3,6 +3,7 @@ let pricing = {};
 let cycle = "monthly";
 let authToken = null;
 let busy = false;
+let currentPlan = null;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const unlimited = (v) => v === Infinity || v === null || v === undefined;
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
@@ -33,16 +34,22 @@ function featuresFor(key, t) {
 function planCardsHtml() {
   return Object.entries(pricing).filter(([key]) => key !== "starter").map(([key, t]) => {
     const isEnterprise = t.monthly == null;
+    const isCurrent = key === currentPlan;
+    const featured = key === "pro" && !isCurrent;
     const priceHtml = isEnterprise
       ? '<p class="premium-price">Custom<span> pricing</span></p>'
       : '<p class="premium-price">' + money(cycle === "yearly" ? t.yearly : t.monthly) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p>';
-    const cta = isEnterprise
+    const cta = isCurrent
+      ? '<button disabled>Current Plan</button>'
+      : isEnterprise
       ? '<a class="button-link" href="mailto:sales@sellerspoint.app?subject=Enterprise%20plan">Contact Sales</a>'
       : '<button data-plan="' + key + '">Choose ' + t.name + '</button>';
     const body = isEnterprise
       ? '<p class="meta">' + t.tagline + '</p>'
       : '<p class="meta">' + t.tagline + '</p><ul class="premium-features">' + featuresFor(key, t).map((f) => "<li>" + f + "</li>").join("") + '</ul>';
-    return '<article class="premium-card' + (isEnterprise ? " premium-card-enterprise" : "") + '"><h2>' + t.name + '</h2>' + priceHtml + body + cta + '</article>';
+    const badge = isCurrent ? '<span class="landing-pricing-badge">Current Plan</span>' : featured ? '<span class="landing-pricing-badge">Most Popular</span>' : "";
+    const classes = "premium-card" + (isEnterprise ? " premium-card-enterprise" : "") + (featured || isCurrent ? " premium-card-featured" : "");
+    return '<article class="' + classes + '">' + badge + '<h2>' + t.name + '</h2>' + priceHtml + body + cta + '</article>';
   }).join("");
 }
 
@@ -67,12 +74,19 @@ function render() {
   $("planCards").innerHTML = planCardsHtml();
   $("planCards").querySelectorAll("button[data-plan]").forEach((b) => (b.onclick = () => chooseAndPay(b.dataset.plan)));
   if ($("comparisonTable")) $("comparisonTable").innerHTML = comparisonTableHtml();
+  // Savings are always "2 months free" (yearly = 10x monthly) on every paid
+  // plan, but the exact NGN amount differs per plan - stating one fixed
+  // figure here would be wrong for anything but whichever plan happened to
+  // be picked first, so this stays plan-agnostic instead.
   const anyTier = Object.values(pricing).find((t) => t.monthly > 0);
   if (anyTier) {
-    const savings = anyTier.monthly * 12 - anyTier.yearly;
     $("cycleHint").textContent = cycle === "yearly"
-      ? "Paying annually saves " + money(savings) + "/year (2 months free) versus paying monthly."
-      : "Switch to yearly to save " + money(savings) + "/year (2 months free).";
+      ? "You're saving 2 months (about 17%) on every plan by paying annually."
+      : "Switch to yearly and get 2 months free on any plan.";
+  }
+  if ($("currentPlanNote") && currentPlan) {
+    $("currentPlanNote").textContent = "You're currently on the " + (pricing[currentPlan]?.name || currentPlan) + " plan.";
+    $("currentPlanNote").style.display = "block";
   }
 }
 
@@ -131,7 +145,12 @@ async function buyAddon(type) {
 if ($("addonCards")) $("addonCards").querySelectorAll("button[data-addon]").forEach((b) => (b.onclick = () => buyAddon(b.dataset.addon)));
 
 async function loadAll() {
-  pricing = await fetch("/api/pricing").then((r) => (r.ok ? r.json() : {}));
+  const [pricingRes, meRes] = await Promise.all([
+    fetch("/api/pricing").then((r) => (r.ok ? r.json() : {})),
+    api("GET", "/api/me").catch(() => null),
+  ]);
+  pricing = pricingRes;
+  currentPlan = meRes?.business?.plan || null;
 }
 
 (async () => {
