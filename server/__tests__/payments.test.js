@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 // payments.js reads PAYSTACK_SECRET_KEY at module-load time, so set it
 // before requiring the module.
 process.env.PAYSTACK_SECRET_KEY = "test_secret_key";
-const { verifyWebhookSignature } = require("../payments");
+const { verifyWebhookSignature, platformCutFor } = require("../payments");
 
 function sign(rawBody) {
   return crypto.createHmac("sha512", "test_secret_key").update(rawBody).digest("hex");
@@ -31,4 +31,14 @@ test("verifyWebhookSignature rejects a missing signature", () => {
 test("verifyWebhookSignature rejects a garbage signature of different length", () => {
   const rawBody = Buffer.from(JSON.stringify({ event: "charge.success" }));
   assert.equal(verifyWebhookSignature(rawBody, "not-a-real-signature"), false);
+});
+
+test("platformCutFor charges starter (free plan) sellers 5% + NGN50", () => {
+  assert.equal(platformCutFor(10000, "starter"), 550); // 500 + 50
+});
+
+test("platformCutFor charges paid-plan sellers 3% + NGN50", () => {
+  assert.equal(platformCutFor(10000, "growth"), 350); // 300 + 50
+  assert.equal(platformCutFor(10000, "pro"), 350);
+  assert.equal(platformCutFor(10000, "business"), 350);
 });

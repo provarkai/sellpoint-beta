@@ -85,10 +85,20 @@ async function verifyTransaction(reference) {
 }
 
 // --- Seller online payments (Paystack subaccounts) -------------------------
-// SellersPoint takes no cut of a seller's storefront sales, so every
-// subaccount is created with percentage_charge: 0 - Paystack still deducts
-// its own processing fee regardless, which is a separate concern from our
-// 0% platform cut.
+// Subaccounts are created with percentage_charge: 0 because our platform cut
+// varies by plan and can't be expressed as a single static split on the
+// subaccount itself - instead it's computed per transaction and passed as
+// transaction_charge at initialize time (see platformCutFor / chargeAmount
+// below). Paystack still deducts its own processing fee regardless, which is
+// a separate concern from our platform cut.
+
+// Free (starter) sellers pay a higher cut since they're not on a paid plan;
+// every paid tier pays the same lower cut. Both add a flat NGN50 per order.
+const PLATFORM_CUT_FLAT_NAIRA = 50;
+function platformCutFor(amountNaira, plan) {
+  const pct = plan === "starter" ? 0.05 : 0.03;
+  return Math.round(amountNaira * pct + PLATFORM_CUT_FLAT_NAIRA);
+}
 
 async function listBanks() {
   const res = await fetch(`${PAYSTACK_BASE_URL}/bank?country=nigeria&currency=NGN`, {
@@ -137,9 +147,13 @@ function estimatePaystackFee(amountNaira) {
 
 // bearer: "subaccount" always - the seller's own payout nets minus
 // Paystack's real fee either way; absorbFees only controls whether we ask
-// the customer to cover an estimate of that fee up front.
-async function initializeStorefrontCheckout({ email, amountNaira, absorbFees, subaccountCode, reference, callbackUrl, businessId, orderId }) {
+// the customer to cover an estimate of that fee up front. transaction_charge
+// is the platform's cut (computed from the order total, not the inflated
+// chargeAmount when the customer is covering the Paystack fee) - Paystack
+// routes that portion to our main account and the rest to the subaccount.
+async function initializeStorefrontCheckout({ email, amountNaira, absorbFees, subaccountCode, reference, callbackUrl, businessId, orderId, plan }) {
   const chargeAmount = absorbFees ? amountNaira : amountNaira + estimatePaystackFee(amountNaira);
+  const platformCut = platformCutFor(amountNaira, plan);
   const res = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
     method: "POST",
     headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
@@ -150,12 +164,13 @@ async function initializeStorefrontCheckout({ email, amountNaira, absorbFees, su
       callback_url: callbackUrl,
       subaccount: subaccountCode,
       bearer: "subaccount",
+      transaction_charge: Math.round(platformCut * 100),
       metadata: { businessId, orderId },
     }),
   });
   const body = await res.json();
   if (!res.ok || !body.status) throw new Error(body.message || "Paystack initialize failed");
-  return { authorizationUrl: body.data.authorization_url, amount: chargeAmount };
+  return { authorizationUrl: body.data.authorization_url, amount: chargeAmount, platformCut };
 }
 
 module.exports = {
@@ -169,5 +184,6 @@ module.exports = {
   createSubaccount,
   estimatePaystackFee,
   initializeStorefrontCheckout,
+  platformCutFor,
   PAYSTACK_PUBLIC_KEY,
 };

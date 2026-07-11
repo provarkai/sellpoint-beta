@@ -296,6 +296,7 @@ app.post(
       callbackUrl,
       businessId: result.businessId,
       orderId: result.orderIds.join(","),
+      plan: result.plan,
     });
     res.json({ authorizationUrl: initialized.authorizationUrl, amount: initialized.amount, reference });
   })

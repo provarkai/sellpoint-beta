@@ -461,7 +461,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
     orderIds.push(order.id);
     total += Number(order.price) * order.qty;
   }
-  return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, orderIds, total, email };
+  return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, plan: effectivePlan(business), orderIds, total, email };
 }
 
 // --- Logistics providers (dispatch/courier credentials, generic) -----------
