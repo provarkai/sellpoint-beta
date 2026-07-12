@@ -11,7 +11,7 @@ function applyState(s){Object.assign(state,s.business,{products:s.products,custo
 async function loadState(){const [s,p,me]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me")]);applyState(s);pricing=p;myRole=me.role}
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
-const date=d=>new Intl.DateTimeFormat("en-NG",{month:"short",day:"numeric",year:"numeric"}).format(new Date(d));
+const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
 function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}

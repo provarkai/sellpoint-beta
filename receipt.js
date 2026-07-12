@@ -84,7 +84,8 @@ function watermarkHtml(text) {
 }
 
 function renderReceipt(r) {
-  const dateStr = new Date(r.issuedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+  const issuedDate = new Date(r.issuedAt);
+  const dateStr = `${String(issuedDate.getDate()).padStart(2, "0")}-${String(issuedDate.getMonth() + 1).padStart(2, "0")}-${issuedDate.getFullYear()}`;
   const itemRows = r.items.map((it) => `<tr><td>${clean(it.name)}</td><td>${it.qty}</td><td>${money(it.price)}</td><td>${money(it.qty * it.price)}</td></tr>`).join("");
   const brandUrl = location.origin + "/receipt.html";
   $("receiptBox").innerHTML = `
