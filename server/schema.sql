@@ -336,6 +336,26 @@ create table if not exists analytics_events (
 create index if not exists analytics_events_type_idx on analytics_events(event_type);
 create index if not exists analytics_events_created_at_idx on analytics_events(created_at);
 
+-- Audit log - "who did what, when", for authenticated mutating actions
+-- (POST/PUT/PATCH/DELETE). Separate from the per-business `events` table,
+-- which is a curated activity feed (item_created, order_created, etc.) with
+-- no user attribution - this is the raw, comprehensive trail: every
+-- request method+path+outcome, tied to the actual user_id and business_id
+-- from the auth middleware. user_id has no FK to auth.users (that table
+-- lives in Supabase's own schema, not this one).
+create table if not exists audit_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
+  business_id uuid references businesses(id) on delete set null,
+  method text not null,
+  path text not null,
+  status_code integer not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists audit_log_business_id_idx on audit_log(business_id);
+create index if not exists audit_log_user_id_idx on audit_log(user_id);
+create index if not exists audit_log_created_at_idx on audit_log(created_at);
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
@@ -366,3 +386,4 @@ alter table platform_settings enable row level security;
 alter table waitlist enable row level security;
 alter table coupons enable row level security;
 alter table analytics_events enable row level security;
+alter table audit_log enable row level security;

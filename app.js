@@ -152,7 +152,7 @@ if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();co
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
 if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to Starter now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to Starter")}catch(err){toast(err.message)}};
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||""}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection();renderReferralSection()};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||""}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection();renderReferralSection();renderAuditLogSection()};
 
 function renderStorefrontSection(){
   if($("dashStoreLink")){
@@ -260,6 +260,18 @@ async function renderReferralSection(){
     $("referralLinkDisplay").textContent=link;
     $("copyReferralLink").onclick=()=>copy(link);
   }catch(err){$("referralLinkDisplay").textContent="Could not load your referral link"}
+}
+let auditLogLoaded=false;
+async function renderAuditLogSection(){
+  if(!$("auditLogSection"))return;
+  const eligible=myRole==="owner";
+  $("auditLogSection").style.display=eligible?"block":"none";
+  if(!eligible||auditLogLoaded)return;
+  auditLogLoaded=true;
+  try{
+    const entries=await api("GET","/api/audit-log");
+    $("auditLogList").innerHTML=entries.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.method)} ${clean(e.path)}</strong><span>${e.statusCode}</span></div><div class="meta">${clean(e.email||"Unknown user")} - ${date(e.createdAt)}</div></div>`).join("")||`<div class="item"><span class="meta">No activity yet</span></div>`;
+  }catch(err){$("auditLogList").innerHTML=`<div class="item"><span class="meta">Could not load activity log</span></div>`}
 }
 function renderCouponsSection(){
   if(!$("couponsSection"))return;

@@ -20,6 +20,9 @@
         <article><h2>Businesses <small id="businessCount"></small></h2><p class="actions"><button id="businessExportCsv">Export CSV</button></p><div id="businessList" class="list"></div></article>
       </section>
       <section class="grid">
+        <article><h2>Audit Log <small class="meta">(cross-tenant, last 100)</small></h2><p class="meta">Every mutating action across all businesses - who did what, when.</p><div id="auditLogList" class="list"></div></article>
+      </section>
+      <section class="grid">
         <form id="pricingForm"><h2>Pricing Tiers</h2><p class="meta">Set the monthly price for each plan - yearly is automatically 10x monthly (2 months free). Starter is always free; Enterprise is always custom.</p><label>Growth (NGN/month)<input id="priceGrowth" type="number" min="0" required></label><label>Pro (NGN/month)<input id="pricePro" type="number" min="0" required></label><label>Business (NGN/month)<input id="priceBusiness" type="number" min="0" required></label><button>Save Pricing</button></form>
         <article><h2>Recent Payments (All Tenants)</h2><p class="actions"><button id="paymentExportCsv">Export CSV</button></p><div id="paymentLog" class="list"></div></article>
       </section>

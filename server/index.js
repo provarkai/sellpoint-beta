@@ -83,6 +83,31 @@ app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: tru
 
 app.use("/api", apiLimiter);
 
+// Audit trail for authenticated mutating actions - "who did what, when".
+// Registered here (not as a per-route middleware) so it doesn't need adding
+// to every single route definition; res.on("finish") fires after the whole
+// pipeline (including whichever per-route auth middleware ran) completes,
+// so req.user/req.businessId are already populated by then if the route is
+// authenticated. Unauthenticated mutations (waitlist signup, storefront
+// checkout) are intentionally not logged here - they're already covered by
+// the separate analytics_events tracking, and there's no user to attribute
+// them to anyway.
+app.use((req, res, next) => {
+  res.on("finish", () => {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return;
+    if (!req.user) return;
+    if (req.originalUrl === "/api/track") return;
+    db.recordAuditLog({
+      userId: req.user.id,
+      businessId: req.businessId || null,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+    }).catch((err) => console.error("Audit log write failed:", err.message));
+  });
+  next();
+});
+
 // Clean shareable storefront URLs (/store/my-shop) instead of a query
 // string - store.js reads the slug back out of location.pathname. Static
 // serving above already ran and found nothing at this path, so this always
@@ -290,6 +315,17 @@ app.get(
   "/api/business/referral",
   requireAuth,
   handle(async (req, res) => res.json({ referralCode: await db.getOrCreateReferralCode(req.businessId) }))
+);
+
+// Owner-only - "who did what" for this business's own team, not visible to
+// staff (matches the same owner-only gating as staff/payment management).
+app.get(
+  "/api/audit-log",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can view the activity log" });
+    res.json(await db.listAuditLog(req.businessId));
+  })
 );
 
 // --- Public storefront (Growth+) --------------------------------------------
@@ -928,6 +964,12 @@ app.get(
   "/api/admin/analytics",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.getAnalyticsSummary()))
+);
+
+app.get(
+  "/api/admin/audit-log",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.listAllAuditLog()))
 );
 
 // Permanently deletes a business and everything under it (products,

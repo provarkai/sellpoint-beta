@@ -1213,6 +1213,41 @@ async function getAnalyticsSummary() {
   };
 }
 
+// --- Audit log ("who did what, when") --------------------------------------
+
+async function recordAuditLog({ userId, businessId, method, path, statusCode }) {
+  await query(
+    "INSERT INTO audit_log (user_id, business_id, method, path, status_code) VALUES ($1,$2,$3,$4,$5)",
+    [userId, businessId, method, path, statusCode]
+  );
+}
+
+// Business-scoped view (Settings > Activity Log) - joins business_members
+// to show an email instead of a bare user_id where the actor is still a
+// member of this business (a removed staff member's past actions still
+// show up, just without an email attached).
+async function listAuditLog(businessId, limit = 50) {
+  const { rows } = await query(
+    `SELECT a.*, m.email FROM audit_log a
+     LEFT JOIN business_members m ON m.user_id = a.user_id AND m.business_id = a.business_id
+     WHERE a.business_id = $1 ORDER BY a.created_at DESC LIMIT $2`,
+    [businessId, limit]
+  );
+  return rows.map((r) => ({ id: r.id, email: r.email || "", method: r.method, path: r.path, statusCode: r.status_code, createdAt: r.created_at }));
+}
+
+// Cross-tenant view (platform admin) - includes the business name so a
+// platform operator can tell which tenant an action belongs to.
+async function listAllAuditLog(limit = 100) {
+  const { rows } = await query(
+    `SELECT a.*, b.name AS business_name FROM audit_log a
+     LEFT JOIN businesses b ON b.id = a.business_id
+     ORDER BY a.created_at DESC LIMIT $1`,
+    [limit]
+  );
+  return rows.map((r) => ({ id: r.id, businessName: r.business_name || "", method: r.method, path: r.path, statusCode: r.status_code, createdAt: r.created_at }));
+}
+
 // --- Platform-admin (cross-tenant) -------------------------------------------
 
 // Everything under a business (products/customers/orders/branches/staff/
@@ -1305,6 +1340,9 @@ module.exports = {
   getWaitlistStats,
   trackEvent,
   getAnalyticsSummary,
+  recordAuditLog,
+  listAuditLog,
+  listAllAuditLog,
   deleteBusiness,
   listStaff,
   inviteStaff,
