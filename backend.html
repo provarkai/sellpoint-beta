@@ -12,6 +12,10 @@
     <div id="adminContent" style="display:none">
       <section class="metrics"><div><small>Businesses</small><b id="totalBusinesses">0</b></div><div><small>Payments recorded</small><b id="totalPayments">0</b></div><div><small>Revenue collected</small><b id="totalRevenue">NGN 0</b></div></section>
       <section class="grid">
+        <article><h2>Analytics <small class="meta">(last 30 days)</small></h2><p class="meta">Top-of-funnel: landing views, signups, storefront traffic. Anonymous, no PII.</p><div id="analyticsSummary" class="list"></div></article>
+        <article><h2>Founding Members Waitlist</h2><div id="waitlistSummary" class="list"></div></article>
+      </section>
+      <section class="grid">
         <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><p class="meta">Subscription payments are collected via Paystack checkout - no manual bank details needed.</p><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<input value="Paystack" disabled></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><button>Save SellersPoint Payment Details</button></form>
         <article><h2>Businesses <small id="businessCount"></small></h2><p class="actions"><button id="businessExportCsv">Export CSV</button></p><div id="businessList" class="list"></div></article>
       </section>

@@ -51,12 +51,15 @@ const apiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.originalUrl === "/api/payments/webhook",
+  skip: (req) => req.originalUrl === "/api/payments/webhook" || req.originalUrl === "/api/health",
 });
 // Business/account creation is the highest-value target for spam signups.
 const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
 // Public, unauthenticated form - same spam-resistance shape as account creation.
 const waitlistLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many submissions from this device - try again later." } });
+// Fires on every page view, so it needs real headroom - still bounded so it
+// can't be used to flood the analytics_events table.
+const trackLimiter = rateLimit({ windowMs: 5 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 
 app.use(
   express.json({
@@ -176,6 +179,30 @@ async function finalizeIfSuccessful(txData) {
   }
   return isNew;
 }
+
+// Public - point an external uptime monitor (UptimeRobot, Better Stack,
+// etc.) at this. Does a real DB round trip so it catches a dead Postgres
+// connection, not just "the Node process is still running".
+app.get(
+  "/api/health",
+  handle(async (req, res) => {
+    await db.healthCheck();
+    res.json({ status: "ok", time: new Date().toISOString() });
+  })
+);
+
+// Public - top-of-funnel analytics beacon (landing views, signup
+// completion, storefront traffic). No auth, no PII - session_id is a
+// random client-generated token, not tied to identity.
+app.post(
+  "/api/track",
+  trackLimiter,
+  handle(async (req, res) => {
+    const { eventType, path, sessionId, meta } = req.body || {};
+    await db.trackEvent({ eventType, path, sessionId, meta });
+    res.status(204).end();
+  })
+);
 
 // Public by design: the Supabase anon key is meant to be embedded in
 // browser code (it only grants what Supabase's own auth rules allow) - this
@@ -895,6 +922,12 @@ app.get(
   "/api/admin/payments",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.listAllPayments()))
+);
+
+app.get(
+  "/api/admin/analytics",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.getAnalyticsSummary()))
 );
 
 // Permanently deletes a business and everything under it (products,

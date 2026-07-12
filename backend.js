@@ -4,6 +4,8 @@ let businesses = [];
 let payments = [];
 let pricing = {};
 let settings = { socialLinks: {} };
+let analytics = { totals: [] };
+let waitlistStats = { total: 0, countries: 0, categories: 0 };
 let authToken = null;
 let confirmDeleteId = null;
 let expandedId = null;
@@ -15,18 +17,22 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
     api("GET", "/api/pricing"),
     api("GET", "/api/admin/settings"),
+    api("GET", "/api/admin/analytics"),
+    api("GET", "/api/waitlist/stats"),
   ]);
   owner = ownerRes;
   businesses = businessesRes;
   payments = paymentsRes;
   pricing = pricingRes;
   settings = settingsRes;
+  analytics = analyticsRes;
+  waitlistStats = waitlistRes;
 }
 
 function businessDetailHtml(b) {
@@ -56,6 +62,12 @@ function render() {
       '</div>';
   }).join("");
   $("paymentLog").innerHTML = payments.slice(0, 20).map((p) => '<div class="item"><div class="item-top"><strong>' + clean(p.businessName) + '</strong><span>' + money(p.amount) + '</span></div><div class="meta">' + clean(p.plan) + ' (' + clean(p.billingCycle) + ') - ' + clean(p.status) + ' - ' + clean(p.reference) + ' - ' + date(p.createdAt) + '</div></div>').join("");
+  const EVENT_LABELS = { landing_view: "Landing page views", signup_completed: "Signups completed", storefront_view: "Storefront views", demo_started: "Demo starts", assessment_completed: "Assessments completed" };
+  $("analyticsSummary").innerHTML = Object.keys(EVENT_LABELS).map((type) => {
+    const found = (analytics.totals || []).find((t) => t.eventType === type);
+    return '<div class="item"><div class="item-top"><strong>' + EVENT_LABELS[type] + '</strong><span>' + (found ? found.count : 0) + '</span></div></div>';
+  }).join("");
+  $("waitlistSummary").innerHTML = '<div class="item"><div class="item-top"><strong>Total registered</strong><span>' + waitlistStats.total + '</span></div></div><div class="item"><div class="item-top"><strong>Countries</strong><span>' + waitlistStats.countries + '</span></div></div><div class="item"><div class="item-top"><strong>Categories</strong><span>' + waitlistStats.categories + '</span></div></div>';
   $("ownerName").value = owner.name;
   $("ownerLink").value = owner.link;
   if (pricing.growth) $("priceGrowth").value = pricing.growth.monthly;

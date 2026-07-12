@@ -43,6 +43,14 @@ async function query(text, params) {
   return pool.query(text, params);
 }
 
+// Backs GET /api/health - a real DB round trip, not just "the process is
+// alive", so an external uptime monitor actually catches a dead/unreachable
+// Postgres connection, not just a crashed Node process.
+async function healthCheck() {
+  await query("SELECT 1");
+  return true;
+}
+
 // Postgres returns `numeric` columns as strings (to avoid float precision
 // loss) - coerce back to JS numbers at the JSON boundary, same shape the
 // frontend already expects from the old SQLite version.
@@ -1175,6 +1183,36 @@ async function getWaitlistStats() {
   return { total: rows[0].total, countries: rows[0].countries, categories: rows[0].categories };
 }
 
+// --- Top-of-funnel analytics -------------------------------------------------
+
+const ALLOWED_EVENT_TYPES = ["landing_view", "signup_completed", "storefront_view", "demo_started", "assessment_completed"];
+
+async function trackEvent({ eventType, path, sessionId, meta }) {
+  if (!ALLOWED_EVENT_TYPES.includes(eventType)) return; // silently drop unknown types - not user-facing, no error needed
+  await query(
+    "INSERT INTO analytics_events (event_type, path, session_id, meta) VALUES ($1,$2,$3,$4)",
+    [eventType, String(path || "").slice(0, 200), String(sessionId || "").slice(0, 100), JSON.stringify(meta || {})]
+  );
+}
+
+// Powers the platform-admin Analytics view - counts per event type, plus a
+// daily trend for the last 30 days so growth/drop-off is visible at a
+// glance without needing a separate charting tool.
+async function getAnalyticsSummary() {
+  const [totals, daily] = await Promise.all([
+    query("SELECT event_type, COUNT(*)::int AS n FROM analytics_events GROUP BY event_type"),
+    query(
+      `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day, event_type, COUNT(*)::int AS n
+       FROM analytics_events WHERE created_at > now() - interval '30 days'
+       GROUP BY 1, 2 ORDER BY 1 DESC`
+    ),
+  ]);
+  return {
+    totals: totals.rows.map((r) => ({ eventType: r.event_type, count: r.n })),
+    daily: daily.rows.map((r) => ({ day: r.day, eventType: r.event_type, count: r.n })),
+  };
+}
+
 // --- Platform-admin (cross-tenant) -------------------------------------------
 
 // Everything under a business (products/customers/orders/branches/staff/
@@ -1218,6 +1256,7 @@ async function listAllPayments() {
 
 module.exports = {
   OrderError,
+  healthCheck,
   getMembership,
   createBusiness,
   getBusiness,
@@ -1264,6 +1303,8 @@ module.exports = {
   listAllPayments,
   createWaitlistEntry,
   getWaitlistStats,
+  trackEvent,
+  getAnalyticsSummary,
   deleteBusiness,
   listStaff,
   inviteStaff,

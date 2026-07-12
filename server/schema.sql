@@ -320,6 +320,22 @@ alter table businesses add column if not exists referral_code text;
 alter table businesses add column if not exists referred_by_business_id uuid references businesses(id) on delete set null;
 create unique index if not exists businesses_referral_code_idx on businesses(referral_code) where referral_code is not null;
 
+-- Top-of-funnel analytics (landing views, signup conversion, storefront
+-- traffic) - deliberately separate from the per-business `events` table,
+-- which requires a business_id and can't capture anonymous/pre-account
+-- activity. No PII by design: session_id is a random client-generated
+-- token (not tied to identity), not a cookie or fingerprint.
+create table if not exists analytics_events (
+  id uuid primary key default gen_random_uuid(),
+  event_type text not null,
+  path text not null default '',
+  session_id text not null default '',
+  meta jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists analytics_events_type_idx on analytics_events(event_type);
+create index if not exists analytics_events_created_at_idx on analytics_events(created_at);
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
@@ -349,3 +365,4 @@ alter table owner_payment enable row level security;
 alter table platform_settings enable row level security;
 alter table waitlist enable row level security;
 alter table coupons enable row level security;
+alter table analytics_events enable row level security;

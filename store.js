@@ -380,6 +380,7 @@ if ($("downloadVcf")) $("downloadVcf").onclick = () => {
   renderGrid();
   renderCartBar();
   $("storeContent").style.display = "block";
+  if (window.track) track("storefront_view", { slug });
 
   // A direct link to one product (from the Share button) opens straight
   // into that product's detail view instead of just the catalog.
