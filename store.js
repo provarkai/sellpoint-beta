@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
+const money = (n) => `${store?.currency || "NGN"} ${Number(n || 0).toLocaleString(CURRENCIES[store?.currency]?.locale || "en-NG")}`;
 const clean = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
 

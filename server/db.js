@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor, ADDON_AI_CREDITS } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
+const { isValidCurrency } = require("./currencies");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -81,6 +82,7 @@ function toBusinessJson(b) {
     paystackAccountName: b.paystack_account_name || "",
     paystackAccountNumberMasked: b.paystack_account_number ? "•••• " + b.paystack_account_number.slice(-4) : "",
     referralCode: b.referral_code || "",
+    currency: b.currency || "NGN",
   };
 }
 function effectivePlan(b) {
@@ -198,9 +200,10 @@ async function createBusiness(userId, fields, email) {
       const { rows: refRows } = await client.query("SELECT id FROM businesses WHERE upper(referral_code) = upper($1)", [referredByCode]);
       referredByBusinessId = refRows[0]?.id || null;
     }
+    const currency = isValidCurrency(fields.currency) ? fields.currency : "NGN";
     const { rows } = await client.query(
-      `INSERT INTO businesses (name, phone, slug, referred_by_business_id) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [businessName, fields.businessPhone || "", slug, referredByBusinessId]
+      `INSERT INTO businesses (name, phone, slug, referred_by_business_id, currency) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [businessName, fields.businessPhone || "", slug, referredByBusinessId, currency]
     );
     const business = rows[0];
     await client.query(
@@ -307,11 +310,12 @@ async function updateBusiness(businessId, fields) {
     payment_provider: fields.paymentProvider ?? current.payment_provider,
     payment_link: fields.paymentLink ?? current.payment_link,
     payment_details: fields.paymentDetails ?? current.payment_details,
+    currency: isValidCurrency(fields.currency) ? fields.currency : current.currency,
   };
   const { rows: updated } = await query(
     `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
-       payment_details=$7
-     WHERE id = $8 RETURNING *`,
+       payment_details=$7, currency=$8
+     WHERE id = $9 RETURNING *`,
     [
       merged.name,
       merged.phone,
@@ -320,6 +324,7 @@ async function updateBusiness(businessId, fields) {
       merged.payment_provider,
       merged.payment_link,
       merged.payment_details,
+      merged.currency,
       businessId,
     ]
   );
@@ -472,6 +477,7 @@ async function getStorefront(slug) {
     businessPhone: business.phone,
     businessAddress: business.address,
     socialLinks: business.social_links || {},
+    currency: business.currency || "NGN",
     memberSince: business.created_at,
     completedOrders: completedRows[0].n,
     whyBuyText: business.why_buy_text || "",

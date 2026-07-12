@@ -58,7 +58,7 @@ $("stepProfile").onsubmit = async (e) => {
   try {
     const file = $("oLogo").files?.[0];
     const businessLogo = file ? await readFileAsDataUrl(file) : undefined;
-    const body = { businessAddress: $("oAddress").value.trim(), paymentDetails: $("oPayment").value.trim() };
+    const body = { businessAddress: $("oAddress").value.trim(), paymentDetails: $("oPayment").value.trim(), currency: $("oCurrency")?.value || "NGN" };
     const businessName = $("oBusinessName").value.trim();
     const businessPhone = $("oBusinessPhone").value.trim();
     if (businessName) body.businessName = businessName;

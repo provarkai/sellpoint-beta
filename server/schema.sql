@@ -326,6 +326,12 @@ alter table businesses add column if not exists referral_code text;
 alter table businesses add column if not exists referred_by_business_id uuid references businesses(id) on delete set null;
 create unique index if not exists businesses_referral_code_idx on businesses(referral_code) where referral_code is not null;
 
+-- Display currency only - affects how amounts are formatted (invoices,
+-- reports, storefront, AI-generated text) throughout the app. Paystack
+-- charging currency is unaffected and stays NGN for every business (see
+-- server/currencies.js for the supported-code list).
+alter table businesses add column if not exists currency text not null default 'NGN';
+
 -- Top-of-funnel analytics (landing views, signup conversion, storefront
 -- traffic) - deliberately separate from the per-business `events` table,
 -- which requires a business_id and can't capture anonymous/pre-account

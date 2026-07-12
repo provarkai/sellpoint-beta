@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const Sentry = require("@sentry/node");
 const rateLimit = require("express-rate-limit");
 const db = require("./db");
+const { CURRENCIES } = require("./currencies");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin } = require("./auth");
 const payments = require("./payments");
 const pricing = require("./pricing");
@@ -628,6 +629,10 @@ app.get(
     res.json(pricing.applyPricingOverrides(settings.pricingOverrides));
   })
 );
+app.get(
+  "/api/currencies",
+  handle(async (req, res) => res.json(CURRENCIES))
+);
 
 // --- Staff seats (owner-only management, any member can view) --------------
 
@@ -682,7 +687,9 @@ app.post(
     const state = await db.getState(req.businessId);
     const product = state.products.find((p) => p.id === productId);
     const customer = state.customers.find((c) => c.id === customerId);
-    const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
+    const currency = state.business.currency || "NGN";
+    const currencyLocale = CURRENCIES[currency]?.locale || "en-NG";
+    const money = (n) => currency + " " + Number(n || 0).toLocaleString(currencyLocale);
     // "description" is used from the product setup form before the product
     // is saved (no productId yet), so it reads name/price/category/type
     // straight off the request body with the saved product as a fallback.
@@ -772,8 +779,8 @@ app.post(
       description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}${draftExtra ? `. ${draftExtra}` : ""}, with fast delivery and great value for the price.`,
     };
     const prompts = {
-      ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
-      insight: `You are an AI business assistant for a Nigerian small business called "${state.businessName}". Write ONE short, specific, actionable insight (1-2 sentences, plain text, no markdown) based ONLY on this real data - never invent numbers: ${trending ? `"${trending.name}" sold ${trending.growthPct}% more units in the last 7 days than the 7 days before that.` : "no clear week-over-week sales trend yet."} Low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Best seller overall: ${bestSeller || "none yet"}. Sound like a sharp business advisor, not a generic tip.`,
+      ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.business.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
+      insight: `You are an AI business assistant for a Nigerian small business called "${state.business.businessName}". Write ONE short, specific, actionable insight (1-2 sentences, plain text, no markdown) based ONLY on this real data - never invent numbers: ${trending ? `"${trending.name}" sold ${trending.growthPct}% more units in the last 7 days than the 7 days before that.` : "no clear week-over-week sales trend yet."} Low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Best seller overall: ${bestSeller || "none yet"}. Sound like a sharp business advisor, not a generic tip.`,
       caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
       reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
