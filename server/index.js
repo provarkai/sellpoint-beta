@@ -607,6 +607,22 @@ app.delete(
     res.status(204).end();
   })
 );
+app.post(
+  "/api/customers/:id/redeem-points",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.redeemLoyaltyPoints(req.businessId, req.params.id, (req.body || {}).points, (req.body || {}).reason);
+    res.json(await db.getCustomerTimeline(req.businessId, req.params.id));
+  })
+);
+app.post(
+  "/api/customers/:id/wallet-adjust",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.adjustWallet(req.businessId, req.params.id, (req.body || {}).amount, (req.body || {}).reason);
+    res.json(await db.getCustomerTimeline(req.businessId, req.params.id));
+  })
+);
 
 // --- Suppliers & purchase orders ---------------------------------------------
 

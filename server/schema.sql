@@ -389,6 +389,45 @@ create unique index if not exists businesses_referral_code_idx on businesses(ref
 -- server/currencies.js for the supported-code list).
 alter table businesses add column if not exists currency text not null default 'NGN';
 
+-- Loyalty points & wallet credit (retention mechanics). Points accrue
+-- automatically on Paid/Delivered orders (both storefront and dashboard);
+-- redemption for this pass is a manual seller-recorded ledger action from
+-- the customer timeline, not wired into live storefront checkout yet (that
+-- would need a zero-total-skips-Paystack branch in the checkout route,
+-- deliberately deferred). loyalty_earn_rate = points earned per 100
+-- (currency units) spent; loyalty_redeem_value = currency value of 1 point.
+alter table businesses add column if not exists loyalty_enabled boolean not null default false;
+alter table businesses add column if not exists loyalty_earn_rate numeric not null default 1;
+alter table businesses add column if not exists loyalty_redeem_value numeric not null default 1;
+alter table customers add column if not exists loyalty_points integer not null default 0;
+alter table customers add column if not exists wallet_balance numeric not null default 0;
+
+-- Ledgers, not just running totals, so a customer's timeline can show the
+-- full history of how their balance got where it is (matches the cashbook's
+-- append-only design elsewhere in this schema).
+create table if not exists loyalty_ledger (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  customer_id text not null references customers(id) on delete cascade,
+  points integer not null,
+  reason text not null default '',
+  order_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists loyalty_ledger_customer_id_idx on loyalty_ledger(customer_id);
+alter table loyalty_ledger enable row level security;
+
+create table if not exists wallet_ledger (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  customer_id text not null references customers(id) on delete cascade,
+  amount numeric not null,
+  reason text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists wallet_ledger_customer_id_idx on wallet_ledger(customer_id);
+alter table wallet_ledger enable row level security;
+
 -- Expenses, cashbook, P&L, daily reconciliation. expense_date is a plain
 -- date (not timestamptz) since expenses are logged per-day, not per-second -
 -- matches how the daily cash reconciliation below groups by day.

@@ -90,6 +90,9 @@ function toBusinessJson(b) {
     paystackAccountNumberMasked: b.paystack_account_number ? "•••• " + b.paystack_account_number.slice(-4) : "",
     referralCode: b.referral_code || "",
     currency: b.currency || "NGN",
+    loyaltyEnabled: !!b.loyalty_enabled,
+    loyaltyEarnRate: Number(b.loyalty_earn_rate ?? 1),
+    loyaltyRedeemValue: Number(b.loyalty_redeem_value ?? 1),
   };
 }
 function effectivePlan(b) {
@@ -114,7 +117,7 @@ function toProductJson(p) {
   };
 }
 function toCustomerJson(c) {
-  return { id: c.id, name: c.name, phone: c.phone, email: c.email, location: c.location };
+  return { id: c.id, name: c.name, phone: c.phone, email: c.email, location: c.location, loyaltyPoints: Number(c.loyalty_points ?? 0), walletBalance: Number(c.wallet_balance ?? 0) };
 }
 function toOrderJson(o) {
   return {
@@ -525,11 +528,14 @@ async function updateBusiness(businessId, fields) {
     payment_link: fields.paymentLink ?? current.payment_link,
     payment_details: fields.paymentDetails ?? current.payment_details,
     currency: isValidCurrency(fields.currency) ? fields.currency : current.currency,
+    loyalty_enabled: fields.loyaltyEnabled ?? current.loyalty_enabled,
+    loyalty_earn_rate: fields.loyaltyEarnRate !== undefined ? requireNumber(fields.loyaltyEarnRate, "Loyalty earn rate", { min: 0 }) : current.loyalty_earn_rate,
+    loyalty_redeem_value: fields.loyaltyRedeemValue !== undefined ? requireNumber(fields.loyaltyRedeemValue, "Loyalty redeem value", { min: 0 }) : current.loyalty_redeem_value,
   };
   const { rows: updated } = await query(
     `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
-       payment_details=$7, currency=$8
-     WHERE id = $9 RETURNING *`,
+       payment_details=$7, currency=$8, loyalty_enabled=$9, loyalty_earn_rate=$10, loyalty_redeem_value=$11
+     WHERE id = $12 RETURNING *`,
     [
       merged.name,
       merged.phone,
@@ -539,6 +545,9 @@ async function updateBusiness(businessId, fields) {
       merged.payment_link,
       merged.payment_details,
       merged.currency,
+      merged.loyalty_enabled,
+      merged.loyalty_earn_rate,
+      merged.loyalty_redeem_value,
       businessId,
     ]
   );
@@ -817,7 +826,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
   const name = requireString(buyerName, "Your name");
   const email = requireString(buyerEmail, "Your email");
 
-  const customer = await createCustomer(business.id, { name, phone: buyerPhone || "", email, location: buyerLocation || "" });
+  const customer = await findOrCreateCustomerByPhone(business.id, { name, phone: buyerPhone || "", email, location: buyerLocation || "" });
   const orderIds = [];
   let total = 0;
   for (const item of items) {
@@ -1213,6 +1222,22 @@ async function deleteCustomer(businessId, id) {
   await query("DELETE FROM customers WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
 
+// Storefront checkout uses this instead of createCustomer so a repeat buyer
+// (matched by phone) reuses their existing customer record - and therefore
+// their existing loyalty points/wallet balance/CRM segment/timeline -
+// instead of silently getting a brand-new customer row on every purchase.
+// The dashboard's own "Add customer" form still calls createCustomer
+// directly, since a seller manually adding a contact is a deliberate action
+// that shouldn't be silently merged into an existing record.
+async function findOrCreateCustomerByPhone(businessId, data) {
+  const phone = String(data.phone || "").replace(/\D/g, "");
+  if (phone) {
+    const { rows } = await query("SELECT * FROM customers WHERE business_id = $1 AND phone = $2 LIMIT 1", [businessId, phone]);
+    if (rows[0]) return toCustomerJson(rows[0]);
+  }
+  return createCustomer(businessId, data);
+}
+
 // --- CRM depth: customer timelines, smart segmentation ---------------------
 
 const DORMANT_DAYS = 60;
@@ -1291,16 +1316,20 @@ async function deleteCustomerNote(businessId, noteId) {
 async function getCustomerTimeline(businessId, customerId) {
   const { rows: customerRows } = await query("SELECT * FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
   if (!customerRows[0]) throw new OrderError("Customer not found");
-  const [segmented, orderRows, noteRows] = await Promise.all([
+  const [segmented, orderRows, noteRows, loyaltyRows, walletRows] = await Promise.all([
     listCustomersWithSegments(businessId),
     query("SELECT * FROM orders WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
     query("SELECT * FROM customer_notes WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
+    query("SELECT * FROM loyalty_ledger WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
+    query("SELECT * FROM wallet_ledger WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
   ]);
   const customer = segmented.find((c) => c.id === customerId) || { ...toCustomerJson(customerRows[0]), totalSpend: 0, paidOrderCount: 0, lastOrderAt: null, segment: "New" };
   return {
     customer,
     orders: orderRows.rows.map(toOrderJson),
     notes: noteRows.rows.map(toCustomerNoteJson),
+    loyaltyLedger: loyaltyRows.rows.map((r) => ({ id: r.id, points: r.points, reason: r.reason, createdAt: r.created_at })),
+    walletLedger: walletRows.rows.map((r) => ({ id: r.id, amount: Number(r.amount), reason: r.reason, createdAt: r.created_at })),
   };
 }
 
@@ -1451,6 +1480,60 @@ async function deletePurchaseOrder(businessId, id) {
   await query("DELETE FROM purchase_orders WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
 
+// --- Loyalty points & wallet credit (retention mechanics) ------------------
+
+// Called once, at most, per order - the first time it reaches Paid/Delivered
+// (guarded by checking loyalty_ledger for an existing row against this
+// order_id, not by which status transition triggered it, since a single
+// order can pass through several - markPaid, then deliver, etc - and should
+// only ever earn points once).
+async function awardLoyaltyPointsIfNeeded(businessId, order) {
+  if (!order || !["Paid", "Delivered"].includes(order.status) || !order.customer_id) return;
+  const { rows: bizRows } = await query("SELECT loyalty_enabled, loyalty_earn_rate FROM businesses WHERE id = $1", [businessId]);
+  const business = bizRows[0];
+  if (!business?.loyalty_enabled) return;
+  const { rows: existing } = await query("SELECT 1 FROM loyalty_ledger WHERE order_id = $1", [order.id]);
+  if (existing[0]) return;
+  const orderTotal = Number(order.price) * order.qty;
+  const points = Math.floor((orderTotal / 100) * Number(business.loyalty_earn_rate));
+  if (points <= 0) return;
+  await query("UPDATE customers SET loyalty_points = loyalty_points + $1 WHERE id = $2 AND business_id = $3", [points, order.customer_id, businessId]);
+  await query(
+    "INSERT INTO loyalty_ledger (business_id, customer_id, points, reason, order_id) VALUES ($1,$2,$3,'Earned from order',$4)",
+    [businessId, order.customer_id, points, order.id]
+  );
+}
+
+async function redeemLoyaltyPoints(businessId, customerId, points, reason) {
+  const pointsToRedeem = requireNumber(points, "Points", { min: 1, integer: true });
+  const redeemReason = requireString(reason, "Reason");
+  const { rows } = await query("SELECT loyalty_points FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
+  if (!rows[0]) throw new OrderError("Customer not found");
+  if (pointsToRedeem > rows[0].loyalty_points) throw new OrderError("Customer doesn't have that many points");
+  await query("UPDATE customers SET loyalty_points = loyalty_points - $1 WHERE id = $2", [pointsToRedeem, customerId]);
+  await query(
+    "INSERT INTO loyalty_ledger (business_id, customer_id, points, reason) VALUES ($1,$2,$3,$4)",
+    [businessId, customerId, -pointsToRedeem, redeemReason]
+  );
+}
+
+// amount can be positive (credit, e.g. refund-as-store-credit or goodwill)
+// or negative (debit, e.g. redeemed against an in-person sale) - a negative
+// amount that would take the balance below zero is rejected.
+async function adjustWallet(businessId, customerId, amount, reason) {
+  const delta = requireNumber(amount, "Amount", { min: -1000000000, max: 1000000000 });
+  if (delta === 0) throw new OrderError("Amount can't be zero");
+  const adjustReason = requireString(reason, "Reason");
+  const { rows } = await query("SELECT wallet_balance FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
+  if (!rows[0]) throw new OrderError("Customer not found");
+  if (Number(rows[0].wallet_balance) + delta < 0) throw new OrderError("That would take the wallet balance below zero");
+  await query("UPDATE customers SET wallet_balance = wallet_balance + $1 WHERE id = $2", [delta, customerId]);
+  await query(
+    "INSERT INTO wallet_ledger (business_id, customer_id, amount, reason) VALUES ($1,$2,$3,$4)",
+    [businessId, customerId, delta, adjustReason]
+  );
+}
+
 // --- Orders ---------------------------------------------------------------
 
 // Quotes are a pre-commitment estimate, not a real sale yet - they don't
@@ -1501,6 +1584,7 @@ async function createOrder(businessId, data) {
     [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate]
   );
   await logEvent(businessId, isQuote ? "quote_created" : "order_created", `${product.name} x ${qty}`);
+  await awardLoyaltyPointsIfNeeded(businessId, rows[0]);
   return toOrderJson(rows[0]);
 }
 
@@ -1542,6 +1626,7 @@ async function updateOrder(businessId, id, changes) {
       id,
     ]);
     await logEvent(businessId, "order_paid", current.product_name);
+    await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
     return toOrderJson(updated[0]);
   }
   if (changes.deliver) {
@@ -1551,6 +1636,7 @@ async function updateOrder(businessId, id, changes) {
       id,
     ]);
     await logEvent(businessId, "digital_delivered", current.product_name);
+    await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
     return toOrderJson(updated[0]);
   }
   if (changes.refund) {
@@ -1567,6 +1653,7 @@ async function updateOrder(businessId, id, changes) {
     delivered,
     id,
   ]);
+  await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
   return toOrderJson(updated[0]);
 }
 
@@ -1820,6 +1907,8 @@ module.exports = {
   getPurchaseOrder,
   updatePurchaseOrderStatus,
   deletePurchaseOrder,
+  redeemLoyaltyPoints,
+  adjustWallet,
   getMembership,
   createBusiness,
   getBusiness,
