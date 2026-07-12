@@ -17,7 +17,7 @@ async function generateText(prompt) {
     headers: {
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://sellerspoint.app",
+      "HTTP-Referer": "https://sellerspoint.ng",
       "X-Title": "SellersPoint",
     },
     body: JSON.stringify({

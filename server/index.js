@@ -1,12 +1,21 @@
 const path = require("node:path");
 const crypto = require("node:crypto");
 const express = require("express");
+const helmet = require("helmet");
+const Sentry = require("@sentry/node");
 const rateLimit = require("express-rate-limit");
 const db = require("./db");
 const { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin } = require("./auth");
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
+
+// Optional - error monitoring. Falls back to console.error-only (already
+// happening in handle() below) when SENTRY_DSN isn't set, same
+// graceful-degradation pattern as the Paystack/OpenRouter keys.
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
+}
 
 const app = express();
 const ROOT = path.join(__dirname, "..");
@@ -17,6 +26,18 @@ const HOST = process.env.HOST || "0.0.0.0";
 // express-rate-limit sees every request as coming from the proxy's IP and
 // either rate-limits everyone together or refuses to start.
 app.set("trust proxy", 1);
+
+// Security headers (clickjacking/MIME-sniffing/HSTS/etc.). CSP is
+// deliberately left off: this app relies on inline onclick="..." handlers
+// throughout every page (not a build step that could add nonces easily),
+// so a real Content-Security-Policy would need `unsafe-inline` for
+// script-src anyway - which defeats most of what CSP is for - or a much
+// larger refactor away from inline handlers first. Cross-Origin-*-Policy
+// headers are also disabled since they can silently break the CDN scripts
+// (jsPDF/html2canvas/XLSX/QRCode/Supabase-via-esm.sh) and Google OAuth
+// redirect flow this app depends on, and there's no way to verify that
+// breakage without a real browser.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false, crossOriginOpenerPolicy: false }));
 
 // General ceiling across the whole API (well above real usage, just a
 // backstop against scraping/abuse) - the webhook is excluded since Paystack
@@ -77,6 +98,7 @@ function handle(fn) {
         res.status(400).json({ error: err.message });
       } else {
         console.error(err);
+        if (process.env.SENTRY_DSN) Sentry.captureException(err);
         res.status(500).json({ error: err.message || "Internal server error" });
       }
     }
