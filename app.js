@@ -181,6 +181,7 @@ function renderStorefrontSection(){
   if($("socialTiktok"))$("socialTiktok").value=social.tiktok||"";
   if($("socialX"))$("socialX").value=social.x||"";
   renderOnlinePaymentSection();
+  renderCouponsSection();
 }
 let banksLoaded=false;
 async function loadBanksOnce(){
@@ -246,6 +247,43 @@ if($("paymentModeForm"))$("paymentModeForm").onsubmit=async e=>{
 if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("dashCopyStoreUrl"))$("dashCopyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
+
+function renderCouponsSection(){
+  if(!$("couponsSection"))return;
+  const eligible=!!state.storefrontEligible&&myRole==="owner";
+  $("couponsSection").style.display=eligible?"block":"none";
+  if(!eligible)return;
+  loadCoupons();
+}
+function couponRowHtml(c){
+  const value=c.discountType==="fixed"?money(c.discountValue):`${c.discountValue}%`;
+  const uses=c.maxUses?`${c.usedCount}/${c.maxUses} used`:`${c.usedCount} used`;
+  const expires=c.expiresAt?` - expires ${date(c.expiresAt)}`:"";
+  return `<div class="item"><div class="item-top"><strong>${clean(c.code)}</strong><span>${value} off</span></div><div class="meta">${uses}${expires}${c.active?"":" - inactive"}</div><div class="item-actions"><button onclick="toggleCoupon('${c.id}',${!c.active})">${c.active?"Deactivate":"Activate"}</button><button onclick="deleteCouponItem('${c.id}')">Delete</button></div></div>`;
+}
+async function loadCoupons(){
+  try{
+    const coupons=await api("GET","/api/coupons");
+    $("couponList").innerHTML=coupons.map(couponRowHtml).join("")||`<div class="item"><span class="meta">No coupons yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function toggleCoupon(id,active){try{await api("PATCH",`/api/coupons/${id}`,{active});loadCoupons();toast(active?"Coupon activated":"Coupon deactivated")}catch(err){toast(err.message)}}
+async function deleteCouponItem(id){try{await api("DELETE",`/api/coupons/${id}`);loadCoupons();toast("Coupon deleted")}catch(err){toast(err.message)}}
+if($("couponForm"))$("couponForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    await api("POST","/api/coupons",{
+      code:$("cpnCode").value.trim(),
+      discountType:$("cpnType").value,
+      discountValue:+$("cpnValue").value,
+      maxUses:$("cpnMaxUses").value.trim()?+$("cpnMaxUses").value:null,
+      expiresAt:$("cpnExpires").value||null,
+    });
+    e.target.reset();
+    loadCoupons();
+    toast("Coupon created");
+  }catch(err){toast(err.message)}
+};
 
 function renderLogistics(){
   if(!$("logisticsList"))return;

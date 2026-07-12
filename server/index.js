@@ -322,13 +322,25 @@ app.put(
   })
 );
 
+// Public, no auth - a storefront visitor previewing a coupon against their
+// cart before checkout. Doesn't consume a use - that only happens once an
+// order is actually placed through /checkout below.
+app.post(
+  "/api/store/:slug/apply-coupon",
+  handle(async (req, res) => {
+    const { code, subtotal } = req.body || {};
+    const result = await db.validateCoupon(req.params.slug, code, Number(subtotal) || 0);
+    res.json(result);
+  })
+);
+
 // Public, no auth - a storefront visitor paying for their cart online.
 app.post(
   "/api/store/:slug/checkout",
   handle(async (req, res) => {
     if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
-    const { items, buyerName, buyerPhone, buyerEmail, buyerLocation } = req.body || {};
-    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation });
+    const { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode } = req.body || {};
+    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode });
     const reference = `spord_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/store/${req.params.slug}?reference=${reference}`;
     const initialized = await payments.initializeStorefrontCheckout({
@@ -370,6 +382,39 @@ app.post(
       plan: info.plan,
     });
     res.json({ authorizationUrl: initialized.authorizationUrl });
+  })
+);
+
+// --- Storefront coupon codes -------------------------------------------------
+
+app.get(
+  "/api/coupons",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listCoupons(req.businessId)))
+);
+app.post(
+  "/api/coupons",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
+    res.status(201).json(await db.createCoupon(req.businessId, req.body || {}));
+  })
+);
+app.patch(
+  "/api/coupons/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
+    res.json(await db.setCouponActive(req.businessId, req.params.id, (req.body || {}).active));
+  })
+);
+app.delete(
+  "/api/coupons/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
+    await db.deleteCoupon(req.businessId, req.params.id);
+    res.status(204).end();
   })
 );
 

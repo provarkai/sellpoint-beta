@@ -288,6 +288,26 @@ create index if not exists waitlist_referral_code_idx on waitlist(referral_code)
 -- column needs its own idempotent ALTER like every other schema addition.
 alter table waitlist add column if not exists readiness_score integer;
 
+-- Storefront coupon codes ----------------------------------------------------
+-- Seller-managed promo codes, redeemable at storefront checkout (both the
+-- WhatsApp order flow and Paystack online payment). code is unique per
+-- business (not globally) so two sellers can both run a "WELCOME10" without
+-- collision. max_uses/expires_at are both nullable = unlimited/no expiry.
+create table if not exists coupons (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  code text not null,
+  discount_type text not null default 'percent',
+  discount_value numeric not null,
+  max_uses integer,
+  used_count integer not null default 0,
+  expires_at timestamptz,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (business_id, code)
+);
+create index if not exists coupons_business_id_idx on coupons(business_id);
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this
@@ -316,3 +336,4 @@ alter table payments enable row level security;
 alter table owner_payment enable row level security;
 alter table platform_settings enable row level security;
 alter table waitlist enable row level security;
+alter table coupons enable row level security;

@@ -54,6 +54,9 @@
   <dialog id="cartModal">
     <h2>Your order</h2>
     <div id="cartItems" class="list"></div>
+    <div class="row"><input id="couponInput" placeholder="Coupon code" style="flex:1"><button type="button" id="applyCoupon">Apply</button></div>
+    <p class="meta" id="couponMsg"></p>
+    <p class="row storefront-cart-total" id="couponDiscountRow" style="display:none"><span>Discount</span><b id="couponDiscountAmount">-NGN 0</b></p>
     <p class="row storefront-cart-total"><span>Total</span><b id="cartTotal">NGN 0</b></p>
     <label>Your name<input id="buyerName" placeholder="Optional"></label>
     <label>Delivery location<input id="buyerLocation" placeholder="e.g. Ikeja, Lagos"></label>

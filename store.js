@@ -15,6 +15,7 @@ let store = null;
 let cartKey = "";
 let cart = {}; // productId -> qty
 let viewingProductId = null;
+let appliedCoupon = null; // { code, discount, total } or null
 
 function loadCart() {
   try {
@@ -40,6 +41,9 @@ function cartCount() {
 function cartTotal() {
   return Object.entries(cart).reduce((s, [id, q]) => s + (product(id) ? effectivePrice(product(id)) : 0) * q, 0);
 }
+function finalTotal() {
+  return appliedCoupon ? appliedCoupon.total : cartTotal();
+}
 
 function renderCartBar() {
   const count = cartCount();
@@ -59,6 +63,10 @@ function setQty(id, qty) {
   else cart[id] = qty;
   saveCart();
   renderCartBar();
+  // Cart changed - a previously-applied discount may no longer be accurate
+  // (e.g. a fixed-amount coupon capped at the old subtotal), so require it
+  // to be re-applied rather than silently carrying a stale number.
+  if (appliedCoupon) { appliedCoupon = null; $("couponMsg").textContent = "Cart changed - re-apply your coupon"; }
   renderCartModal();
 }
 
@@ -168,7 +176,13 @@ function renderCartModal() {
     if (!p) return "";
     return `<div class="item"><div class="item-top"><strong>${clean(p.name)}</strong><span>${money(effectivePrice(p) * qty)}</span></div><div class="item-actions"><button onclick="setQty('${id}',${qty - 1})">-</button><span>${qty}</span><button onclick="setQty('${id}',${qty + 1})">+</button><button onclick="setQty('${id}',0)">Remove</button></div></div>`;
   }).join("") || `<div class="item"><span class="meta">Your cart is empty</span></div>`;
-  $("cartTotal").textContent = money(cartTotal());
+  if (appliedCoupon) {
+    $("couponDiscountRow").style.display = "flex";
+    $("couponDiscountAmount").textContent = "-" + money(appliedCoupon.discount);
+  } else {
+    $("couponDiscountRow").style.display = "none";
+  }
+  $("cartTotal").textContent = money(finalTotal());
   if (store.onlinePaymentEnabled) {
     $("payOnlineFields").style.display = "block";
     $("payOnline").style.display = "inline-grid";
@@ -177,16 +191,44 @@ function renderCartModal() {
 
 $("viewCart").onclick = () => { renderCartModal(); $("cartModal").showModal(); };
 $("closeCart").onclick = () => $("cartModal").close();
+
+if ($("applyCoupon")) $("applyCoupon").onclick = async () => {
+  const code = $("couponInput").value.trim();
+  if (!code) return;
+  const btn = $("applyCoupon");
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(getSlug())}/apply-coupon`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, subtotal: cartTotal() }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Invalid coupon code");
+    appliedCoupon = json;
+    $("couponMsg").textContent = `Coupon "${json.code}" applied - ${money(json.discount)} off`;
+    renderCartModal();
+  } catch (err) {
+    appliedCoupon = null;
+    $("couponMsg").textContent = err.message;
+    renderCartModal();
+  } finally {
+    btn.disabled = false;
+  }
+};
+
 $("orderWhatsApp").onclick = () => {
   const entries = Object.entries(cart);
   if (!entries.length) return toast("Your cart is empty");
   const buyerName = $("buyerName").value.trim();
   const buyerLocation = $("buyerLocation").value.trim();
   const lines = entries.map(([id, qty]) => { const p = product(id); return `${p.name} x ${qty} - ${money(effectivePrice(p) * qty)}`; }).join("\n");
-  const msg = `Hello ${clean(store.businessName)}, I'd like to order:\n\n${lines}\n\nTotal: ${money(cartTotal())}${buyerName ? "\n\nFrom: " + buyerName : ""}${buyerLocation ? "\nDelivery location: " + buyerLocation : ""}`;
+  const couponLine = appliedCoupon ? `\nCoupon: ${appliedCoupon.code} (-${money(appliedCoupon.discount)})` : "";
+  const msg = `Hello ${clean(store.businessName)}, I'd like to order:\n\n${lines}\n${couponLine}\nTotal: ${money(finalTotal())}${buyerName ? "\n\nFrom: " + buyerName : ""}${buyerLocation ? "\nDelivery location: " + buyerLocation : ""}`;
   const phone = (store.businessPhone || "").replace(/\D/g, "");
   open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   cart = {};
+  appliedCoupon = null;
   saveCart();
   renderCartBar();
   $("cartModal").close();
@@ -213,11 +255,13 @@ if ($("payOnline")) $("payOnline").onclick = async () => {
         buyerEmail,
         buyerPhone: $("buyerPhone").value.trim(),
         buyerLocation: $("buyerLocation").value.trim(),
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
       }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Could not start payment");
     cart = {};
+    appliedCoupon = null;
     saveCart();
     location.href = json.authorizationUrl;
   } catch (err) {

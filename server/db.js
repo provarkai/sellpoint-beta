@@ -437,10 +437,82 @@ async function saveSubaccountDetails(businessId, { subaccountCode, bankCode, ban
   return toBusinessJson(rows[0]);
 }
 
+// --- Storefront coupon codes -------------------------------------------------
+// Seller-managed promo codes. Unique per business (not globally), so two
+// sellers can both run "WELCOME10" without collision.
+
+function toCouponJson(c) {
+  return {
+    id: c.id,
+    code: c.code,
+    discountType: c.discount_type,
+    discountValue: Number(c.discount_value),
+    maxUses: c.max_uses,
+    usedCount: c.used_count,
+    expiresAt: c.expires_at,
+    active: c.active,
+    createdAt: c.created_at,
+  };
+}
+
+async function listCoupons(businessId) {
+  const { rows } = await query("SELECT * FROM coupons WHERE business_id = $1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toCouponJson);
+}
+
+async function createCoupon(businessId, data) {
+  const code = requireString(data.code, "Coupon code").toUpperCase().replace(/\s+/g, "");
+  const discountType = data.discountType === "fixed" ? "fixed" : "percent";
+  const discountValue = requireNumber(data.discountValue, "Discount value", { min: 0.01, max: discountType === "percent" ? 100 : undefined });
+  const maxUses = data.maxUses === undefined || data.maxUses === null || data.maxUses === "" ? null : requireNumber(data.maxUses, "Max uses", { min: 1, integer: true });
+  const expiresAt = data.expiresAt ? new Date(data.expiresAt).toISOString() : null;
+  const { rows: existing } = await query("SELECT 1 FROM coupons WHERE business_id = $1 AND upper(code) = $2", [businessId, code]);
+  if (existing.length) throw new OrderError("A coupon with this code already exists");
+  const { rows } = await query(
+    `INSERT INTO coupons (business_id, code, discount_type, discount_value, max_uses, expires_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [businessId, code, discountType, discountValue, maxUses, expiresAt]
+  );
+  return toCouponJson(rows[0]);
+}
+
+async function setCouponActive(businessId, id, active) {
+  const { rows } = await query("UPDATE coupons SET active=$1 WHERE id=$2 AND business_id=$3 RETURNING *", [!!active, id, businessId]);
+  if (!rows[0]) throw new OrderError("Coupon not found");
+  return toCouponJson(rows[0]);
+}
+
+async function deleteCoupon(businessId, id) {
+  await query("DELETE FROM coupons WHERE id = $1 AND business_id = $2", [id, businessId]);
+}
+
+// Public - validates a code against a storefront (by slug) and a cart
+// subtotal, returning the discount without consuming a use (that only
+// happens via redeemCoupon, called once an order/checkout actually
+// completes). Shared by the storefront cart's live "Apply" preview and the
+// real checkout path below, which always re-validates server-side rather
+// than trusting a client-supplied discount amount.
+async function validateCoupon(slug, code, subtotal) {
+  const { rows: bizRows } = await query("SELECT id FROM businesses WHERE lower(slug) = lower($1)", [slug]);
+  const business = bizRows[0];
+  if (!business) throw new OrderError("Store not found");
+  const { rows } = await query("SELECT * FROM coupons WHERE business_id = $1 AND upper(code) = upper($2)", [business.id, requireString(code, "Coupon code")]);
+  const coupon = rows[0];
+  if (!coupon || !coupon.active) throw new OrderError("Invalid coupon code");
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) throw new OrderError("This coupon has expired");
+  if (coupon.max_uses != null && coupon.used_count >= coupon.max_uses) throw new OrderError("This coupon has reached its usage limit");
+  const value = Number(coupon.discount_value);
+  const discount = coupon.discount_type === "fixed" ? Math.min(value, subtotal) : Math.round(subtotal * (value / 100) * 100) / 100;
+  return { couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: value, discount, total: Math.max(0, subtotal - discount) };
+}
+
+async function redeemCoupon(couponId) {
+  await query("UPDATE coupons SET used_count = used_count + 1 WHERE id = $1", [couponId]);
+}
+
 // Public checkout path (no session) - looks the business up by slug the same
 // way the storefront itself does, re-checking storefront eligibility so a
 // downgraded/disabled store can't still take payments through a stale link.
-async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation }) {
+async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode }) {
   const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
   const business = rows[0];
   if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) {
@@ -461,6 +533,15 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
     orderIds.push(order.id);
     total += Number(order.price) * order.qty;
   }
+  // Re-validate server-side rather than trusting a client-supplied discount -
+  // the storefront's "Apply" button is just a preview.
+  let couponId = null;
+  if (couponCode) {
+    const result = await validateCoupon(slug, couponCode, total);
+    couponId = result.couponId;
+    total = result.total;
+  }
+  if (couponId) await redeemCoupon(couponId);
   return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, plan: effectivePlan(business), orderIds, total, email };
 }
 
@@ -1089,6 +1170,11 @@ module.exports = {
   updatePaymentSettings,
   saveSubaccountDetails,
   checkoutStorefront,
+  listCoupons,
+  createCoupon,
+  setCouponActive,
+  deleteCoupon,
+  validateCoupon,
   getOrderForPaymentLink,
   listLogisticsProviders,
   createLogisticsProvider,
