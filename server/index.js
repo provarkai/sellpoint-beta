@@ -874,6 +874,54 @@ app.get(
   })
 );
 
+// --- Expenses, cashbook, P&L, daily reconciliation ---------------------------
+// Available on every plan (basic bookkeeping, not a premium analytics
+// feature) - unlike /api/reports above.
+
+app.get(
+  "/api/expenses",
+  requireAuth,
+  handle(async (req, res) => {
+    res.json({
+      expenses: await db.listExpenses(req.businessId, { from: req.query.from, to: req.query.to }),
+      categories: db.EXPENSE_CATEGORIES,
+    });
+  })
+);
+app.post(
+  "/api/expenses",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createExpense(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/expenses/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deleteExpense(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+app.get(
+  "/api/cashbook",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getCashbook(req.businessId, { from: req.query.from, to: req.query.to })))
+);
+app.get(
+  "/api/profit-loss",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getProfitAndLoss(req.businessId, { from: req.query.from, to: req.query.to })))
+);
+app.get(
+  "/api/reconciliations",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listReconciliations(req.businessId)))
+);
+app.post(
+  "/api/reconciliations",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.upsertReconciliation(req.businessId, req.body || {})))
+);
+
 // --- Branches (Business+) -----------------------------------------------------
 
 app.get(

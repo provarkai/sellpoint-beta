@@ -332,6 +332,40 @@ create unique index if not exists businesses_referral_code_idx on businesses(ref
 -- server/currencies.js for the supported-code list).
 alter table businesses add column if not exists currency text not null default 'NGN';
 
+-- Expenses, cashbook, P&L, daily reconciliation. expense_date is a plain
+-- date (not timestamptz) since expenses are logged per-day, not per-second -
+-- matches how the daily cash reconciliation below groups by day.
+create table if not exists expenses (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  category text not null default 'Other',
+  description text not null default '',
+  amount numeric not null,
+  expense_date date not null default current_date,
+  created_at timestamptz not null default now()
+);
+create index if not exists expenses_business_id_idx on expenses(business_id);
+create index if not exists expenses_date_idx on expenses(business_id, expense_date);
+alter table expenses enable row level security;
+
+-- One row per business per day. expected_cash is a snapshot computed at
+-- save time (paid-order revenue minus expenses recorded that day) - not
+-- recalculated later, so a reconciliation stays a historical record even if
+-- orders/expenses for that date are edited afterward.
+create table if not exists cash_reconciliations (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  reconciliation_date date not null,
+  expected_cash numeric not null,
+  counted_cash numeric not null,
+  variance numeric not null,
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  unique (business_id, reconciliation_date)
+);
+create index if not exists cash_reconciliations_business_id_idx on cash_reconciliations(business_id);
+alter table cash_reconciliations enable row level security;
+
 -- Top-of-funnel analytics (landing views, signup conversion, storefront
 -- traffic) - deliberately separate from the per-business `events` table,
 -- which requires a business_id and can't capture anonymous/pre-account

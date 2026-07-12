@@ -13,7 +13,7 @@ const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===und
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
 const date=d=>new Intl.DateTimeFormat("en-NG",{month:"short",day:"numeric",year:"numeric"}).format(new Date(d));
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -358,6 +358,28 @@ if($("repExportExcel"))$("repExportExcel").onclick=()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Status","Count"],...lastReport.statusBreakdown.map(x=>[x.status,x.count])]),"Order Status");
   XLSX.writeFile(wb,"sellerspoint-reports.xlsx");
 };
+
+let expenseCategories=[];
+async function loadExpensesTab(){
+  if(!$("eList"))return;
+  if(!$("eDate").value)$("eDate").value=new Date().toISOString().slice(0,10);
+  if(!$("rDate").value)$("rDate").value=new Date().toISOString().slice(0,10);
+  try{
+    const [expRes,pl,cb,recon]=await Promise.all([api("GET","/api/expenses"),api("GET","/api/profit-loss"),api("GET","/api/cashbook"),api("GET","/api/reconciliations")]);
+    expenseCategories=expRes.categories;
+    if($("eCategory").options.length===0)$("eCategory").innerHTML=expenseCategories.map(c=>`<option>${clean(c)}</option>`).join("");
+    $("eCount").textContent=`(${expRes.expenses.length})`;
+    $("eList").innerHTML=expRes.expenses.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.description)}</strong><span>${money(e.amount)}</span></div><div class="meta">${clean(e.category)} - ${date(e.date)}</div><div class="item-actions"><button onclick="delExpense('${e.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No expenses logged yet</span></div>`;
+    $("plSummary").innerHTML=`<div class="item"><strong>Revenue</strong><span>${money(pl.revenue)}</span></div><div class="item"><strong>Expenses</strong><span>${money(pl.expensesTotal)}</span></div><div class="item"><strong>Net profit</strong><span>${money(pl.netProfit)}</span></div>`;
+    $("plByCategory").innerHTML=pl.expensesByCategory.map(c=>`<div class="item"><strong>${clean(c.category)}</strong><span>${money(c.total)}</span></div>`).join("")||`<div class="item"><span class="meta">No expenses this month</span></div>`;
+    $("cashbookSummary").innerHTML=`<div class="item"><strong>Cash in</strong><span>${money(cb.totalIn)}</span></div><div class="item"><strong>Cash out</strong><span>${money(cb.totalOut)}</span></div><div class="item"><strong>Net</strong><span>${money(cb.totalIn-cb.totalOut)}</span></div>`;
+    $("cashbookList").innerHTML=cb.entries.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.description)}</strong><span>${e.type==="in"?"+":"-"}${money(e.amount)}</span></div><div class="meta">${date(e.date)} - Balance: ${money(e.balance)}</div></div>`).join("")||`<div class="item"><span class="meta">No cash movements in this period</span></div>`;
+    $("reconcileList").innerHTML=recon.map(r=>`<div class="item"><div class="item-top"><strong>${date(r.date)}</strong><span>${money(r.countedCash)}</span></div><div class="meta">Expected ${money(r.expectedCash)} - Variance ${money(r.variance)}${r.notes?" - "+clean(r.notes):""}</div></div>`).join("")||`<div class="item"><span class="meta">No reconciliations yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function delExpense(id){try{await api("DELETE",`/api/expenses/${id}`);loadExpensesTab();toast("Expense deleted")}catch(err){toast(err.message)}}
+if($("expenseForm"))$("expenseForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/expenses",{description:$("eDescription").value.trim(),amount:+$("eAmount").value,category:$("eCategory").value,date:$("eDate").value});e.target.reset();$("eDate").value=new Date().toISOString().slice(0,10);loadExpensesTab();toast("Expense logged")}catch(err){toast(err.message)}};
+if($("reconcileForm"))$("reconcileForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/reconciliations",{date:$("rDate").value,countedCash:+$("rCounted").value,notes:$("rNotes").value.trim()});$("rNotes").value="";loadExpensesTab();toast("Reconciliation saved")}catch(err){toast(err.message)}};
 
 function renderTeamVisibility(){
   if(!$("teamSection"))return;

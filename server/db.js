@@ -1,7 +1,14 @@
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
 const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor, ADDON_AI_CREDITS } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
+
+// By default node-postgres parses `date` columns (OID 1082) into a JS Date
+// at local-server-midnight, which shifts to the previous/next day once
+// serialized to JSON on any server not running in UTC (expense_date /
+// reconciliation_date are the only `date`-typed columns in the schema).
+// Returning the raw "YYYY-MM-DD" string instead sidesteps that entirely.
+types.setTypeParser(1082, (val) => val);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -282,6 +289,213 @@ async function getReports(businessId, tier = "basic") {
     topCustomers: topCustomers.rows.map((r) => ({ name: r.name, spend: Number(r.spend), orders: Number(r.orders) })),
     statusBreakdown: statusBreakdown.rows.map((r) => ({ status: r.status, count: Number(r.n) })),
   };
+}
+
+// --- Expenses, cashbook, P&L, daily reconciliation ---------------------
+
+const EXPENSE_CATEGORIES = [
+  "Inventory & Stock",
+  "Rent",
+  "Salaries & Wages",
+  "Transport & Logistics",
+  "Utilities",
+  "Marketing & Ads",
+  "Fees & Charges",
+  "Equipment",
+  "Other",
+];
+
+function toExpenseJson(e) {
+  return {
+    id: e.id,
+    category: e.category,
+    description: e.description,
+    amount: Number(e.amount),
+    date: e.expense_date,
+    createdAt: e.created_at,
+  };
+}
+
+function normalizeDateInput(value) {
+  // Accepts "YYYY-MM-DD" (from a date <input>) or an ISO timestamp; falls
+  // back to today if missing/invalid rather than erroring, since a date is
+  // always optional in these forms (defaults to "now").
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+}
+
+async function createExpense(businessId, data) {
+  const category = EXPENSE_CATEGORIES.includes(data.category) ? data.category : "Other";
+  const description = requireString(data.description, "Description");
+  const amount = requireNumber(data.amount, "Amount", { min: 0.01 });
+  const expenseDate = normalizeDateInput(data.date);
+  const { rows } = await query(
+    `INSERT INTO expenses (business_id, category, description, amount, expense_date)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [businessId, category, description, amount, expenseDate]
+  );
+  await logEvent(businessId, "expense_logged", `${category}: ${description} (${amount})`);
+  return toExpenseJson(rows[0]);
+}
+
+async function listExpenses(businessId, { from, to } = {}) {
+  const conditions = ["business_id = $1"];
+  const params = [businessId];
+  if (from) {
+    params.push(from);
+    conditions.push(`expense_date >= $${params.length}`);
+  }
+  if (to) {
+    params.push(to);
+    conditions.push(`expense_date <= $${params.length}`);
+  }
+  const { rows } = await query(
+    `SELECT * FROM expenses WHERE ${conditions.join(" AND ")} ORDER BY expense_date DESC, created_at DESC`,
+    params
+  );
+  return rows.map(toExpenseJson);
+}
+
+async function deleteExpense(businessId, id) {
+  const { rows } = await query("DELETE FROM expenses WHERE id = $1 AND business_id = $2 RETURNING id", [id, businessId]);
+  if (!rows[0]) throw new OrderError("Expense not found");
+}
+
+// Combined cash-in (paid/delivered orders) + cash-out (expenses) ledger,
+// sorted oldest-first with a running balance - a simple cashbook view, not a
+// full double-entry ledger. Defaults to the last 30 days if no range given,
+// since an unbounded query could return years of orders for an old business.
+async function getCashbook(businessId, { from, to } = {}) {
+  const rangeFrom = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rangeTo = to || new Date().toISOString().slice(0, 10);
+  const [orderRows, expenseRows] = await Promise.all([
+    query(
+      `SELECT id, created_at::date AS date, product_name, qty, price, (price * qty) AS amount
+       FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered')
+         AND created_at::date >= $2 AND created_at::date <= $3`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+    query(
+      `SELECT id, expense_date AS date, category, description, amount FROM expenses
+       WHERE business_id = $1 AND expense_date >= $2 AND expense_date <= $3`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+  ]);
+  const entries = [
+    ...orderRows.rows.map((o) => ({
+      date: o.date,
+      type: "in",
+      description: `${o.product_name} x ${o.qty}`,
+      amount: Number(o.amount),
+      refId: o.id,
+    })),
+    ...expenseRows.rows.map((e) => ({
+      date: e.date,
+      type: "out",
+      description: `${e.category}: ${e.description}`,
+      amount: Number(e.amount),
+      refId: e.id,
+    })),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  let balance = 0;
+  const withBalance = entries.map((e) => {
+    balance += e.type === "in" ? e.amount : -e.amount;
+    return { ...e, balance };
+  });
+  return {
+    from: rangeFrom,
+    to: rangeTo,
+    entries: withBalance,
+    totalIn: entries.filter((e) => e.type === "in").reduce((s, e) => s + e.amount, 0),
+    totalOut: entries.filter((e) => e.type === "out").reduce((s, e) => s + e.amount, 0),
+  };
+}
+
+// Revenue minus expenses for the range, with an expense-by-category
+// breakdown. No cost-of-goods-sold line - this app doesn't track a per-unit
+// cost price today, so "net profit" here is revenue minus logged expenses,
+// not a true gross-margin P&L.
+async function getProfitAndLoss(businessId, { from, to } = {}) {
+  const rangeFrom = from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const rangeTo = to || new Date().toISOString().slice(0, 10);
+  const [revenueRows, expenseRows, categoryRows] = await Promise.all([
+    query(
+      `SELECT COALESCE(SUM(price * qty), 0) AS revenue FROM orders
+       WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date >= $2 AND created_at::date <= $3`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+    query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
+       WHERE business_id = $1 AND expense_date >= $2 AND expense_date <= $3`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+    query(
+      `SELECT category, SUM(amount) AS total FROM expenses
+       WHERE business_id = $1 AND expense_date >= $2 AND expense_date <= $3
+       GROUP BY category ORDER BY total DESC`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+  ]);
+  const revenue = Number(revenueRows.rows[0].revenue);
+  const expensesTotal = Number(expenseRows.rows[0].total);
+  return {
+    from: rangeFrom,
+    to: rangeTo,
+    revenue,
+    expensesTotal,
+    netProfit: revenue - expensesTotal,
+    expensesByCategory: categoryRows.rows.map((r) => ({ category: r.category, total: Number(r.total) })),
+  };
+}
+
+function toReconciliationJson(r) {
+  return {
+    id: r.id,
+    date: r.reconciliation_date,
+    expectedCash: Number(r.expected_cash),
+    countedCash: Number(r.counted_cash),
+    variance: Number(r.variance),
+    notes: r.notes,
+    createdAt: r.created_at,
+  };
+}
+
+// expected_cash is a snapshot (paid-order revenue minus expenses for that
+// single day) computed once at save time - see the schema.sql comment for
+// why this deliberately isn't recalculated on read.
+async function upsertReconciliation(businessId, data) {
+  const date = normalizeDateInput(data.date);
+  const countedCash = requireNumber(data.countedCash, "Counted cash", { min: 0 });
+  const notes = (data.notes || "").toString().slice(0, 2000);
+  const [revenueRows, expenseRows] = await Promise.all([
+    query(
+      `SELECT COALESCE(SUM(price * qty), 0) AS revenue FROM orders
+       WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date = $2`,
+      [businessId, date]
+    ),
+    query(`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE business_id = $1 AND expense_date = $2`, [businessId, date]),
+  ]);
+  const expectedCash = Number(revenueRows.rows[0].revenue) - Number(expenseRows.rows[0].total);
+  const variance = countedCash - expectedCash;
+  const { rows } = await query(
+    `INSERT INTO cash_reconciliations (business_id, reconciliation_date, expected_cash, counted_cash, variance, notes)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (business_id, reconciliation_date)
+     DO UPDATE SET counted_cash = $4, expected_cash = $3, variance = $5, notes = $6
+     RETURNING *`,
+    [businessId, date, expectedCash, countedCash, variance, notes]
+  );
+  await logEvent(businessId, "cash_reconciled", `${date}: counted ${countedCash}, expected ${expectedCash} (variance ${variance})`);
+  return toReconciliationJson(rows[0]);
+}
+
+async function listReconciliations(businessId, limit = 30) {
+  const { rows } = await query(
+    `SELECT * FROM cash_reconciliations WHERE business_id = $1 ORDER BY reconciliation_date DESC LIMIT $2`,
+    [businessId, limit]
+  );
+  return rows.map(toReconciliationJson);
 }
 
 async function getBusiness(businessId) {
@@ -1348,6 +1562,14 @@ async function listAllPayments() {
 module.exports = {
   OrderError,
   healthCheck,
+  EXPENSE_CATEGORIES,
+  createExpense,
+  listExpenses,
+  deleteExpense,
+  getCashbook,
+  getProfitAndLoss,
+  upsertReconciliation,
+  listReconciliations,
   getMembership,
   createBusiness,
   getBusiness,
