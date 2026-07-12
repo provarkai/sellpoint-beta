@@ -191,16 +191,6 @@ app.get(
   handle(async (req, res) => res.json(await db.getPublicSocialLinks()))
 );
 
-// TEMPORARY - one-off verification that Sentry actually receives events now
-// that SENTRY_DSN is set in Railway. Remove after confirming in the Sentry
-// dashboard.
-app.get(
-  "/api/_sentry-test",
-  handle(async () => {
-    throw new Error("Sentry test event - safe to resolve/ignore");
-  })
-);
-
 // --- Founding Members waitlist (pre-launch growth capture) -----------------
 
 app.post(
