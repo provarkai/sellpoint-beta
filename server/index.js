@@ -582,6 +582,32 @@ app.delete(
   })
 );
 
+// --- CRM depth: customer timelines, smart segmentation -----------------------
+
+app.get(
+  "/api/customers/segments",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listCustomersWithSegments(req.businessId)))
+);
+app.get(
+  "/api/customers/:id/timeline",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getCustomerTimeline(req.businessId, req.params.id)))
+);
+app.post(
+  "/api/customers/:id/notes",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.addCustomerNote(req.businessId, req.params.id, (req.body || {}).note)))
+);
+app.delete(
+  "/api/customers/:customerId/notes/:noteId",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deleteCustomerNote(req.businessId, req.params.noteId);
+    res.status(204).end();
+  })
+);
+
 app.post(
   "/api/orders",
   requireAuth,

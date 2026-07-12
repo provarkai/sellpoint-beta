@@ -3,6 +3,9 @@ let pricing={};
 let authToken=null;
 let userEmail=null;
 let myRole=null;
+let customerSegments={};
+let customerSegmentFilter=null;
+let viewingCustomerId=null;
 const $=id=>document.getElementById(id), money=n=>`${state.currency||"NGN"} ${Number(n||0).toLocaleString(CURRENCIES[state.currency]?.locale||"en-NG")}`;
 const clean=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)};
@@ -13,7 +16,7 @@ const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===und
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -21,7 +24,9 @@ function productDetailsHtml(p){if(p.type==="Digital product")return `<div class=
 function render(){
   const storeLive=!!state.storefrontEligible&&!!state.storefrontEnabled&&!!state.slug;
   $("pList").innerHTML=state.products.map(p=>`<div class="item"><div class="item-clickable" style="cursor:pointer;display:flex;gap:10px;align-items:center" onclick="toggleItem('${p.id}')">${p.image?`<img src="${p.image}" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0">`:""}<div style="flex:1"><div class="item-top"><strong>${clean(p.name)}</strong><span>${p.discountPrice?`<s class="meta">${money(p.price)}</s> ${money(p.discountPrice)}`:money(p.price)}</span></div><div class="meta">${clean(p.type||"Product")} - ${clean(p.category||"General")} - ${p.stock} ${p.type==="Service"?"slots":p.type==="Digital product"?"licenses":"in stock"}</div></div></div><div id="details-${p.id}" style="display:none">${productDetailsHtml(p)}</div><div class="item-actions"><button onclick="editProduct('${p.id}')">Edit</button>${storeLive?`<button onclick="copyProductLink('${p.id}')">Copy Link</button>`:""}<button onclick="caption('${p.id}')">Caption</button><button onclick="delProduct('${p.id}')">Delete</button></div></div>`).join("");
-  $("cList").innerHTML=state.customers.map(c=>`<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}${c.email?` - ${clean(c.email)}`:""}</div><div class="item-actions"><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`).join("");
+  const visibleCustomers=customerSegmentFilter?state.customers.filter(c=>(customerSegments[c.id]?.segment)===customerSegmentFilter):state.customers;
+  $("cList").innerHTML=visibleCustomers.map(c=>{const seg=customerSegments[c.id]?.segment;return `<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}${c.email?` - ${clean(c.email)}`:""}${seg?` - ${segmentLabel(seg)}`:""}</div><div class="item-actions"><button onclick="openCustomerTimeline('${c.id}')">Timeline</button><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`}).join("");
+  renderSegmentFilter();
   $("oList").innerHTML=state.orders.map(o=>{const p=product(o.productId),c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">Receipt</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button><button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
   const pLimRaw=pricing[state.plan]?.productLimit,pLim=pLimRaw===null||pLimRaw===undefined?Infinity:pLimRaw;
   $("pCount").textContent=`${state.products.length}/${pLim===Infinity?"unlimited":pLim} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;if($("used"))$("used").textContent=state.orders.length;
@@ -67,6 +72,47 @@ $("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("
   else{const created=await api("POST","/api/products",payload);state.products.unshift(created);e.target.reset();pendingImages=[];renderImagePreview();updateProductFields();render();toast("Item saved")}
 }catch(err){toast(err.message)}};
 $("customerForm").onsubmit=async e=>{e.preventDefault();const created=await api("POST","/api/customers",{name:$("cName").value.trim(),phone:$("cPhone").value.replace(/\D/g,""),email:$("cEmail")?.value.trim()||"",location:$("cLoc").value.trim()});state.customers.unshift(created);e.target.reset();render();toast("Customer saved")};
+
+const SEGMENTS=["New","Active","Repeat","VIP","At Risk"];
+const SEGMENT_ICONS={New:"🆕",Active:"✅",Repeat:"🔁",VIP:"⭐","At Risk":"⚠️"};
+function segmentLabel(seg){return `${SEGMENT_ICONS[seg]||""} ${seg}`}
+async function loadCustomerSegments(){
+  if(!$("cList"))return;
+  try{
+    const list=await api("GET","/api/customers/segments");
+    customerSegments={};
+    list.forEach(c=>customerSegments[c.id]={segment:c.segment,totalSpend:c.totalSpend,paidOrderCount:c.paidOrderCount});
+    render();
+  }catch(err){toast(err.message)}
+}
+function renderSegmentFilter(){
+  if(!$("cSegmentFilter"))return;
+  const counts={};
+  Object.values(customerSegments).forEach(c=>counts[c.segment]=(counts[c.segment]||0)+1);
+  const allBtn=`<button class="${customerSegmentFilter?"":"active"}" onclick="setSegmentFilter(null)">All (${state.customers.length})</button>`;
+  const segBtns=SEGMENTS.filter(s=>counts[s]).map(s=>`<button class="${customerSegmentFilter===s?"active":""}" onclick="setSegmentFilter('${s}')">${segmentLabel(s)} (${counts[s]})</button>`).join("");
+  $("cSegmentFilter").innerHTML=allBtn+segBtns;
+}
+function setSegmentFilter(seg){customerSegmentFilter=seg;render()}
+async function openCustomerTimeline(id){
+  try{
+    const t=await api("GET",`/api/customers/${id}/timeline`);
+    viewingCustomerId=id;
+    renderCustomerTimeline(t);
+    $("customerTimelineModal").showModal();
+  }catch(err){toast(err.message)}
+}
+function renderCustomerTimeline(t){
+  $("ctName").textContent=t.customer.name;
+  $("ctSegment").textContent=`${t.customer.segment} - ${money(t.customer.totalSpend)} total spend - ${t.customer.paidOrderCount} completed order${t.customer.paidOrderCount===1?"":"s"}`;
+  const orderEntries=t.orders.map(o=>({type:"order",at:o.createdAt,html:`<div class="item"><div class="item-top"><strong>${clean(o.productName)} x ${o.qty}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(o.status)} - ${date(o.createdAt)}</div></div>`}));
+  const noteEntries=t.notes.map(n=>({type:"note",at:n.createdAt,html:`<div class="item"><div class="item-top"><strong>Note</strong><span>${date(n.createdAt)}</span></div><div class="meta">${clean(n.note)}</div><div class="item-actions"><button onclick="delCustomerNote('${n.id}')">Delete</button></div></div>`}));
+  const merged=[...orderEntries,...noteEntries].sort((a,b)=>new Date(b.at)-new Date(a.at));
+  $("ctTimeline").innerHTML=merged.map(e=>e.html).join("")||`<div class="item"><span class="meta">No activity yet</span></div>`;
+}
+if($("ctNoteForm"))$("ctNoteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST",`/api/customers/${viewingCustomerId}/notes`,{note:$("ctNoteText").value.trim()});$("ctNoteText").value="";const t=await api("GET",`/api/customers/${viewingCustomerId}/timeline`);renderCustomerTimeline(t);toast("Note added")}catch(err){toast(err.message)}};
+async function delCustomerNote(noteId){try{await api("DELETE",`/api/customers/${viewingCustomerId}/notes/${noteId}`);const t=await api("GET",`/api/customers/${viewingCustomerId}/timeline`);renderCustomerTimeline(t);toast("Note deleted")}catch(err){toast(err.message)}}
+if($("closeCustomerTimeline"))$("closeCustomerTimeline").onclick=()=>$("customerTimelineModal").close();
 $("orderForm").onsubmit=async e=>{e.preventDefault();const p=product($("oProduct").value),c=customer($("oCustomer").value),q=+$("oQty").value,status=$("oStatus").value,isQuote=status==="Quote";if(!isQuote&&state.orders.filter(o=>o.status!=="Quote").length>=orderLimit()){showPaywall();return}if(!p||!c)return toast("Add product and customer first");if(!isQuote&&q>p.stock)return toast("Not enough stock");try{const created=await api("POST","/api/orders",{productId:p.id,customerId:c.id,qty:q,status,deliveryMethod:$("oDeliveryMethod")?.value||"self",dueDate:$("oDueDate")?.value||undefined});if(!isQuote)p.stock-=q;state.orders.unshift(created);e.target.reset();$("oQty").value=1;render();toast(isQuote?"Quote saved":"Order created")}catch(err){toast(err.message)}};
 async function convertOrder(id){try{const updated=await api("POST",`/api/orders/${id}/convert`,{});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;const p=product(updated.productId);if(p)p.stock-=updated.qty;render();toast("Quote converted to order")}catch(err){toast(err.message)}}
 async function refundOrder(id){const restock=confirm("Restock the item(s) from this order?");try{const updated=await api("PATCH",`/api/orders/${id}`,{refund:true,restock});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;if(restock){const p=product(updated.productId);if(p)p.stock+=updated.qty}render();toast("Order refunded")}catch(err){toast(err.message)}}

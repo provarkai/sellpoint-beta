@@ -1213,6 +1213,97 @@ async function deleteCustomer(businessId, id) {
   await query("DELETE FROM customers WHERE id = $1 AND business_id = $2", [id, businessId]);
 }
 
+// --- CRM depth: customer timelines, smart segmentation ---------------------
+
+const DORMANT_DAYS = 60;
+
+// Segments are computed on read, not stored, so they're always current and
+// need no migration/backfill as order history changes:
+// - New: no completed (Paid/Delivered) purchase yet.
+// - At Risk: has purchased before but nothing in the last DORMANT_DAYS.
+// - VIP: top ~20% of this business's paying customers by total spend
+//   (relative, not a fixed currency figure, since spend scale varies by
+//   business size and now also by display currency).
+// - Repeat: 2+ completed purchases, not otherwise VIP/At Risk.
+// - Active: exactly 1 recent completed purchase.
+function computeSegments(customers) {
+  const spenders = customers.map((c) => c.totalSpend).filter((s) => s > 0).sort((a, b) => b - a);
+  const vipCount = Math.max(1, Math.ceil(spenders.length * 0.2));
+  const vipThreshold = spenders.length ? spenders[Math.min(vipCount, spenders.length) - 1] : Infinity;
+  const now = Date.now();
+  return customers.map((c) => {
+    let segment;
+    if (c.paidOrderCount === 0) segment = "New";
+    else if (c.lastOrderAt && now - new Date(c.lastOrderAt).getTime() > DORMANT_DAYS * 24 * 60 * 60 * 1000) segment = "At Risk";
+    else if (c.totalSpend > 0 && c.totalSpend >= vipThreshold) segment = "VIP";
+    else if (c.paidOrderCount >= 2) segment = "Repeat";
+    else segment = "Active";
+    return { ...c, segment };
+  });
+}
+
+async function listCustomersWithSegments(businessId) {
+  const { rows } = await query(
+    `SELECT c.*,
+       COALESCE(SUM(CASE WHEN o.status IN ('Paid','Delivered') THEN o.price * o.qty ELSE 0 END), 0) AS total_spend,
+       COUNT(CASE WHEN o.status IN ('Paid','Delivered') THEN 1 END) AS paid_order_count,
+       MAX(CASE WHEN o.status IN ('Paid','Delivered') THEN o.created_at END) AS last_order_at
+     FROM customers c
+     LEFT JOIN orders o ON o.customer_id = c.id AND o.business_id = c.business_id
+     WHERE c.business_id = $1
+     GROUP BY c.id
+     ORDER BY c.created_at DESC`,
+    [businessId]
+  );
+  const customers = rows.map((r) => ({
+    ...toCustomerJson(r),
+    totalSpend: Number(r.total_spend),
+    paidOrderCount: Number(r.paid_order_count),
+    lastOrderAt: r.last_order_at,
+  }));
+  return computeSegments(customers);
+}
+
+function toCustomerNoteJson(n) {
+  return { id: n.id, note: n.note, createdAt: n.created_at };
+}
+
+async function addCustomerNote(businessId, customerId, note) {
+  const { rows: exists } = await query("SELECT 1 FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
+  if (!exists[0]) throw new OrderError("Customer not found");
+  const text = requireString(note, "Note");
+  const { rows } = await query(
+    "INSERT INTO customer_notes (business_id, customer_id, note) VALUES ($1, $2, $3) RETURNING *",
+    [businessId, customerId, text]
+  );
+  return toCustomerNoteJson(rows[0]);
+}
+
+async function deleteCustomerNote(businessId, noteId) {
+  const { rows } = await query("DELETE FROM customer_notes WHERE id = $1 AND business_id = $2 RETURNING id", [noteId, businessId]);
+  if (!rows[0]) throw new OrderError("Note not found");
+}
+
+// Full picture for one customer: profile + segment, every order (including
+// Quotes/Refunded, unlike the revenue-facing aggregates elsewhere, since a
+// timeline should show everything that happened), and the freeform note log
+// - merged into one chronological feed for the UI.
+async function getCustomerTimeline(businessId, customerId) {
+  const { rows: customerRows } = await query("SELECT * FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
+  if (!customerRows[0]) throw new OrderError("Customer not found");
+  const [segmented, orderRows, noteRows] = await Promise.all([
+    listCustomersWithSegments(businessId),
+    query("SELECT * FROM orders WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
+    query("SELECT * FROM customer_notes WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
+  ]);
+  const customer = segmented.find((c) => c.id === customerId) || { ...toCustomerJson(customerRows[0]), totalSpend: 0, paidOrderCount: 0, lastOrderAt: null, segment: "New" };
+  return {
+    customer,
+    orders: orderRows.rows.map(toOrderJson),
+    notes: noteRows.rows.map(toCustomerNoteJson),
+  };
+}
+
 // --- Orders ---------------------------------------------------------------
 
 // Quotes are a pre-commitment estimate, not a real sale yet - they don't
@@ -1570,6 +1661,10 @@ module.exports = {
   getProfitAndLoss,
   upsertReconciliation,
   listReconciliations,
+  listCustomersWithSegments,
+  addCustomerNote,
+  deleteCustomerNote,
+  getCustomerTimeline,
   getMembership,
   createBusiness,
   getBusiness,

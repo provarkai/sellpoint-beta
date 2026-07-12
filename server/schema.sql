@@ -167,6 +167,20 @@ create table if not exists customers (
 create index if not exists customers_business_id_idx on customers(business_id);
 alter table customers add column if not exists email text not null default '';
 
+-- Freeform interaction log ("called about delayed delivery", "asked for a
+-- discount") shown alongside order history on a customer's timeline - see
+-- getCustomerTimeline in db.js. Separate from the customer's own fields
+-- since notes are an append-only log, not profile data.
+create table if not exists customer_notes (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  customer_id text not null references customers(id) on delete cascade,
+  note text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists customer_notes_customer_id_idx on customer_notes(customer_id);
+alter table customer_notes enable row level security;
+
 create table if not exists orders (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,
