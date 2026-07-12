@@ -170,7 +170,10 @@ async function finalizeIfSuccessful(txData) {
     status: "success",
     rawPayload: txData,
   });
-  if (isNew) await db.activatePlan(businessId, plan, billingCycle);
+  if (isNew) {
+    await db.activatePlan(businessId, plan, billingCycle);
+    await db.rewardReferrerIfEligible(businessId).catch((err) => console.error("Referral reward failed:", err.message));
+  }
   return isNew;
 }
 
@@ -251,6 +254,15 @@ app.post(
     if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change the plan" });
     res.json(await db.downgradeToStarter(req.businessId));
   })
+);
+
+// Real-customer referral program - any team member can see/share the link,
+// not just the owner (this is separate from the pre-launch waitlist's own
+// referral system on founding-members.html).
+app.get(
+  "/api/business/referral",
+  requireAuth,
+  handle(async (req, res) => res.json({ referralCode: await db.getOrCreateReferralCode(req.businessId) }))
 );
 
 // --- Public storefront (Growth+) --------------------------------------------

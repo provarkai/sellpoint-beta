@@ -152,7 +152,7 @@ if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();co
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
 if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to Starter now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to Starter")}catch(err){toast(err.message)}};
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||""}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection()};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||""}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection();renderReferralSection()};
 
 function renderStorefrontSection(){
   if($("dashStoreLink")){
@@ -248,6 +248,19 @@ if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/sto
 if($("dashCopyStoreUrl"))$("dashCopyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
 
+let referralLinkLoaded=false;
+async function renderReferralSection(){
+  if(!$("referralSection"))return;
+  $("referralSection").style.display="block";
+  if(referralLinkLoaded)return;
+  try{
+    const {referralCode}=await api("GET","/api/business/referral");
+    referralLinkLoaded=true;
+    const link=`${location.origin}/signup.html?ref=${referralCode}`;
+    $("referralLinkDisplay").textContent=link;
+    $("copyReferralLink").onclick=()=>copy(link);
+  }catch(err){$("referralLinkDisplay").textContent="Could not load your referral link"}
+}
 function renderCouponsSection(){
   if(!$("couponsSection"))return;
   const eligible=!!state.storefrontEligible&&myRole==="owner";

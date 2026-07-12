@@ -308,6 +308,18 @@ create table if not exists coupons (
 );
 create index if not exists coupons_business_id_idx on coupons(business_id);
 
+-- Referral program (real paying-customer referrals, separate from the
+-- pre-launch waitlist's own referral_code column) - referral_code is this
+-- business's own shareable code (generated lazily on first request, not at
+-- signup, so existing businesses self-heal instead of needing a backfill);
+-- referred_by_business_id is set once, at signup, if the new business
+-- arrived via another business's referral link. The reward (see
+-- rewardReferrerIfEligible in db.js) fires once, on the referred business's
+-- first successful paid-plan payment.
+alter table businesses add column if not exists referral_code text;
+alter table businesses add column if not exists referred_by_business_id uuid references businesses(id) on delete set null;
+create unique index if not exists businesses_referral_code_idx on businesses(referral_code) where referral_code is not null;
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this

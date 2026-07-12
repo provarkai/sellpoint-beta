@@ -3,6 +3,11 @@ const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add(
 
 async function boot() {
   const supabase = await window.supabaseReady;
+  // A referral link (another business's own share link, or a
+  // founding-members waitlist link that led here) carries the code as
+  // ?ref=CODE - stashed in user_metadata now since it's only usable once
+  // the account (and its business) actually exists a moment from now.
+  const referredByCode = new URLSearchParams(location.search).get("ref") || "";
 
   $("signupForm").onsubmit = async (e) => {
     e.preventDefault();
@@ -10,7 +15,7 @@ async function boot() {
     const businessPhone = $("businessPhone").value.replace(/\D/g, "");
     const email = $("email").value.trim();
     const password = $("password").value;
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName, businessPhone } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName, businessPhone, referredByCode } } });
     if (error) return toast(error.message);
     if (data.session) {
       // Email confirmation is off on this Supabase project - session is

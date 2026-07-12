@@ -16,10 +16,11 @@
     if (!me.business) {
       const businessName = session.user.user_metadata?.businessName || "Your Business";
       const businessPhone = session.user.user_metadata?.businessPhone || "";
+      const referredByCode = session.user.user_metadata?.referredByCode || "";
       await fetch("/api/businesses", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ businessName, businessPhone }),
+        body: JSON.stringify({ businessName, businessPhone, referredByCode }),
       });
       return true;
     }

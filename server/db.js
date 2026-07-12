@@ -72,6 +72,7 @@ function toBusinessJson(b) {
     paystackBankName: b.paystack_bank_name || "",
     paystackAccountName: b.paystack_account_name || "",
     paystackAccountNumberMasked: b.paystack_account_number ? "•••• " + b.paystack_account_number.slice(-4) : "",
+    referralCode: b.referral_code || "",
   };
 }
 function effectivePlan(b) {
@@ -177,9 +178,20 @@ async function createBusiness(userId, fields, email) {
     }
     const businessName = fields.businessName || "Your Business";
     const slug = await uniqueSlug(client, businessName);
+    // A referral link (waitlist.html?ref=... or a real business's own
+    // share link) carries the code through signup's user_metadata - look it
+    // up against real businesses only (the waitlist's own codes are a
+    // separate, unrelated namespace). No match just means no referrer, not
+    // an error - a stale/mistyped code shouldn't block signup.
+    const referredByCode = (fields.referredByCode || "").trim();
+    let referredByBusinessId = null;
+    if (referredByCode) {
+      const { rows: refRows } = await client.query("SELECT id FROM businesses WHERE upper(referral_code) = upper($1)", [referredByCode]);
+      referredByBusinessId = refRows[0]?.id || null;
+    }
     const { rows } = await client.query(
-      `INSERT INTO businesses (name, phone, slug) VALUES ($1, $2, $3) RETURNING *`,
-      [businessName, fields.businessPhone || "", slug]
+      `INSERT INTO businesses (name, phone, slug, referred_by_business_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [businessName, fields.businessPhone || "", slug, referredByBusinessId]
     );
     const business = rows[0];
     await client.query(
@@ -317,6 +329,54 @@ async function activatePlan(businessId, plan, billingCycle) {
   else expires.setMonth(expires.getMonth() + 1);
   await setPlan(businessId, plan, billingCycle, expires.toISOString());
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
+}
+
+// --- Referral program (real paying customers) -------------------------------
+
+// Generated lazily on first request rather than at signup, so businesses
+// created before this feature shipped self-heal instead of needing a
+// backfill migration.
+async function getOrCreateReferralCode(businessId) {
+  const { rows } = await query("SELECT referral_code FROM businesses WHERE id = $1", [businessId]);
+  if (!rows[0]) throw new OrderError("Business not found");
+  if (rows[0].referral_code) return rows[0].referral_code;
+  for (let i = 0; i < 20; i++) {
+    const candidate = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const { rows: taken } = await query("SELECT 1 FROM businesses WHERE referral_code = $1", [candidate]);
+    if (taken.length) continue;
+    const { rows: updated } = await query("UPDATE businesses SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL RETURNING referral_code", [candidate, businessId]);
+    if (updated[0]) return updated[0].referral_code;
+    // Lost a race with a concurrent request generating one first - re-read.
+    const { rows: retry } = await query("SELECT referral_code FROM businesses WHERE id = $1", [businessId]);
+    if (retry[0]?.referral_code) return retry[0].referral_code;
+  }
+  throw new OrderError("Could not generate a referral code - try again");
+}
+
+// Reward: 1 free month, fired once, the moment a referred business makes its
+// first successful PAID-PLAN payment (never for addon purchases or
+// storefront orders, and never more than once per referred business even if
+// they later upgrade again). If the referrer is on Starter, this gives them
+// a month of Growth rather than "a free month of free" - otherwise it
+// extends whatever paid plan they're already on.
+async function rewardReferrerIfEligible(businessId) {
+  const { rows } = await query("SELECT referred_by_business_id FROM businesses WHERE id = $1", [businessId]);
+  const referrerId = rows[0]?.referred_by_business_id;
+  if (!referrerId) return;
+  const { rows: paymentCountRows } = await query(
+    "SELECT COUNT(*)::int AS n FROM payments WHERE business_id = $1 AND status = 'success' AND plan NOT LIKE 'addon:%' AND plan != 'storefront_order'",
+    [businessId]
+  );
+  if (paymentCountRows[0].n !== 1) return; // not exactly their first paid-plan payment
+  const { rows: referrerRows } = await query("SELECT * FROM businesses WHERE id = $1", [referrerId]);
+  const referrer = referrerRows[0];
+  if (!referrer) return;
+  const targetPlan = effectivePlan(referrer) === "starter" ? "growth" : referrer.plan;
+  const now = new Date();
+  const base = referrer.plan_expires_at && new Date(referrer.plan_expires_at) > now ? new Date(referrer.plan_expires_at) : now;
+  base.setMonth(base.getMonth() + 1);
+  await setPlan(referrerId, targetPlan, referrer.billing_cycle || "monthly", base.toISOString());
+  await logEvent(referrerId, "referral_reward", `1 free month of ${targetPlan} for a referred business's first payment`);
 }
 
 // Immediate downgrade to Starter, at the tenant's own request. Per the
@@ -1164,6 +1224,8 @@ module.exports = {
   getState,
   updateBusiness,
   activatePlan,
+  getOrCreateReferralCode,
+  rewardReferrerIfEligible,
   downgradeToStarter,
   updateStorefrontSettings,
   getStorefront,
