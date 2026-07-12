@@ -132,6 +132,7 @@ function toOrderJson(o) {
     createdAt: o.created_at,
     delivered: !!o.delivered,
     deliveryMethod: o.delivery_method,
+    deliveryFee: Number(o.delivery_fee || 0),
     dueDate: o.due_date,
   };
 }
@@ -943,6 +944,57 @@ async function getPublicSocialLinks() {
   return rows[0]?.social_links || {};
 }
 
+// --- SellersPoint Logistics (item 7): admin-controlled fee on the platform-run
+// delivery option, alongside a seller's own self/rider arrangements --------
+
+const DEFAULT_LOGISTICS_SETTINGS = { enabled: false, flatFee: 0, percentFee: 0, apiBase: "", apiKey: "" };
+
+async function getRawLogisticsSettings() {
+  const { rows } = await query("SELECT logistics_settings FROM platform_settings WHERE id = 1");
+  return { ...DEFAULT_LOGISTICS_SETTINGS, ...(rows[0]?.logistics_settings || {}) };
+}
+
+// Admin-facing: full settings, but api_key is masked the same way the
+// Paystack account number is elsewhere - never round-tripped in full once set.
+async function getLogisticsSettingsForAdmin() {
+  const settings = await getRawLogisticsSettings();
+  return {
+    enabled: settings.enabled,
+    flatFee: Number(settings.flatFee),
+    percentFee: Number(settings.percentFee),
+    apiBase: settings.apiBase,
+    apiKeySet: !!settings.apiKey,
+    apiKeyMasked: settings.apiKey ? "•••• " + settings.apiKey.slice(-4) : "",
+  };
+}
+
+async function updateLogisticsSettings(fields) {
+  const current = await getRawLogisticsSettings();
+  const next = {
+    enabled: fields.enabled !== undefined ? !!fields.enabled : current.enabled,
+    flatFee: fields.flatFee !== undefined ? requireNumber(fields.flatFee, "Flat fee", { min: 0 }) : current.flatFee,
+    percentFee: fields.percentFee !== undefined ? requireNumber(fields.percentFee, "Percent fee", { min: 0, max: 100 }) : current.percentFee,
+    apiBase: fields.apiBase !== undefined ? String(fields.apiBase).trim() : current.apiBase,
+    // Only overwrite the stored key if a new non-empty one was actually
+    // submitted - the admin UI never receives the real key back, so leaving
+    // the field blank on save must mean "keep the existing key," not "clear it."
+    apiKey: fields.apiKey ? String(fields.apiKey).trim() : current.apiKey,
+  };
+  await query("UPDATE platform_settings SET logistics_settings = $1 WHERE id = 1", [JSON.stringify(next)]);
+  return getLogisticsSettingsForAdmin();
+}
+
+// Dashboard-facing (any authenticated seller): only what's needed to offer
+// and price the option at order-creation time - never the API credentials.
+async function getPublicLogisticsInfo() {
+  const settings = await getRawLogisticsSettings();
+  return { enabled: settings.enabled, flatFee: Number(settings.flatFee), percentFee: Number(settings.percentFee) };
+}
+
+function computeLogisticsFee(subtotal, settings) {
+  return Math.round(Number(subtotal) * (Number(settings.percentFee) / 100) + Number(settings.flatFee));
+}
+
 async function updatePricingOverrides(overrides) {
   const current = await getPlatformSettings();
   const merged = { ...current.pricingOverrides, ...overrides };
@@ -1578,10 +1630,16 @@ async function createOrder(businessId, data) {
   // a real selling price, not just a display label.
   const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
   const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : product.price;
+  let deliveryFee = 0;
+  if (deliveryMethod === "sellerspoint") {
+    const logistics = await getRawLogisticsSettings();
+    if (!logistics.enabled) throw new OrderError("SellersPoint Logistics isn't available yet - choose self delivery or a dispatch rider instead.");
+    deliveryFee = computeLogisticsFee(sellingPrice * qty, logistics);
+  }
   const { rows } = await query(
-    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate]
+    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date, delivery_fee)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11,$12) RETURNING *`,
+    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate, deliveryFee]
   );
   await logEvent(businessId, isQuote ? "quote_created" : "order_created", `${product.name} x ${qty}`);
   await awardLoyaltyPointsIfNeeded(businessId, rows[0]);
@@ -1938,6 +1996,9 @@ module.exports = {
   updatePlatformSettings,
   getPublicSocialLinks,
   updatePricingOverrides,
+  getLogisticsSettingsForAdmin,
+  updateLogisticsSettings,
+  getPublicLogisticsInfo,
   createProduct,
   updateProduct,
   deleteProduct,

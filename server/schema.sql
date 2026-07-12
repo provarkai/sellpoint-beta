@@ -303,6 +303,16 @@ alter table platform_settings add column if not exists social_links jsonb not nu
 -- app invents.
 alter table businesses add column if not exists why_buy_text text not null default '';
 
+-- SellersPoint Logistics (item 7): platform-run delivery as a third
+-- deliveryMethod option alongside a seller's own self/rider arrangements.
+-- The actual courier API is still being evaluated, so apiBase/apiKey exist
+-- as a place to plug one in later - what's live now is the enable toggle
+-- and the flat+percent fee charged per order, mirroring platformCutFor's
+-- model in server/payments.js. api_key is never returned to the client in
+-- full, same masking pattern as the Paystack account number elsewhere.
+alter table platform_settings add column if not exists logistics_settings jsonb not null default '{}'::jsonb;
+alter table orders add column if not exists delivery_fee numeric not null default 0;
+
 -- Seller online payments (Paystack subaccounts) - entirely optional, off by
 -- default. payment_mode 'manual' is the existing WhatsApp + bank transfer
 -- flow (via payment_details above); 'paystack' means storefront customers

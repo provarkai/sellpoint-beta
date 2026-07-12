@@ -7,6 +7,7 @@ let settings = { socialLinks: {} };
 let analytics = { totals: [] };
 let waitlistStats = { total: 0, countries: 0, categories: 0 };
 let auditLog = [];
+let logisticsSettings = { enabled: false, flatFee: 0, percentFee: 0, apiBase: "", apiKeySet: false, apiKeyMasked: "" };
 let authToken = null;
 let confirmDeleteId = null;
 let expandedId = null;
@@ -18,7 +19,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -27,6 +28,7 @@ async function loadAll() {
     api("GET", "/api/admin/analytics"),
     api("GET", "/api/waitlist/stats"),
     api("GET", "/api/admin/audit-log"),
+    api("GET", "/api/admin/logistics-settings"),
   ]);
   owner = ownerRes;
   businesses = businessesRes;
@@ -36,6 +38,7 @@ async function loadAll() {
   analytics = analyticsRes;
   waitlistStats = waitlistRes;
   auditLog = auditRes;
+  logisticsSettings = logisticsRes;
 }
 
 function businessDetailHtml(b) {
@@ -84,6 +87,11 @@ function render() {
   $("socialX").value = sl.x || "";
   $("socialWhatsapp").value = sl.whatsapp || "";
   $("socialLinkedin").value = sl.linkedin || "";
+  $("logEnabled").checked = !!logisticsSettings.enabled;
+  $("logFlatFee").value = logisticsSettings.flatFee ?? 0;
+  $("logPercentFee").value = logisticsSettings.percentFee ?? 0;
+  $("logApiBase").value = logisticsSettings.apiBase || "";
+  $("logApiKeyStatus").textContent = logisticsSettings.apiKeySet ? `(set - ${logisticsSettings.apiKeyMasked})` : "(not set)";
 }
 
 $("ownerPaymentForm").onsubmit = async (e) => {
@@ -107,6 +115,23 @@ $("socialLinksForm").onsubmit = async (e) => {
   try {
     settings = await api("PUT", "/api/admin/settings", { socialLinks: { instagram: $("socialInstagram").value.trim(), facebook: $("socialFacebook").value.trim(), tiktok: $("socialTiktok").value.trim(), x: $("socialX").value.trim(), whatsapp: $("socialWhatsapp").value.trim(), linkedin: $("socialLinkedin").value.trim() } });
     toast("Social links saved - now live in the landing page footer");
+    render();
+  } catch (err) {
+    toast(err.message);
+  }
+};
+$("logisticsForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    logisticsSettings = await api("PUT", "/api/admin/logistics-settings", {
+      enabled: $("logEnabled").checked,
+      flatFee: +$("logFlatFee").value,
+      percentFee: +$("logPercentFee").value,
+      apiBase: $("logApiBase").value.trim(),
+      apiKey: $("logApiKey").value.trim(),
+    });
+    $("logApiKey").value = "";
+    toast("Logistics settings saved");
     render();
   } catch (err) {
     toast(err.message);

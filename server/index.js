@@ -879,19 +879,30 @@ app.post(
       description: `Write a short storefront product description (2-3 sentences, plain text, no markdown, no hashtags, no emojis) for a Nigerian small business selling "${draftName}"${draftCategory ? ` (category: ${draftCategory})` : ""}, a ${draftType.toLowerCase()} priced at ${money(draftPrice)}.${draftExtra ? ` Extra details to weave in naturally: ${draftExtra}.` : ""} Describe what it is, who it's for, and why it's worth buying.`,
     };
     if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
-    let text = templates[tool];
     let used = await db.getAiUsage(req.businessId);
     const limit = await db.effectiveAiLimit(req.businessId);
-    // Only a genuine AI call counts against the monthly quota - a template
-    // fallback (no key configured, over quota, or the API call itself
-    // failing) costs nothing and always still works, degraded.
-    if (ai.isConfigured() && used < limit) {
-      try {
-        text = await ai.generateText(prompts[tool]);
-        used = await db.incrementAiUsage(req.businessId);
-      } catch (err) {
-        console.error("OpenRouter generation failed, falling back to template:", err.message);
-      }
+    // Once OpenRouter is configured, the monthly quota is a hard stop, not a
+    // soft degrade - previously, hitting the limit silently fell back to a
+    // free local template (including a genuinely data-driven "ask" fallback
+    // that read real business data), which meant a business could keep
+    // "chatting" indefinitely past its credit limit with no visible sign
+    // anything had changed, and buying more AI credits had no observable
+    // effect. Only when the platform hasn't configured OpenRouter at all
+    // (a global, not per-business, state) does every business get the free
+    // template - that's a feature-availability fallback, not a quota one.
+    if (!ai.isConfigured()) {
+      return res.json({ text: templates[tool], used, limit });
+    }
+    if (used >= limit) {
+      return res.status(400).json({ error: "You've used all your AI generations for this month. Upgrade your plan or buy more AI credits to keep using the AI Assistant.", used, limit });
+    }
+    let text;
+    try {
+      text = await ai.generateText(prompts[tool]);
+      used = await db.incrementAiUsage(req.businessId);
+    } catch (err) {
+      console.error("OpenRouter generation failed, falling back to template:", err.message);
+      text = templates[tool];
     }
     res.json({ text, used, limit });
   })
@@ -1174,6 +1185,22 @@ app.put(
   "/api/admin/settings",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.updatePlatformSettings(req.body || {})))
+);
+
+app.get(
+  "/api/admin/logistics-settings",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.getLogisticsSettingsForAdmin()))
+);
+app.put(
+  "/api/admin/logistics-settings",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.updateLogisticsSettings(req.body || {})))
+);
+app.get(
+  "/api/logistics-settings",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getPublicLogisticsInfo()))
 );
 
 app.put(
