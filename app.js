@@ -16,7 +16,7 @@ const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===und
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -426,6 +426,40 @@ async function loadExpensesTab(){
 async function delExpense(id){try{await api("DELETE",`/api/expenses/${id}`);loadExpensesTab();toast("Expense deleted")}catch(err){toast(err.message)}}
 if($("expenseForm"))$("expenseForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/expenses",{description:$("eDescription").value.trim(),amount:+$("eAmount").value,category:$("eCategory").value,date:$("eDate").value});e.target.reset();$("eDate").value=new Date().toISOString().slice(0,10);loadExpensesTab();toast("Expense logged")}catch(err){toast(err.message)}};
 if($("reconcileForm"))$("reconcileForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/reconciliations",{date:$("rDate").value,countedCash:+$("rCounted").value,notes:$("rNotes").value.trim()});$("rNotes").value="";loadExpensesTab();toast("Reconciliation saved")}catch(err){toast(err.message)}};
+
+let poItemRowId=0;
+function poAddItemRow(){
+  if(!state.products.length)return toast("Add a product first");
+  const id="poRow"+poItemRowId++;
+  const row=document.createElement("div");
+  row.className="item";
+  row.id=id;
+  const productOptions=state.products.map(p=>`<option value="${p.id}">${clean(p.name)}</option>`).join("");
+  row.innerHTML=`<div class="item-top"><select class="poItemProduct">${productOptions}</select></div><div class="item-actions"><input class="poItemQty" type="number" min="1" value="1" placeholder="Qty"><input class="poItemCost" type="number" min="0" step="0.01" value="0" placeholder="Unit cost"><button type="button" onclick="document.getElementById('${id}').remove()">Remove</button></div>`;
+  $("poItemRows").appendChild(row);
+}
+if($("poAddItem"))$("poAddItem").onclick=poAddItemRow;
+function collectPoItems(){
+  return [...$("poItemRows").children].map(row=>({productId:row.querySelector(".poItemProduct").value,qty:+row.querySelector(".poItemQty").value,unitCost:+row.querySelector(".poItemCost").value||0})).filter(i=>i.productId&&i.qty>0);
+}
+async function loadSuppliersTab(){
+  if(!$("spList"))return;
+  if($("poItemRows").children.length===0)poAddItemRow();
+  try{
+    const [suppliers,pos]=await Promise.all([api("GET","/api/suppliers"),api("GET","/api/purchase-orders")]);
+    $("spCount").textContent=`(${suppliers.length})`;
+    $("spList").innerHTML=suppliers.map(s=>`<div class="item"><div class="item-top"><strong>${clean(s.name)}</strong><span>${clean(s.phone)}</span></div><div class="meta">${clean(s.email||"No email")}${s.address?` - ${clean(s.address)}`:""}</div><div class="item-actions"><button onclick="delSupplier('${s.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No suppliers yet</span></div>`;
+    $("poSupplier").innerHTML=`<option value="">No supplier</option>`+suppliers.map(s=>`<option value="${s.id}">${clean(s.name)}</option>`).join("");
+    $("poCount").textContent=`(${pos.length})`;
+    const statuses=["Draft","Ordered","Received","Cancelled"];
+    $("poList").innerHTML=pos.map(po=>{const itemsHtml=po.items.map(i=>`<div class="row"><span>${clean(i.productName)} x ${i.qty}</span><b>${money(i.qty*i.unitCost)}</b></div>`).join("");return `<div class="item"><div class="item-clickable" style="cursor:pointer" onclick="toggleItem('po_${po.id}')"><div class="item-top"><strong>${clean(po.supplierName)}</strong><span>${money(po.totalCost)}</span></div><div class="meta">${po.totalItems} item(s) - ${date(po.createdAt)}${po.notes?` - ${clean(po.notes)}`:""}</div></div><div id="details-po_${po.id}" style="display:none">${itemsHtml}</div><div class="item-actions">${po.status==="Received"?`<span class="meta">Received</span>`:`<select onchange="setPoStatus('${po.id}',this.value)">${statuses.map(s=>`<option ${s===po.status?"selected":""}>${s}</option>`).join("")}</select>`}${po.status!=="Received"?`<button onclick="delPo('${po.id}')">Delete</button>`:""}</div></div>`}).join("")||`<div class="item"><span class="meta">No purchase orders yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function delSupplier(id){try{await api("DELETE",`/api/suppliers/${id}`);loadSuppliersTab();toast("Supplier deleted")}catch(err){toast(err.message)}}
+async function setPoStatus(id,status){try{await api("PATCH",`/api/purchase-orders/${id}`,{status});loadSuppliersTab();toast(status==="Received"?"Purchase order received - stock updated":"Purchase order updated")}catch(err){toast(err.message)}}
+async function delPo(id){try{await api("DELETE",`/api/purchase-orders/${id}`);loadSuppliersTab();toast("Purchase order deleted")}catch(err){toast(err.message)}}
+if($("supplierForm"))$("supplierForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/suppliers",{name:$("spName").value.trim(),phone:$("spPhone").value.trim(),email:$("spEmail").value.trim(),address:$("spAddress").value.trim(),notes:$("spNotes").value.trim()});e.target.reset();loadSuppliersTab();toast("Supplier saved")}catch(err){toast(err.message)}};
+if($("poForm"))$("poForm").onsubmit=async e=>{e.preventDefault();try{const items=collectPoItems();if(!items.length)return toast("Add at least one item");await api("POST","/api/purchase-orders",{supplierId:$("poSupplier").value||undefined,items,notes:$("poNotes").value.trim()});$("poNotes").value="";$("poItemRows").innerHTML="";poAddItemRow();loadSuppliersTab();toast("Purchase order created")}catch(err){toast(err.message)}};
 
 function renderTeamVisibility(){
   if(!$("teamSection"))return;

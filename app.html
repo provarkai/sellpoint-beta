@@ -18,6 +18,7 @@
       <button class="tab" data-tab="ai">✨ AI Assistant</button>
       <button class="tab" data-tab="reports" id="reportsTab" style="display:none">📈 Reports</button>
       <button class="tab" data-tab="expenses">💰 Expenses</button>
+      <button class="tab" data-tab="suppliers">📥 Suppliers</button>
       <button class="tab" data-tab="logistics">🚚 Logistics</button>
       <button class="tab" data-tab="settings">⚙️ Settings</button>
       <button id="upgrade" class="tab-upgrade">🚀 Upgrade</button>
@@ -51,6 +52,12 @@
       <article><h2>Cashbook <small class="meta">(last 30 days)</small></h2><div id="cashbookSummary" class="list"></div><div id="cashbookList" class="list"></div></article>
       <form id="reconcileForm"><h2>Daily cash reconciliation</h2><label>Date<input id="rDate" type="date"></label><label>Cash counted<input id="rCounted" type="number" min="0" step="0.01" required></label><label>Notes<textarea id="rNotes" rows="2" placeholder="Optional"></textarea></label><button>Save Reconciliation</button></form>
       <article><h2>Reconciliation history</h2><div id="reconcileList" class="list"></div></article>
+    </div></section>
+    <section id="suppliers" class="page"><div class="grid">
+      <form id="supplierForm"><h2>Add supplier</h2><label>Name<input id="spName" required></label><label>Phone<input id="spPhone" placeholder="2348012345678"></label><label>Email<input id="spEmail" type="email" placeholder="Optional"></label><label>Address<input id="spAddress"></label><label>Notes<textarea id="spNotes" rows="2" placeholder="Optional"></textarea></label><button>Save Supplier</button></form>
+      <article><h2>Suppliers <small id="spCount"></small></h2><div id="spList" class="list"></div></article>
+      <form id="poForm"><h2>New purchase order</h2><label>Supplier<select id="poSupplier"><option value="">No supplier</option></select></label><div id="poItemRows"></div><p class="actions"><button type="button" id="poAddItem">Add Item</button></p><label>Notes<textarea id="poNotes" rows="2" placeholder="Optional"></textarea></label><button>Create Purchase Order</button></form>
+      <article><h2>Purchase Orders <small id="poCount"></small></h2><div id="poList" class="list"></div></article>
     </div></section>
     <section id="settings" class="page"><div class="grid"><form id="settingsForm"><h2>Business Profile</h2><label>Business logo<input id="sLogo" type="file" accept="image/*"></label><label>Business name<input id="sBusiness" required></label><label>Phone<input id="sPhone" placeholder="2348012345678"></label><label>Address<input id="sAddress" placeholder="123 Market Street, Lagos"></label><label>Payment details <span class="meta">(sent to customers with pending-payment orders)</span><textarea id="sPayment" rows="4" placeholder="Bank: Example Bank
 Account: 1234567890

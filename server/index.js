@@ -608,6 +608,55 @@ app.delete(
   })
 );
 
+// --- Suppliers & purchase orders ---------------------------------------------
+
+app.get(
+  "/api/suppliers",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listSuppliers(req.businessId)))
+);
+app.post(
+  "/api/suppliers",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createSupplier(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/suppliers/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deleteSupplier(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+app.get(
+  "/api/purchase-orders",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listPurchaseOrders(req.businessId)))
+);
+app.post(
+  "/api/purchase-orders",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createPurchaseOrder(req.businessId, req.body || {})))
+);
+app.get(
+  "/api/purchase-orders/:id",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getPurchaseOrder(req.businessId, req.params.id)))
+);
+app.patch(
+  "/api/purchase-orders/:id",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.updatePurchaseOrderStatus(req.businessId, req.params.id, (req.body || {}).status)))
+);
+app.delete(
+  "/api/purchase-orders/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deletePurchaseOrder(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+
 app.post(
   "/api/orders",
   requireAuth,

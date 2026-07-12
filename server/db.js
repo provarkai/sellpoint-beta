@@ -1304,6 +1304,153 @@ async function getCustomerTimeline(businessId, customerId) {
   };
 }
 
+// --- Suppliers & purchase orders --------------------------------------------
+
+function toSupplierJson(s) {
+  return { id: s.id, name: s.name, phone: s.phone, email: s.email, address: s.address, notes: s.notes, createdAt: s.created_at };
+}
+
+async function createSupplier(businessId, data) {
+  const name = requireString(data.name, "Supplier name");
+  const { rows } = await query(
+    `INSERT INTO suppliers (business_id, name, phone, email, address, notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [businessId, name, String(data.phone || "").trim(), String(data.email || "").trim(), String(data.address || "").trim(), String(data.notes || "").trim()]
+  );
+  return toSupplierJson(rows[0]);
+}
+
+async function listSuppliers(businessId) {
+  const { rows } = await query("SELECT * FROM suppliers WHERE business_id = $1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toSupplierJson);
+}
+
+async function deleteSupplier(businessId, id) {
+  await query("DELETE FROM suppliers WHERE id = $1 AND business_id = $2", [id, businessId]);
+}
+
+const PO_STATUSES = ["Draft", "Ordered", "Received", "Cancelled"];
+
+function toPurchaseOrderItemJson(i) {
+  return { id: i.id, productId: i.product_id, productName: i.product_name, qty: Number(i.qty), unitCost: Number(i.unit_cost) };
+}
+
+async function createPurchaseOrder(businessId, data) {
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (!items.length) throw new OrderError("Add at least one item to the purchase order");
+  const supplierId = data.supplierId || null;
+  const notes = String(data.notes || "").trim();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: poRows } = await client.query(
+      `INSERT INTO purchase_orders (business_id, supplier_id, status, notes) VALUES ($1,$2,'Draft',$3) RETURNING *`,
+      [businessId, supplierId, notes]
+    );
+    const po = poRows[0];
+    for (const item of items) {
+      const qty = requireNumber(item.qty, "Item quantity", { min: 1, integer: true });
+      const unitCost = requireNumber(item.unitCost ?? 0, "Item unit cost", { min: 0 });
+      const { rows: productRows } = await client.query("SELECT name FROM products WHERE id = $1 AND business_id = $2", [item.productId, businessId]);
+      if (!productRows[0]) throw new OrderError("One of the selected products was not found");
+      await client.query(
+        `INSERT INTO purchase_order_items (business_id, purchase_order_id, product_id, product_name, qty, unit_cost) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [businessId, po.id, item.productId, productRows[0].name, qty, unitCost]
+      );
+    }
+    await client.query("COMMIT");
+    await logEvent(businessId, "purchase_order_created", `${items.length} item(s)`);
+    return getPurchaseOrder(businessId, po.id);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function listPurchaseOrders(businessId) {
+  const { rows } = await query(
+    `SELECT po.*, s.name AS supplier_name,
+       COALESCE(SUM(i.qty * i.unit_cost), 0) AS total_cost,
+       COALESCE(SUM(i.qty), 0) AS total_items
+     FROM purchase_orders po
+     LEFT JOIN suppliers s ON s.id = po.supplier_id
+     LEFT JOIN purchase_order_items i ON i.purchase_order_id = po.id
+     WHERE po.business_id = $1
+     GROUP BY po.id, s.name
+     ORDER BY po.created_at DESC`,
+    [businessId]
+  );
+  const { rows: itemRows } = await query(
+    `SELECT i.* FROM purchase_order_items i JOIN purchase_orders po ON po.id = i.purchase_order_id WHERE po.business_id = $1`,
+    [businessId]
+  );
+  const itemsByPo = {};
+  itemRows.forEach((i) => (itemsByPo[i.purchase_order_id] = itemsByPo[i.purchase_order_id] || []).push(toPurchaseOrderItemJson(i)));
+  return rows.map((r) => ({
+    id: r.id,
+    supplierId: r.supplier_id,
+    supplierName: r.supplier_name || "No supplier",
+    status: r.status,
+    notes: r.notes,
+    totalCost: Number(r.total_cost),
+    totalItems: Number(r.total_items),
+    createdAt: r.created_at,
+    receivedAt: r.received_at,
+    items: itemsByPo[r.id] || [],
+  }));
+}
+
+async function getPurchaseOrder(businessId, id) {
+  const { rows } = await query(
+    `SELECT po.*, s.name AS supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+     WHERE po.id = $1 AND po.business_id = $2`,
+    [id, businessId]
+  );
+  const po = rows[0];
+  if (!po) throw new OrderError("Purchase order not found");
+  const { rows: itemRows } = await query("SELECT * FROM purchase_order_items WHERE purchase_order_id = $1 ORDER BY id", [id]);
+  return {
+    id: po.id,
+    supplierId: po.supplier_id,
+    supplierName: po.supplier_name || "No supplier",
+    status: po.status,
+    notes: po.notes,
+    createdAt: po.created_at,
+    receivedAt: po.received_at,
+    items: itemRows.map(toPurchaseOrderItemJson),
+  };
+}
+
+// Stock only ever changes here, once, on the Draft/Ordered -> Received
+// transition - re-receiving an already-Received PO is rejected so stock
+// can't be double-counted by clicking the status dropdown twice.
+async function updatePurchaseOrderStatus(businessId, id, status) {
+  if (!PO_STATUSES.includes(status)) throw new OrderError("Invalid purchase order status");
+  const { rows } = await query("SELECT * FROM purchase_orders WHERE id = $1 AND business_id = $2", [id, businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Purchase order not found");
+  if (status === "Received") {
+    if (current.status === "Received") throw new OrderError("This purchase order has already been received");
+    const { rows: itemRows } = await query("SELECT * FROM purchase_order_items WHERE purchase_order_id = $1", [id]);
+    for (const item of itemRows) {
+      await query("UPDATE products SET stock = stock + $1 WHERE id = $2 AND business_id = $3", [item.qty, item.product_id, businessId]);
+    }
+    await query("UPDATE purchase_orders SET status = 'Received', received_at = now() WHERE id = $1", [id]);
+    await logEvent(businessId, "purchase_order_received", `${itemRows.length} item(s) restocked`);
+  } else {
+    await query("UPDATE purchase_orders SET status = $1 WHERE id = $2", [status, id]);
+  }
+  return getPurchaseOrder(businessId, id);
+}
+
+async function deletePurchaseOrder(businessId, id) {
+  const { rows } = await query("SELECT status FROM purchase_orders WHERE id = $1 AND business_id = $2", [id, businessId]);
+  if (!rows[0]) throw new OrderError("Purchase order not found");
+  if (rows[0].status === "Received") throw new OrderError("Received purchase orders can't be deleted - they're part of your stock history");
+  await query("DELETE FROM purchase_orders WHERE id = $1 AND business_id = $2", [id, businessId]);
+}
+
 // --- Orders ---------------------------------------------------------------
 
 // Quotes are a pre-commitment estimate, not a real sale yet - they don't
@@ -1665,6 +1812,14 @@ module.exports = {
   addCustomerNote,
   deleteCustomerNote,
   getCustomerTimeline,
+  createSupplier,
+  listSuppliers,
+  deleteSupplier,
+  createPurchaseOrder,
+  listPurchaseOrders,
+  getPurchaseOrder,
+  updatePurchaseOrderStatus,
+  deletePurchaseOrder,
   getMembership,
   createBusiness,
   getBusiness,

@@ -204,6 +204,49 @@ alter table orders add column if not exists delivery_method text not null defaul
 -- no migration needed for those.
 alter table orders add column if not exists due_date timestamptz;
 
+-- Suppliers & purchase orders - extends the products table (restocking from
+-- a named supplier rather than editing stock counts directly). Receiving a
+-- PO is the only action that touches product stock, mirroring how paying
+-- for a customer order is the only action that decrements it.
+create table if not exists suppliers (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  email text not null default '',
+  address text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists suppliers_business_id_idx on suppliers(business_id);
+alter table suppliers enable row level security;
+
+create table if not exists purchase_orders (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  supplier_id uuid references suppliers(id) on delete set null,
+  status text not null default 'Draft',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  received_at timestamptz
+);
+create index if not exists purchase_orders_business_id_idx on purchase_orders(business_id);
+alter table purchase_orders enable row level security;
+
+-- product_name is a snapshot (like orders.product_name) so a PO's history
+-- stays readable even if the product is later renamed or deleted.
+create table if not exists purchase_order_items (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  product_id text not null,
+  product_name text not null default '',
+  qty integer not null default 1,
+  unit_cost numeric not null default 0
+);
+create index if not exists purchase_order_items_po_id_idx on purchase_order_items(purchase_order_id);
+alter table purchase_order_items enable row level security;
+
 create table if not exists events (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,
