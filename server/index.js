@@ -591,6 +591,11 @@ app.patch(
   requireAuth,
   handle(async (req, res) => res.json(await db.updateOrder(req.businessId, req.params.id, req.body || {})))
 );
+app.post(
+  "/api/orders/:id/convert",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.convertQuoteToOrder(req.businessId, req.params.id)))
+);
 app.delete(
   "/api/orders/:id",
   requireAuth,
@@ -686,9 +691,14 @@ app.post(
     const draftCategory = req.body.category || product?.category || "";
     const draftPrice = req.body.price ?? product?.price ?? 0;
     const draftExtra = (detail || "").trim();
-    const revenue = state.orders.reduce((s, o) => s + (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty, 0);
+    // "Paid revenue" means what it says - Quotes aren't real sales yet and
+    // Refunded orders no longer are, so both are excluded here (and from
+    // the best-seller tally below) so the AI never states an inflated
+    // number as fact.
+    const revenue = state.orders.filter((o) => ["Paid", "Delivered"].includes(o.status)).reduce((s, o) => s + (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty, 0);
     const tally = {};
     state.orders.forEach((o) => {
+      if (o.status === "Quote" || o.status === "Refunded") return;
       const n = state.products.find((p) => p.id === o.productId)?.name || o.productName;
       if (n) tally[n] = (tally[n] || 0) + o.qty;
     });

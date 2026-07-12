@@ -120,6 +120,7 @@ function toOrderJson(o) {
     createdAt: o.created_at,
     delivered: !!o.delivered,
     deliveryMethod: o.delivery_method,
+    dueDate: o.due_date,
   };
 }
 function toEventJson(e) {
@@ -250,10 +251,13 @@ async function getReports(businessId, tier = "basic") {
        GROUP BY 1 ORDER BY 1 DESC LIMIT $2`,
       [businessId, months]
     ),
+    // Quotes aren't real sales yet and Refunded orders no longer are -
+    // excluded from both so "top products/customers" reflects actual
+    // committed business, not estimates or reversed sales.
     includeTop
       ? query(
           `SELECT product_name, SUM(qty) AS units, SUM(price * qty) AS revenue
-           FROM orders WHERE business_id = $1
+           FROM orders WHERE business_id = $1 AND status NOT IN ('Quote', 'Refunded')
            GROUP BY product_name ORDER BY units DESC LIMIT $2`,
           [businessId, topN]
         )
@@ -262,7 +266,7 @@ async function getReports(businessId, tier = "basic") {
       ? query(
           `SELECT c.name, SUM(o.price * o.qty) AS spend, COUNT(*) AS orders
            FROM orders o JOIN customers c ON c.id = o.customer_id
-           WHERE o.business_id = $1 GROUP BY c.name ORDER BY spend DESC LIMIT $2`,
+           WHERE o.business_id = $1 AND o.status NOT IN ('Quote', 'Refunded') GROUP BY c.name ORDER BY spend DESC LIMIT $2`,
           [businessId, topN]
         )
       : Promise.resolve({ rows: [] }),
@@ -991,27 +995,41 @@ async function deleteCustomer(businessId, id) {
 
 // --- Orders ---------------------------------------------------------------
 
+// Quotes are a pre-commitment estimate, not a real sale yet - they don't
+// touch stock and don't count against the plan's order limit (both only
+// apply once a quote is actually converted into a real order via
+// convertQuoteToOrder below).
 async function createOrder(businessId, data) {
-  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  const business = businessRows[0];
-  const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1", [businessId]);
-  const limit = orderLimitFor(effectivePlan(business));
-  if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
-
+  const isQuote = data.status === "Quote";
   const qty = requireNumber(data.qty ?? 1, "Quantity", { min: 1, integer: true });
+  const dueDate = data.dueDate ? new Date(data.dueDate).toISOString() : null;
 
-  // Atomic check-and-decrement: baking "enough stock?" into the UPDATE's
-  // WHERE clause (instead of reading stock, checking it in JS, then writing
-  // a computed value back) closes a race where two concurrent checkouts for
-  // the same product could both pass a stale read and oversell it.
-  const { rows: productRows } = await query(
-    "UPDATE products SET stock = stock - $1 WHERE id = $2 AND business_id = $3 AND stock >= $1 RETURNING *",
-    [qty, data.productId, businessId]
-  );
-  const product = productRows[0];
-  if (!product) {
-    const { rows: existing } = await query("SELECT 1 FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
-    throw new OrderError(existing[0] ? "Not enough stock" : "Product not found");
+  let product;
+  if (isQuote) {
+    const { rows: productRows } = await query("SELECT * FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
+    product = productRows[0];
+    if (!product) throw new OrderError("Product not found");
+  } else {
+    const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+    const business = businessRows[0];
+    const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status != 'Quote'", [businessId]);
+    const limit = orderLimitFor(effectivePlan(business));
+    if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
+
+    // Atomic check-and-decrement: baking "enough stock?" into the UPDATE's
+    // WHERE clause (instead of reading stock, checking it in JS, then
+    // writing a computed value back) closes a race where two concurrent
+    // checkouts for the same product could both pass a stale read and
+    // oversell it.
+    const { rows: productRows } = await query(
+      "UPDATE products SET stock = stock - $1 WHERE id = $2 AND business_id = $3 AND stock >= $1 RETURNING *",
+      [qty, data.productId, businessId]
+    );
+    product = productRows[0];
+    if (!product) {
+      const { rows: existing } = await query("SELECT 1 FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
+      throw new OrderError(existing[0] ? "Not enough stock" : "Product not found");
+    }
   }
   const id = uid("o");
   const deliveryMethod = ["self", "rider", "sellerspoint"].includes(data.deliveryMethod) ? data.deliveryMethod : "self";
@@ -1020,12 +1038,37 @@ async function createOrder(businessId, data) {
   const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
   const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : product.price;
   const { rows } = await query(
-    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod]
+    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11) RETURNING *`,
+    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate]
   );
-  await logEvent(businessId, "order_created", `${product.name} x ${qty}`);
+  await logEvent(businessId, isQuote ? "quote_created" : "order_created", `${product.name} x ${qty}`);
   return toOrderJson(rows[0]);
+}
+
+// Turns a Quote into a real order - this is the moment stock actually gets
+// reserved and the plan's order limit actually gets checked, since a quote
+// itself was neither.
+async function convertQuoteToOrder(businessId, id) {
+  const { rows } = await query("SELECT * FROM orders WHERE id = $1 AND business_id = $2", [id, businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Order not found");
+  if (current.status !== "Quote") throw new OrderError("This order is not a quote");
+
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status != 'Quote'", [businessId]);
+  const limit = orderLimitFor(effectivePlan(businessRows[0]));
+  if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
+
+  const { rows: productRows } = await query(
+    "UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING *",
+    [current.qty, current.product_id]
+  );
+  if (!productRows[0]) throw new OrderError("Not enough stock to convert this quote");
+
+  const { rows: updated } = await query("UPDATE orders SET status='Pending payment' WHERE id=$1 RETURNING *", [id]);
+  await logEvent(businessId, "quote_converted", current.product_name);
+  return toOrderJson(updated[0]);
 }
 
 async function updateOrder(businessId, id, changes) {
@@ -1050,6 +1093,13 @@ async function updateOrder(businessId, id, changes) {
       id,
     ]);
     await logEvent(businessId, "digital_delivered", current.product_name);
+    return toOrderJson(updated[0]);
+  }
+  if (changes.refund) {
+    if (current.status === "Refunded") throw new OrderError("This order is already refunded");
+    if (changes.restock) await query("UPDATE products SET stock = stock + $1 WHERE id = $2", [current.qty, current.product_id]);
+    const { rows: updated } = await query("UPDATE orders SET status='Refunded' WHERE id=$1 RETURNING *", [id]);
+    await logEvent(businessId, "order_refunded", `${current.product_name}${changes.restock ? " (restocked)" : ""}`);
     return toOrderJson(updated[0]);
   }
   const status = changes.status ?? current.status;
@@ -1327,6 +1377,7 @@ module.exports = {
   createCustomer,
   deleteCustomer,
   createOrder,
+  convertQuoteToOrder,
   updateOrder,
   deleteOrder,
   resetData,

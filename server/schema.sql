@@ -183,6 +183,12 @@ create table if not exists orders (
 );
 create index if not exists orders_business_id_idx on orders(business_id);
 alter table orders add column if not exists delivery_method text not null default 'self';
+-- Credit sales: an optional date payment is expected by, surfaced as an
+-- overdue flag in the dashboard's "Follow up on payments" list. status
+-- itself has no enum constraint (always been a plain text column) - "Quote"
+-- and "Refunded" are new valid values handled entirely in application code,
+-- no migration needed for those.
+alter table orders add column if not exists due_date timestamptz;
 
 create table if not exists events (
   id text primary key,
