@@ -51,7 +51,7 @@ const apiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.originalUrl === "/api/payments/webhook" || req.originalUrl === "/api/health",
+  skip: (req) => { const p = canonicalApiPath(req); return p === "/api/payments/webhook" || p === "/api/health"; },
 });
 // Business/account creation is the highest-value target for spam signups.
 const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
@@ -81,6 +81,26 @@ app.use(
 // revalidation round trip per load.
 app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: true, maxAge: 0, setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
 
+// API versioning: /api/v1/* is an alias for /api/* - same routes, same
+// behavior. This exists so future external integrations (Slice Four/Five
+// payment/marketplace partners) have a stable versioned base to build
+// against from day one, instead of depending on an unprefixed path that
+// could change shape later with nothing to fall back to. The existing
+// frontend keeps calling unprefixed /api/* untouched - nothing about its
+// behavior changes. A real v2, if a genuinely breaking change is ever
+// needed, would get its own explicit route definitions rather than this
+// alias. Rewriting req.url (not req.originalUrl - Express keeps that as the
+// true incoming path regardless) means downstream code that compares
+// req.originalUrl against a specific path must go through
+// canonicalApiPath() below, or a versioned call silently bypasses it.
+app.use((req, res, next) => {
+  if (req.url === "/api/v1" || req.url.startsWith("/api/v1/")) req.url = "/api" + req.url.slice("/api/v1".length);
+  next();
+});
+function canonicalApiPath(req) {
+  return req.originalUrl.replace(/^\/api\/v1(\/|$)/, "/api$1");
+}
+
 app.use("/api", apiLimiter);
 
 // Audit trail for authenticated mutating actions - "who did what, when".
@@ -96,12 +116,12 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return;
     if (!req.user) return;
-    if (req.originalUrl === "/api/track") return;
+    if (canonicalApiPath(req) === "/api/track") return;
     db.recordAuditLog({
       userId: req.user.id,
       businessId: req.businessId || null,
       method: req.method,
-      path: req.originalUrl,
+      path: canonicalApiPath(req),
       statusCode: res.statusCode,
     }).catch((err) => console.error("Audit log write failed:", err.message));
   });
