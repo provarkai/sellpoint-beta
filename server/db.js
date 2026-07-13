@@ -1,5 +1,9 @@
 const { Pool, types } = require("pg");
-const { orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor, ADDON_AI_CREDITS } = require("./pricing");
+const {
+  orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor,
+  whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
+  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS,
+} = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
 
@@ -331,6 +335,15 @@ function normalizeDateInput(value) {
 }
 
 async function createExpense(businessId, data) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = expenseLimitFor(effectivePlan(businessRows[0]));
+  if (limit !== Infinity) {
+    const { rows: countRows } = await query(
+      "SELECT COUNT(*)::int AS n FROM expenses WHERE business_id = $1 AND created_at >= date_trunc('month', now())",
+      [businessId]
+    );
+    if (countRows[0].n >= limit) throw new OrderError("Expense logging limit reached for the current plan this month");
+  }
   const category = EXPENSE_CATEGORIES.includes(data.category) ? data.category : "Other";
   const description = requireString(data.description, "Description");
   const amount = requireNumber(data.amount, "Amount", { min: 0.01 });
@@ -371,8 +384,19 @@ async function deleteExpense(businessId, id) {
 // sorted oldest-first with a running balance - a simple cashbook view, not a
 // full double-entry ledger. Defaults to the last 30 days if no range given,
 // since an unbounded query could return years of orders for an old business.
+// Clips a requested (or default) "from" date to how far back the business's
+// plan is allowed to look (plHistoryDaysFor) - the requester can ask for
+// more, they just can't get more than their plan's history window.
+async function clipHistoryFrom(businessId, requestedFrom) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const days = plHistoryDaysFor(effectivePlan(businessRows[0]));
+  if (days === Infinity) return requestedFrom;
+  const earliestAllowed = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return !requestedFrom || requestedFrom < earliestAllowed ? earliestAllowed : requestedFrom;
+}
+
 async function getCashbook(businessId, { from, to } = {}) {
-  const rangeFrom = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rangeFrom = await clipHistoryFrom(businessId, from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const rangeTo = to || new Date().toISOString().slice(0, 10);
   const [orderRows, expenseRows] = await Promise.all([
     query(
@@ -422,7 +446,7 @@ async function getCashbook(businessId, { from, to } = {}) {
 // cost price today, so "net profit" here is revenue minus logged expenses,
 // not a true gross-margin P&L.
 async function getProfitAndLoss(businessId, { from, to } = {}) {
-  const rangeFrom = from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const rangeFrom = await clipHistoryFrom(businessId, from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const rangeTo = to || new Date().toISOString().slice(0, 10);
   const [revenueRows, expenseRows, categoryRows] = await Promise.all([
     query(
@@ -521,6 +545,9 @@ async function updateBusiness(businessId, fields) {
   const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const current = rows[0];
   if (!current) throw new OrderError("Business not found");
+  if (fields.loyaltyEnabled === true && !current.loyalty_enabled && !loyaltyAvailableFor(effectivePlan(current))) {
+    throw new OrderError("Loyalty & wallet is available on the Growth plan and above");
+  }
   const merged = {
     name: fields.businessName ?? current.name,
     phone: fields.businessPhone ?? current.phone,
@@ -832,7 +859,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
   const orderIds = [];
   let total = 0;
   for (const item of items) {
-    const order = await createOrder(business.id, { productId: item.productId, customerId: customer.id, qty: item.qty || 1, status: "Pending payment" });
+    const order = await createOrder(business.id, { productId: item.productId, customerId: customer.id, qty: item.qty || 1, status: "Pending payment", source: "storefront" });
     orderIds.push(order.id);
     total += Number(order.price) * order.qty;
   }
@@ -1006,7 +1033,7 @@ async function updatePricingOverrides(overrides) {
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
 async function recordAddonPurchase(businessId, type) {
-  const month = type === "ai_credits" ? currentMonth() : null;
+  const month = type === "ai_credits" || type === "whatsapp_credits" ? currentMonth() : null;
   await query("INSERT INTO addon_purchases (business_id, type, month) VALUES ($1, $2, $3)", [businessId, type, month]);
 }
 
@@ -1016,6 +1043,14 @@ async function getAddonAiBonus(businessId) {
     [businessId, currentMonth()]
   );
   return rows[0].n * ADDON_AI_CREDITS;
+}
+
+async function getAddonWhatsAppBonus(businessId) {
+  const { rows } = await query(
+    "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'whatsapp_credits' AND month = $2",
+    [businessId, currentMonth()]
+  );
+  return rows[0].n * ADDON_WHATSAPP_CREDITS;
 }
 
 async function getAddonSeatBonus(businessId) {
@@ -1098,6 +1133,23 @@ async function effectiveAiLimit(businessId) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const base = aiLimitFor(effectivePlan(businessRows[0]));
   return base === Infinity ? base : base + (await getAddonAiBonus(businessId));
+}
+
+// WhatsApp is metered the same way AI is - a monthly count against a plan
+// limit, toppable up via the whatsapp_credits add-on - since it's one of
+// only two features here with a real per-use cost (see pricing.js).
+async function getWhatsAppUsage(businessId) {
+  const { rows } = await query(
+    "SELECT COUNT(*)::int AS n FROM whatsapp_messages WHERE business_id = $1 AND direction = 'out' AND created_at >= date_trunc('month', now())",
+    [businessId]
+  );
+  return rows[0].n;
+}
+
+async function effectiveWhatsAppLimit(businessId) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const base = whatsappLimitFor(effectivePlan(businessRows[0]));
+  return base === Infinity ? base : base + (await getAddonWhatsAppBonus(businessId));
 }
 
 async function incrementAiUsage(businessId) {
@@ -1293,6 +1345,16 @@ function toBatchJson(b) {
 }
 
 async function createBatch(businessId, data) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = batchLimitFor(effectivePlan(businessRows[0]));
+  if (limit === 0) throw new OrderError("Batch tracking isn't available on your current plan");
+  if (limit !== Infinity) {
+    const { rows: countRows } = await query(
+      "SELECT COUNT(*)::int AS n FROM product_batches WHERE business_id = $1 AND created_at >= date_trunc('month', now())",
+      [businessId]
+    );
+    if (countRows[0].n >= limit) throw new OrderError("Batch logging limit reached for the current plan this month");
+  }
   const { rows: productRows } = await query("SELECT id FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
   if (!productRows[0]) throw new OrderError("Product not found");
   const quantity = requireNumber(data.quantity, "Quantity", { min: 0, integer: true });
@@ -1329,9 +1391,19 @@ async function deleteBatch(businessId, id) {
 // with no customer record on file is a normal POS case.
 async function posCheckout(businessId, { items, customerId }) {
   if (!Array.isArray(items) || !items.length) throw new OrderError("Cart is empty");
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = posLimitFor(effectivePlan(businessRows[0]));
+  if (limit === 0) throw new OrderError("POS mode isn't available on your current plan");
+  if (limit !== Infinity) {
+    const { rows: countRows } = await query(
+      "SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND source = 'pos' AND created_at >= date_trunc('month', now())",
+      [businessId]
+    );
+    if (countRows[0].n + items.length > limit) throw new OrderError("POS sale limit reached for the current plan this month");
+  }
   const orders = [];
   for (const item of items) {
-    const order = await createOrder(businessId, { productId: item.productId, customerId: customerId || null, qty: item.qty || 1, status: "Paid" });
+    const order = await createOrder(businessId, { productId: item.productId, customerId: customerId || null, qty: item.qty || 1, status: "Paid", source: "pos" });
     orders.push(order);
   }
   return orders;
@@ -1476,6 +1548,12 @@ function toSupplierJson(s) {
 }
 
 async function createSupplier(businessId, data) {
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const limit = supplierLimitFor(effectivePlan(businessRows[0]));
+  if (limit !== Infinity) {
+    const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM suppliers WHERE business_id = $1", [businessId]);
+    if (countRows[0].n >= limit) throw new OrderError("Supplier limit reached for the current plan");
+  }
   const name = requireString(data.name, "Supplier name");
   const { rows } = await query(
     `INSERT INTO suppliers (business_id, name, phone, email, address, notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -1502,6 +1580,15 @@ function toPurchaseOrderItemJson(i) {
 async function createPurchaseOrder(businessId, data) {
   const items = Array.isArray(data.items) ? data.items : [];
   if (!items.length) throw new OrderError("Add at least one item to the purchase order");
+  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+  const poLimit = poLimitFor(effectivePlan(businessRows[0]));
+  if (poLimit !== Infinity) {
+    const { rows: countRows } = await query(
+      "SELECT COUNT(*)::int AS n FROM purchase_orders WHERE business_id = $1 AND created_at >= date_trunc('month', now())",
+      [businessId]
+    );
+    if (countRows[0].n >= poLimit) throw new OrderError("Purchase order limit reached for the current plan this month");
+  }
   const supplierId = data.supplierId || null;
   const notes = String(data.notes || "").trim();
   const client = await pool.connect();
@@ -1720,10 +1807,11 @@ async function createOrder(businessId, data) {
     if (!logistics.enabled) throw new OrderError("SellersPoint Logistics isn't available yet - choose self delivery or a dispatch rider instead.");
     deliveryFee = computeLogisticsFee(sellingPrice * qty, logistics);
   }
+  const source = ["dashboard", "pos", "storefront"].includes(data.source) ? data.source : "dashboard";
   const { rows } = await query(
-    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date, delivery_fee)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11,$12) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate, deliveryFee]
+    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date, delivery_fee, source)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11,$12,$13) RETURNING *`,
+    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate, deliveryFee, source]
   );
   await logEvent(businessId, isQuote ? "quote_created" : "order_created", `${product.name} x ${qty}`);
   await awardLoyaltyPointsIfNeeded(businessId, rows[0]);
@@ -2060,7 +2148,13 @@ async function listWhatsAppMessages(businessId, orderId) {
 // Sends a payment reminder for a specific order via the platform WhatsApp
 // number and logs it - used by the dashboard's "Follow up on payments" list
 // as the real-send alternative to the existing wa.me deep-link flow.
+async function assertWhatsAppQuotaAvailable(businessId) {
+  const [used, limit] = await Promise.all([getWhatsAppUsage(businessId), effectiveWhatsAppLimit(businessId)]);
+  if (used >= limit) throw new OrderError("You've used all your WhatsApp sends for this month. Upgrade your plan or buy more WhatsApp credits to keep sending.");
+}
+
 async function sendPaymentReminder(businessId, orderId, whatsapp) {
+  await assertWhatsAppQuotaAvailable(businessId);
   const { rows } = await query(
     `SELECT o.*, c.phone AS customer_phone, c.name AS customer_name FROM orders o
      LEFT JOIN customers c ON c.id = o.customer_id
@@ -2097,6 +2191,8 @@ async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp, baseUrl
   try {
     const { rows: existing } = await query("SELECT 1 FROM whatsapp_messages WHERE order_id = $1 AND message_type = 'paid_confirmation'", [order.id]);
     if (existing[0]) return;
+    const [used, limit] = await Promise.all([getWhatsAppUsage(businessId), effectiveWhatsAppLimit(businessId)]);
+    if (used >= limit) return; // over quota - silently skip, same as any other WhatsApp hiccup here
     const { rows: custRows } = await query("SELECT phone, name FROM customers WHERE id = $1", [order.customerId]);
     const customerPhone = custRows[0]?.phone;
     if (!customerPhone) return;
@@ -2164,7 +2260,7 @@ async function sendAllReminders(businessId, whatsapp) {
       results.push({ orderId: row.id, sent: true });
     } catch (err) {
       results.push({ orderId: row.id, sent: false, error: err.message });
-      if (/rate limit|too many|429/i.test(err.message)) break;
+      if (/rate limit|too many|429|used all your WhatsApp sends/i.test(err.message)) break;
     }
   }
   return { total: rows.length, sent: results.filter((r) => r.sent).length, results };
@@ -2271,6 +2367,8 @@ module.exports = {
   getAiUsage,
   incrementAiUsage,
   effectiveAiLimit,
+  getWhatsAppUsage,
+  effectiveWhatsAppLimit,
   getReceiptUsage,
   incrementReceiptUsage,
   listBranches,

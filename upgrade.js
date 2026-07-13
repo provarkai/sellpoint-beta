@@ -108,7 +108,7 @@ async function chooseAndPay(plan) {
   }
 }
 
-const ADDON_LABELS = { ai_credits: "500 extra AI generations", staff: "an extra staff seat", branch: "an extra branch" };
+const ADDON_LABELS = { ai_credits: "500 extra AI generations", whatsapp_credits: "100 extra WhatsApp sends", staff: "an extra staff seat", branch: "an extra branch" };
 
 async function checkReturnFromPaystack() {
   const params = new URLSearchParams(location.search);

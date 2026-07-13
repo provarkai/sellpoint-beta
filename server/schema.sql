@@ -232,6 +232,10 @@ alter table orders add column if not exists delivery_method text not null defaul
 -- and "Refunded" are new valid values handled entirely in application code,
 -- no migration needed for those.
 alter table orders add column if not exists due_date timestamptz;
+-- Tracks which flow created an order ('dashboard', 'pos', 'storefront') so
+-- the Pro+ POS monthly limit can be enforced by counting real POS sales
+-- specifically, not every order regardless of channel.
+alter table orders add column if not exists source text not null default 'dashboard';
 
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a

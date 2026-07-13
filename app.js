@@ -557,7 +557,7 @@ async function loadTeam(){
     const rawLimit=roster.limit===null||roster.limit===undefined?Infinity:roster.limit;
     const limit=rawLimit===Infinity?"unlimited":rawLimit;
     $("teamCount").textContent=`${roster.staff.length}/${limit} staff`;
-    $("teamLimitNote").textContent=rawLimit===0?"Upgrade to Pro or above to add staff.":`You can invite up to ${limit} staff member(s).`;
+    $("teamLimitNote").innerHTML=rawLimit===0?`Your plan doesn't include staff seats. <a href="upgrade.html#addonCards">Buy a staff seat for ₦2,000</a> without upgrading your whole plan, or move to Pro for 3 included.`:`You can invite up to ${limit} staff member(s).`;
     $("inviteForm").style.display=rawLimit===0?"none":"grid";
     const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><span class="meta">Staff</span><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
     $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;

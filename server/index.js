@@ -1193,7 +1193,7 @@ app.delete(
 
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
-const ADDON_TYPES = ["ai_credits", "staff", "branch"];
+const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch"];
 
 app.post(
   "/api/addons/purchase",

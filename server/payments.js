@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { ADDON_PRICE } = require("./pricing");
+const { ADDON_PRICES } = require("./pricing");
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
@@ -41,6 +41,8 @@ async function initializeTransaction({ email, plan, billingCycle, amountNaira, r
 // link) so activation stays automatic; addonType travels in metadata
 // instead of plan/billingCycle.
 async function initializeAddonTransaction({ email, addonType, reference, callbackUrl, businessId }) {
+  const amount = ADDON_PRICES[addonType];
+  if (!amount) throw new Error("Unknown add-on type");
   const res = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
     method: "POST",
     headers: {
@@ -49,7 +51,7 @@ async function initializeAddonTransaction({ email, addonType, reference, callbac
     },
     body: JSON.stringify({
       email,
-      amount: Math.round(ADDON_PRICE * 100),
+      amount: Math.round(amount * 100),
       reference,
       callback_url: callbackUrl,
       metadata: { addonType, businessId },
@@ -57,7 +59,7 @@ async function initializeAddonTransaction({ email, addonType, reference, callbac
   });
   const body = await res.json();
   if (!res.ok || !body.status) throw new Error(body.message || "Paystack initialize failed");
-  return { authorizationUrl: body.data.authorization_url, amount: ADDON_PRICE };
+  return { authorizationUrl: body.data.authorization_url, amount };
 }
 
 // Paystack signs the raw request body with HMAC SHA512 using the secret key -
