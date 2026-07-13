@@ -568,6 +568,37 @@ app.delete(
   })
 );
 
+// --- Item 8 scaffold: barcode lookup, batch tracking, POS mode ---------------
+
+app.get(
+  "/api/products/barcode/:code",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.getProductByBarcode(req.businessId, req.params.code)))
+);
+app.get(
+  "/api/batches",
+  requireAuth,
+  handle(async (req, res) => res.json(await db.listBatches(req.businessId, req.query.productId)))
+);
+app.post(
+  "/api/batches",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createBatch(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/batches/:id",
+  requireAuth,
+  handle(async (req, res) => {
+    await db.deleteBatch(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+app.post(
+  "/api/pos/checkout",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.posCheckout(req.businessId, req.body || {})))
+);
+
 app.post(
   "/api/customers",
   requireAuth,

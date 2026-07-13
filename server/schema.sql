@@ -155,6 +155,35 @@ alter table products add column if not exists images jsonb not null default '[]'
 -- percentage everywhere it's used.
 alter table products add column if not exists discount_price numeric;
 
+-- Item 8 scaffold (barcode scanning, batch tracking, dedicated POS mode -
+-- see CLAUDE.md's Slice Two priority list, sequenced last as the highest
+-- lift). barcode is optional and manually entered for now (or typed by a
+-- USB barcode scanner, which types the code as keystrokes + Enter - no
+-- camera/JS scanning library needed for that common case); a real camera-
+-- based scan UI can layer on top of the same lookup endpoint later without
+-- another migration. Warehouse support reuses the existing `branches` table
+-- as the location entity rather than introducing a parallel concept.
+alter table products add column if not exists barcode text;
+create unique index if not exists products_barcode_idx on products(business_id, barcode) where barcode is not null and barcode != '';
+
+-- Batch/lot tracking - deliberately NOT wired into stock deduction yet
+-- (createOrder still decrements products.stock directly, a single number,
+-- not a specific batch). This is a record-keeping scaffold for expiry/cost
+-- tracking per batch; allocating sales against specific batches (FIFO/FEFO)
+-- is a bigger follow-up once this is actually used.
+create table if not exists product_batches (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  product_id text not null,
+  batch_number text not null default '',
+  quantity integer not null default 0,
+  expiry_date date,
+  cost_price numeric,
+  created_at timestamptz not null default now()
+);
+create index if not exists product_batches_product_id_idx on product_batches(product_id);
+alter table product_batches enable row level security;
+
 create table if not exists customers (
   id text primary key,
   business_id uuid not null references businesses(id) on delete cascade,

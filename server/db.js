@@ -114,6 +114,7 @@ function toProductJson(p) {
     image: p.image,
     images: p.images || [],
     description: p.description,
+    barcode: p.barcode || "",
   };
 }
 function toCustomerJson(c) {
@@ -1187,6 +1188,23 @@ function parseDiscountPrice(value, price) {
   return n;
 }
 
+// Empty string normalizes to null so the partial unique index (which
+// excludes null/empty) doesn't collide across every product that simply
+// hasn't been given a barcode yet.
+function normalizeBarcode(value) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed || null;
+}
+
+async function assertBarcodeAvailable(businessId, barcode, excludeProductId) {
+  if (!barcode) return;
+  const { rows } = await query(
+    "SELECT id FROM products WHERE business_id = $1 AND barcode = $2 AND id != COALESCE($3, '')",
+    [businessId, barcode, excludeProductId || null]
+  );
+  if (rows[0]) throw new OrderError("Another product already uses this barcode");
+}
+
 async function createProduct(businessId, data) {
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM products WHERE business_id = $1", [businessId]);
@@ -1197,10 +1215,12 @@ async function createProduct(businessId, data) {
   const stock = requireNumber(data.stock, "Stock", { min: 0, integer: true });
   const discountPrice = parseDiscountPrice(data.discountPrice, price);
   const images = normalizeImages(data.images);
+  const barcode = normalizeBarcode(data.barcode);
+  await assertBarcodeAvailable(businessId, barcode);
   const id = uid("p");
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
     [
       id,
       businessId,
@@ -1215,6 +1235,7 @@ async function createProduct(businessId, data) {
       images[0] || data.image || "",
       JSON.stringify(images),
       data.description || "",
+      barcode,
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -1231,9 +1252,11 @@ async function updateProduct(businessId, id, data) {
   const discountPrice = data.discountPrice !== undefined ? parseDiscountPrice(data.discountPrice, price) : current.discount_price;
   const images = data.images !== undefined ? normalizeImages(data.images) : current.images;
   const image = data.images !== undefined ? images[0] || "" : data.image !== undefined ? data.image : current.image;
+  const barcode = data.barcode !== undefined ? normalizeBarcode(data.barcode) : current.barcode;
+  if (data.barcode !== undefined) await assertBarcodeAvailable(businessId, barcode, id);
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11
-     WHERE id = $12 AND business_id = $13 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12
+     WHERE id = $13 AND business_id = $14 RETURNING *`,
     [
       name,
       price,
@@ -1246,11 +1269,72 @@ async function updateProduct(businessId, id, data) {
       image,
       JSON.stringify(images),
       data.description !== undefined ? data.description : current.description,
+      barcode,
       id,
       businessId,
     ]
   );
   return toProductJson(updated[0]);
+}
+
+async function getProductByBarcode(businessId, code) {
+  const barcode = normalizeBarcode(code);
+  if (!barcode) throw new OrderError("Enter or scan a barcode first");
+  const { rows } = await query("SELECT * FROM products WHERE business_id = $1 AND barcode = $2", [businessId, barcode]);
+  if (!rows[0]) throw new OrderError("No product found with that barcode");
+  return toProductJson(rows[0]);
+}
+
+// --- Batch/lot tracking (scaffold - see schema.sql comment; not yet wired
+// into stock deduction) ------------------------------------------------
+
+function toBatchJson(b) {
+  return { id: b.id, productId: b.product_id, batchNumber: b.batch_number, quantity: b.quantity, expiryDate: b.expiry_date, costPrice: b.cost_price == null ? null : Number(b.cost_price), createdAt: b.created_at };
+}
+
+async function createBatch(businessId, data) {
+  const { rows: productRows } = await query("SELECT id FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
+  if (!productRows[0]) throw new OrderError("Product not found");
+  const quantity = requireNumber(data.quantity, "Quantity", { min: 0, integer: true });
+  const costPrice = data.costPrice === undefined || data.costPrice === null || data.costPrice === "" ? null : requireNumber(data.costPrice, "Cost price", { min: 0 });
+  const expiryDate = data.expiryDate ? normalizeDateInput(data.expiryDate) : null;
+  const { rows } = await query(
+    `INSERT INTO product_batches (business_id, product_id, batch_number, quantity, expiry_date, cost_price)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [businessId, data.productId, String(data.batchNumber || "").trim(), quantity, expiryDate, costPrice]
+  );
+  return toBatchJson(rows[0]);
+}
+
+async function listBatches(businessId, productId) {
+  const conditions = ["business_id = $1"];
+  const params = [businessId];
+  if (productId) {
+    params.push(productId);
+    conditions.push(`product_id = $${params.length}`);
+  }
+  const { rows } = await query(`SELECT * FROM product_batches WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`, params);
+  return rows.map(toBatchJson);
+}
+
+async function deleteBatch(businessId, id) {
+  const { rows } = await query("DELETE FROM product_batches WHERE id = $1 AND business_id = $2 RETURNING id", [id, businessId]);
+  if (!rows[0]) throw new OrderError("Batch not found");
+}
+
+// --- Dedicated POS mode (scaffold) --------------------------------------
+// Reuses createOrder per cart line rather than a bespoke code path, so
+// stock decrement, plan order-limit, loyalty accrual, and delivery-fee
+// logic all stay in one place. customerId is optional - a walk-in sale
+// with no customer record on file is a normal POS case.
+async function posCheckout(businessId, { items, customerId }) {
+  if (!Array.isArray(items) || !items.length) throw new OrderError("Cart is empty");
+  const orders = [];
+  for (const item of items) {
+    const order = await createOrder(businessId, { productId: item.productId, customerId: customerId || null, qty: item.qty || 1, status: "Paid" });
+    orders.push(order);
+  }
+  return orders;
 }
 
 async function deleteProduct(businessId, id) {
@@ -1967,6 +2051,11 @@ module.exports = {
   deletePurchaseOrder,
   redeemLoyaltyPoints,
   adjustWallet,
+  getProductByBarcode,
+  createBatch,
+  listBatches,
+  deleteBatch,
+  posCheckout,
   getMembership,
   createBusiness,
   getBusiness,

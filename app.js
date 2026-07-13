@@ -16,8 +16,9 @@ async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
+const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -54,9 +55,61 @@ let pendingImages=[];
 function renderImagePreview(){if($("pImagePreview"))$("pImagePreview").innerHTML=pendingImages.map((src,i)=>`<div class="product-photo-thumb"><img src="${src}" alt=""><button type="button" onclick="removePendingImage(${i})">&times;</button></div>`).join("")}
 function removePendingImage(i){pendingImages.splice(i,1);renderImagePreview()}
 if($("pImage"))$("pImage").onchange=async e=>{const files=[...e.target.files].slice(0,Math.max(0,5-pendingImages.length));for(const f of files){pendingImages.push(await readFileAsDataUrl(f))}renderImagePreview();e.target.value=""};
-function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;$("pCat").value=p.category||"";$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
+function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
 function cancelEditProduct(){editingProductId=null;pendingImages=[];renderImagePreview();$("productForm").reset();updateProductFields();$("pFormTitle").textContent="Add product / service";$("pSubmitBtn").textContent="Save Item";$("pCancelEdit").style.display="none"}
 if($("pCancelEdit"))$("pCancelEdit").onclick=cancelEditProduct;
+async function loadBatches(){
+  if(!$("bList"))return;
+  opts($("bProduct"),state.products,p=>p.name,"Add a product first");
+  try{
+    const batches=await api("GET","/api/batches");
+    $("bCount").textContent=`(${batches.length})`;
+    $("bList").innerHTML=batches.map(b=>{const p=product(b.productId);return `<div class="item"><div class="item-top"><strong>${clean(p?.name||"Deleted product")}</strong><span>${b.quantity} units</span></div><div class="meta">${clean(b.batchNumber||"No batch number")}${b.expiryDate?` - Expires ${date(b.expiryDate)}`:""}${b.costPrice!=null?` - Cost ${money(b.costPrice)}`:""}</div><div class="item-actions"><button onclick="delBatch('${b.id}')">Delete</button></div></div>`}).join("")||`<div class="item"><span class="meta">No batches logged yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function delBatch(id){try{await api("DELETE",`/api/batches/${id}`);loadBatches();toast("Batch deleted")}catch(err){toast(err.message)}}
+
+let posCart=[];
+function enterPos(){
+  if(!$("posCartList"))return;
+  $("posCustomer").innerHTML=`<option value="">Walk-in customer</option>`+state.customers.map(c=>`<option value="${c.id}">${clean(c.name)}</option>`).join("");
+  renderPosCart();
+  $("posBarcodeInput").value="";
+  $("posBarcodeInput").focus();
+}
+function renderPosCart(){
+  $("posCartCount").textContent=`(${posCart.reduce((s,l)=>s+l.qty,0)} items)`;
+  $("posCartList").innerHTML=posCart.map((l,i)=>`<div class="item"><div class="item-top"><strong>${clean(l.name)}</strong><span>${money(l.price*l.qty)}</span></div><div class="meta">${money(l.price)} each</div><div class="item-actions"><button onclick="posAdjustQty(${i},-1)">-</button><span>${l.qty}</span><button onclick="posAdjustQty(${i},1)">+</button><button onclick="posRemoveLine(${i})">Remove</button></div></div>`).join("")||`<div class="item"><span class="meta">Cart is empty - scan or type a barcode above</span></div>`;
+  $("posCartTotal").textContent=money(posCart.reduce((s,l)=>s+l.price*l.qty,0));
+}
+function posAdjustQty(i,delta){posCart[i].qty+=delta;if(posCart[i].qty<=0)posCart.splice(i,1);renderPosCart()}
+function posRemoveLine(i){posCart.splice(i,1);renderPosCart()}
+function posAddProduct(p){const existing=posCart.find(l=>l.productId===p.id);if(existing)existing.qty+=1;else posCart.push({productId:p.id,name:p.name,price:p.discountPrice||p.price,qty:1});renderPosCart()}
+if($("posScanForm"))$("posScanForm").onsubmit=async e=>{
+  e.preventDefault();
+  const code=$("posBarcodeInput").value.trim();
+  $("posBarcodeInput").value="";
+  if(!code)return;
+  try{
+    const p=await api("GET",`/api/products/barcode/${encodeURIComponent(code)}`);
+    posAddProduct(p);
+    toast(`Added ${p.name}`);
+  }catch(err){toast(err.message)}
+  $("posBarcodeInput").focus();
+};
+if($("posClearCart"))$("posClearCart").onclick=()=>{posCart=[];renderPosCart()};
+if($("posCompleteSale"))$("posCompleteSale").onclick=async()=>{
+  if(!posCart.length)return toast("Cart is empty");
+  try{
+    const created=await api("POST","/api/pos/checkout",{items:posCart.map(l=>({productId:l.productId,qty:l.qty})),customerId:$("posCustomer").value||undefined});
+    created.forEach(o=>{state.orders.unshift(o);const p=product(o.productId);if(p)p.stock-=o.qty});
+    posCart=[];
+    renderPosCart();
+    render();
+    toast(`Sale completed - ${created.length} item(s)`);
+  }catch(err){toast(err.message)}
+};
+if($("batchForm"))$("batchForm").onsubmit=async e=>{e.preventDefault();try{if(!$("bProduct").value)return toast("Add a product first");await api("POST","/api/batches",{productId:$("bProduct").value,batchNumber:$("bNumber").value.trim(),quantity:+$("bQty").value,expiryDate:$("bExpiry").value||undefined,costPrice:$("bCost").value?+$("bCost").value:undefined});e.target.reset();loadBatches();toast("Batch logged")}catch(err){toast(err.message)}};
 if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   const name=$("pName").value.trim();
   if(!name)return toast("Enter a product name first");
@@ -68,7 +121,7 @@ if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   }catch(err){toast(err.message)}
   finally{btn.disabled=false;btn.textContent="Write with AI"}
 };
-$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,category:$("pCat").value.trim(),type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages};
+$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages};
   if(editingProductId){const updated=await api("PUT",`/api/products/${editingProductId}`,payload);const idx=state.products.findIndex(x=>x.id===editingProductId);if(idx>-1)state.products[idx]=updated;cancelEditProduct();render();toast("Item updated")}
   else{const created=await api("POST","/api/products",payload);state.products.unshift(created);e.target.reset();pendingImages=[];renderImagePreview();updateProductFields();render();toast("Item saved")}
 }catch(err){toast(err.message)}};
@@ -180,12 +233,15 @@ async function delProduct(id){await api("DELETE",`/api/products/${id}`);state.pr
 async function delCustomer(id){await api("DELETE",`/api/customers/${id}`);state.customers=state.customers.filter(x=>x.id!==id);render()}
 async function delOrder(id){await api("DELETE",`/api/orders/${id}`);state.orders=state.orders.filter(x=>x.id!==id);render()}
 function caption(id){show("ai");$("aiTool").value="caption";$("aiProduct").value=id;generateAI()}
-async function refreshAiUsage(){try{const u=await api("GET","/api/ai/usage");$("aiUsage").textContent=`${u.used}/${u.limit===null||u.limit===Infinity?"unlimited":u.limit} AI generations used this month`}catch{}}
+function updateAiUsageDisplay(used,limit){const unlimited=limit===null||limit===Infinity;$("aiUsage").textContent=`${used}/${unlimited?"unlimited":limit} AI generations used this month`;if($("aiUpgradeCta"))$("aiUpgradeCta").style.display=!unlimited&&used>=limit?"flex":"none"}
+async function refreshAiUsage(){try{const u=await api("GET","/api/ai/usage");updateAiUsageDisplay(u.used,u.limit)}catch{}}
 function addChatBubble(text,isUser){const div=document.createElement("div");div.className="landing-ai-bubble "+(isUser?"landing-ai-bubble-user":"landing-ai-bubble-ai");div.textContent=text;$("aiChatLog").appendChild(div);$("aiChatLog").scrollTop=$("aiChatLog").scrollHeight}
-async function askAi(question){if(!question)return;addChatBubble(question,true);try{const result=await api("POST","/api/ai/generate",{tool:"ask",question});addChatBubble(result.text,false);$("aiUsage").textContent=`${result.used}/${result.limit===null||result.limit===Infinity?"unlimited":result.limit} AI generations used this month`}catch(err){addChatBubble(err.message,false)}}
+async function askAi(question){if(!question)return;addChatBubble(question,true);try{const result=await api("POST","/api/ai/generate",{tool:"ask",question});addChatBubble(result.text,false);updateAiUsageDisplay(result.used,result.limit)}catch(err){addChatBubble(err.message,false);refreshAiUsage()}}
 if($("aiAskForm"))$("aiAskForm").onsubmit=e=>{e.preventDefault();const q=$("aiQuestion").value.trim();if(!q)return;$("aiQuestion").value="";askAi(q)};
 if($("aiSuggestions"))$("aiSuggestions").querySelectorAll("button[data-q]").forEach(b=>b.onclick=()=>askAi(b.dataset.q));
-async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;$("aiUsage").textContent=`${result.used}/${result.limit===null||result.limit===Infinity?"unlimited":result.limit} AI generations used this month`;toast("Message generated")}catch(err){toast(err.message)}}
+async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;updateAiUsageDisplay(result.used,result.limit);toast("Message generated")}catch(err){toast(err.message);refreshAiUsage()}}
+if($("aiUpgradePlanBtn"))$("aiUpgradePlanBtn").onclick=()=>open("upgrade.html","_blank","noopener");
+if($("aiBuyCreditsBtn"))$("aiBuyCreditsBtn").onclick=()=>open("upgrade.html#addonCards","_blank","noopener");
 $("invSelect").onchange=renderInvoice;$("waInvoice").onclick=()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];wa(invoiceText(),customer(o?.customerId)?.phone||"")};$("genAI").onclick=generateAI;$("copyAI").onclick=()=>copy($("aiOut").value);$("upgrade").onclick=()=>open("upgrade.html","_blank","noopener");$("export").onclick=()=>{downloadCsv(["Name","Price","Stock","Category","Type"],state.products.map(p=>[p.name,p.price,p.stock,p.category||"",p.type||""]),"products.csv");downloadCsv(["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.csv");downloadCsv(["Customer","Product","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",product(o.productId)?.name||o.productName,o.qty,o.status,total(o),o.createdAt]),"orders.csv")};$("demo").onclick=async()=>{applyState(await api("POST","/api/demo"));render();toast("Demo loaded")};
 
 // Renders a narrow, receipt-style portrait layout for export/sharing (not
@@ -330,7 +386,7 @@ async function renderAuditLogSection(){
   auditLogLoaded=true;
   try{
     const entries=await api("GET","/api/audit-log");
-    $("auditLogList").innerHTML=entries.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.method)} ${clean(e.path)}</strong><span>${e.statusCode}</span></div><div class="meta">${clean(e.email||"Unknown user")} - ${date(e.createdAt)}</div></div>`).join("")||`<div class="item"><span class="meta">No activity yet</span></div>`;
+    $("auditLogList").innerHTML=entries.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.method)} ${clean(e.path)}</strong><span>${e.statusCode}</span></div><div class="meta">${clean(e.email||"Unknown user")} - ${dateTime(e.createdAt)}</div></div>`).join("")||`<div class="item"><span class="meta">No activity yet</span></div>`;
   }catch(err){$("auditLogList").innerHTML=`<div class="item"><span class="meta">Could not load activity log</span></div>`}
 }
 function renderCouponsSection(){
