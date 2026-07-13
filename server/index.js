@@ -351,7 +351,7 @@ app.get(
   })
 );
 
-// --- Public storefront (Growth+) --------------------------------------------
+// --- Public storefront (all plans, including free Starter) -----------------
 
 app.put(
   "/api/business/storefront",

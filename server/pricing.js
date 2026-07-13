@@ -19,10 +19,15 @@ const ADDON_AI_CREDITS = 500;
 // location (0 = single location only).
 // reportsTier is "none"/"basic"/"standard"/"advanced" - see db.js#getReports
 // for what each level actually includes.
-// storefront: Growth and above get a public catalog page (/store/<slug>) -
-// see server/index.js's /api/store/:slug and db.js#getStorefront.
+// storefront: every tier gets a public catalog page (/store/<slug>) - see
+// server/index.js's /api/store/:slug and db.js#getStorefront. Opened up to
+// Starter too (previously Growth+ only) since a public storefront is what
+// lets a free-tier seller actually generate revenue and convert to a paid
+// plan, not something worth withholding as the paywall itself; the
+// productLimit each tier already carries is what naturally differentiates
+// how much of a catalog a free storefront can show.
 const TIERS = {
-  starter: { name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0, reportsTier: "none", receiptLimit: 50, storefront: false, tagline: "Free - 30 orders/month, 5 products, basic invoices and AI samples" },
+  starter: { name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0, reportsTier: "none", receiptLimit: 50, storefront: true, tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, and a public storefront" },
   growth: { name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 50, branchLimit: 0, reportsTier: "basic", receiptLimit: Infinity, storefront: true, tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, unlimited free receipts" },
   pro: { name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 3, aiLimit: 500, branchLimit: 1, reportsTier: "standard", receiptLimit: Infinity, storefront: true, tagline: "Everything in Growth plus 3 staff, a second branch, more AI generations, and sales reports" },
   business: { name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 20, aiLimit: 5000, branchLimit: 20, reportsTier: "advanced", receiptLimit: Infinity, storefront: true, tagline: "Everything in Pro plus up to 20 staff, 20 branches, and advanced reports" },

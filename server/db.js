@@ -633,7 +633,7 @@ async function downgradeToStarter(businessId) {
   return business;
 }
 
-// --- Public storefront (Growth plan and above) ------------------------------
+// --- Public storefront (all plans, including free Starter) -----------------
 
 // Separate from updateBusiness (which deliberately only ever touches profile
 // fields) since this needs its own validation: slug uniqueness, and a
