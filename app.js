@@ -224,7 +224,17 @@ async function paymentBlockFor(id,status){
 async function orderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello, your order for ${p?.name||o.productName} x ${o.qty} is ${o.status}. Total: ${money(total(o))}.${paymentBlock}\n\nThank you.`}
 async function paymentReminderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId),c=customer(o.customerId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello ${c?.name||"there"}, this is a friendly reminder about your order for ${p?.name||o.productName} x ${o.qty} (${money(total(o))}).${paymentBlock}\n\nPlease complete payment so we can process it. Thank you!`}
 async function sendOrderWhatsApp(id,phone){wa(await orderMsg(id),phone)}
-async function sendReminderWhatsApp(id,phone){wa(await paymentReminderMsg(id),phone)}
+async function sendReminderWhatsApp(id,phone){
+  try{
+    await api("POST",`/api/orders/${id}/send-reminder-whatsapp`,{});
+    toast("Reminder sent via WhatsApp");
+  }catch(err){
+    // Falls back to the manual wa.me compose link whenever direct sending
+    // isn't configured yet (or the send itself fails) - the seller can
+    // still send it themselves with one tap, same as before this existed.
+    wa(await paymentReminderMsg(id),phone);
+  }
+}
 function wa(msg,phone=""){open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank","noopener")}function copy(t){navigator.clipboard.writeText(t);toast("Copied")}
 function copyProductLink(id){copy(`${location.origin}/store/${state.slug||""}?product=${id}`)}
 function openInvoice(id){show("invoice");$("invSelect").value=id;renderInvoice()}

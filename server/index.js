@@ -10,6 +10,7 @@ const { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin } = re
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
+const whatsapp = require("./whatsapp");
 
 // Optional - error monitoring. Falls back to console.error-only (already
 // happening in handle() below) when SENTRY_DSN isn't set, same
@@ -52,7 +53,7 @@ const apiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => { const p = canonicalApiPath(req); return p === "/api/payments/webhook" || p === "/api/health"; },
+  skip: (req) => { const p = canonicalApiPath(req); return p === "/api/payments/webhook" || p === "/api/webhooks/whatsapp" || p === "/api/health"; },
 });
 // Business/account creation is the highest-value target for spam signups.
 const createBusinessLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many accounts created from this device - try again later." } });
@@ -478,6 +479,20 @@ app.post(
       plan: info.plan,
     });
     res.json({ authorizationUrl: initialized.authorizationUrl });
+  })
+);
+
+// Real-send alternative to the existing wa.me deep-link reminder flow (Slice
+// Five: WhatsApp automation) - sends via the platform's shared WhatsApp
+// number instead of opening a manual compose link. The client falls back to
+// the wa.me link when this isn't configured yet, so nothing breaks before
+// WASENDER_API_KEY is set.
+app.post(
+  "/api/orders/:id/send-reminder-whatsapp",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
+    res.json(await db.sendPaymentReminder(req.businessId, req.params.id, whatsapp));
   })
 );
 
@@ -1217,6 +1232,32 @@ app.post(
     }
     const event = req.body || {};
     if (event.event === "charge.success") await finalizeIfSuccessful(event.data);
+    res.status(200).json({ received: true });
+  })
+);
+
+// Public, no auth - WasenderAPI verifies itself via X-Webhook-Signature
+// (checked against WASENDER_WEBHOOK_SECRET) rather than a session/API key,
+// same reasoning as the Paystack webhook above: this is a server-to-server
+// call with no user attached. Currently just updates a logged message's
+// delivery status and logs inbound replies - no auto-reply/automation logic
+// yet, this is the receiving half of the send/receive foundation.
+app.post(
+  "/api/webhooks/whatsapp",
+  handle(async (req, res) => {
+    if (!whatsapp.hasWebhookSecret() || !whatsapp.verifyWebhookSignature(req.headers["x-webhook-signature"])) {
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+    const event = req.body || {};
+    if (event.event === "message-status-update" || event.event === "messages.update") {
+      const msgId = event.data?.msgId ?? event.data?.key?.id;
+      const status = event.data?.status;
+      if (msgId && status) await db.updateWhatsAppMessageStatusByWasenderId(String(msgId), status);
+    } else if (event.event === "messages.received" || event.event === "messages.upsert") {
+      const phone = (event.data?.key?.remoteJid || "").split("@")[0];
+      const body = event.data?.message?.conversation || event.data?.message?.extendedTextMessage?.text || "";
+      if (phone) await db.recordWhatsAppMessage(null, { direction: "in", phone, body, status: "received" });
+    }
     res.status(200).json({ received: true });
   })
 );

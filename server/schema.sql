@@ -537,6 +537,29 @@ create index if not exists audit_log_business_id_idx on audit_log(business_id);
 create index if not exists audit_log_user_id_idx on audit_log(user_id);
 create index if not exists audit_log_created_at_idx on audit_log(created_at);
 
+-- WhatsApp automation (Slice Five item 2). Platform-level send/receive log -
+-- one shared WhatsApp Business number (via WasenderAPI, connected outside
+-- this codebase) sends on behalf of any business's customer-facing
+-- messages, not a per-tenant "connect your own WhatsApp" session. order_id
+-- has no FK (orders.id is text, not referenced elsewhere by uuid FKs) - a
+-- soft link is enough for a message log. business_id is nullable since an
+-- inbound message (a customer replying) may arrive before it can be matched
+-- to a specific business/order.
+create table if not exists whatsapp_messages (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references businesses(id) on delete set null,
+  order_id text,
+  direction text not null,
+  phone text not null,
+  body text not null default '',
+  status text not null default 'sent',
+  wasender_message_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists whatsapp_messages_business_id_idx on whatsapp_messages(business_id);
+create index if not exists whatsapp_messages_wasender_id_idx on whatsapp_messages(wasender_message_id);
+alter table whatsapp_messages enable row level security;
+
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the
 -- `postgres` role (see server/db.js), which bypasses RLS entirely - so this

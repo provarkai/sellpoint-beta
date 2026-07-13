@@ -2026,9 +2026,67 @@ async function listAllPayments() {
   return rows.map(toPaymentJson);
 }
 
+// --- WhatsApp automation (Slice Five) ---------------------------------------
+
+function toWhatsAppMessageJson(m) {
+  return { id: m.id, orderId: m.order_id, direction: m.direction, phone: m.phone, body: m.body, status: m.status, createdAt: m.created_at };
+}
+
+async function recordWhatsAppMessage(businessId, { orderId, direction, phone, body, status, wasenderMessageId }) {
+  const { rows } = await query(
+    `INSERT INTO whatsapp_messages (business_id, order_id, direction, phone, body, status, wasender_message_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [businessId || null, orderId || null, direction, phone, body || "", status || "sent", wasenderMessageId || null]
+  );
+  return toWhatsAppMessageJson(rows[0]);
+}
+
+async function updateWhatsAppMessageStatusByWasenderId(wasenderMessageId, status) {
+  if (!wasenderMessageId) return;
+  await query("UPDATE whatsapp_messages SET status = $1 WHERE wasender_message_id = $2", [status, wasenderMessageId]);
+}
+
+async function listWhatsAppMessages(businessId, orderId) {
+  const conditions = ["business_id = $1"];
+  const params = [businessId];
+  if (orderId) {
+    params.push(orderId);
+    conditions.push(`order_id = $${params.length}`);
+  }
+  const { rows } = await query(`SELECT * FROM whatsapp_messages WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`, params);
+  return rows.map(toWhatsAppMessageJson);
+}
+
+// Sends a payment reminder for a specific order via the platform WhatsApp
+// number and logs it - used by the dashboard's "Follow up on payments" list
+// as the real-send alternative to the existing wa.me deep-link flow.
+async function sendPaymentReminder(businessId, orderId, whatsapp) {
+  const { rows } = await query(
+    `SELECT o.*, c.phone AS customer_phone, c.name AS customer_name FROM orders o
+     LEFT JOIN customers c ON c.id = o.customer_id
+     WHERE o.id = $1 AND o.business_id = $2`,
+    [orderId, businessId]
+  );
+  const order = rows[0];
+  if (!order) throw new OrderError("Order not found");
+  if (!order.customer_phone) throw new OrderError("This customer has no phone number on file");
+  const { rows: businessRows } = await query("SELECT name, currency FROM businesses WHERE id = $1", [businessId]);
+  const business = businessRows[0];
+  const currency = business?.currency || "NGN";
+  const total = Number(order.price) * order.qty;
+  const text = `Hello ${order.customer_name || "there"}, this is a friendly reminder from ${business?.name || "us"} about your pending order for ${order.product_name} x ${order.qty} (${currency} ${total.toLocaleString()}). Please complete payment so we can process it. Thank you!`;
+  const result = await whatsapp.sendMessage(order.customer_phone, text);
+  await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId });
+  return { sent: true, phone: order.customer_phone };
+}
+
 module.exports = {
   OrderError,
   healthCheck,
+  recordWhatsAppMessage,
+  updateWhatsAppMessageStatusByWasenderId,
+  listWhatsAppMessages,
+  sendPaymentReminder,
   EXPENSE_CATEGORIES,
   createExpense,
   listExpenses,
