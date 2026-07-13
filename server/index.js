@@ -845,11 +845,33 @@ app.post(
       owedByCustomer[name] = (owedByCustomer[name] || 0) + amt;
     });
     const lowStock = state.products.filter((p) => p.stock < 5);
+    // Broader business context beyond orders/products/customers, gathered
+    // only for the "ask"/"briefing" tools (not caption/reply/reminder/
+    // description) so the other, more frequent tools don't pay for queries
+    // they never use. Extends the AI Assistant beyond Slice Two's original
+    // order/stock-only scope into expenses/P&L, CRM segments, and
+    // suppliers/purchase orders now that those exist.
+    let profitLoss = null, segments = [], purchaseOrders = [], overdueCredit = [];
+    if (tool === "ask" || tool === "briefing") {
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+      [profitLoss, segments, purchaseOrders] = await Promise.all([
+        db.getProfitAndLoss(req.businessId, { from: monthStart }),
+        db.listCustomersWithSegments(req.businessId),
+        db.listPurchaseOrders(req.businessId),
+      ]);
+      overdueCredit = state.orders.filter((o) => o.dueDate && new Date(o.dueDate) < new Date() && o.status !== "Paid" && o.status !== "Delivered" && o.status !== "Refunded");
+    }
+    const vipCustomers = segments.filter((c) => c.segment === "VIP");
+    const atRiskCustomers = segments.filter((c) => c.segment === "At Risk");
+    const openPurchaseOrders = purchaseOrders.filter((po) => po.status === "Draft" || po.status === "Ordered");
     function askFallback(q) {
       const lower = q.toLowerCase();
       if (/owe|pending|unpaid/.test(lower)) {
         const entries = Object.entries(owedByCustomer);
         return entries.length ? "Customers who owe you money: " + entries.map(([n, a]) => `${n} (${money(a)})`).join(", ") + "." : "No one currently owes you money - all orders are paid up.";
+      }
+      if (/overdue|credit sale|due date|late payment/.test(lower)) {
+        return overdueCredit.length ? "Overdue credit sales: " + overdueCredit.map((o) => `${state.customers.find((c) => c.id === o.customerId)?.name || "a customer"} (${money((state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty)}, due ${new Date(o.dueDate).toISOString().slice(0, 10)})`).join(", ") + "." : "No overdue credit sales right now.";
       }
       if (/restock|low stock|running out/.test(lower)) {
         return lowStock.length ? "Restock soon: " + lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") + "." : "Nothing is low on stock right now.";
@@ -857,10 +879,22 @@ app.post(
       if (/best.?sell|top product|sold best|popular/.test(lower)) {
         return bestSeller ? `Your best-selling item is ${bestSeller}.` : "Not enough sales yet to tell what's selling best.";
       }
+      if (/vip|top customer|best customer|loyal customer/.test(lower)) {
+        return vipCustomers.length ? "Your VIP customers: " + vipCustomers.map((c) => `${c.name} (${money(c.totalSpend)} spent)`).join(", ") + "." : "No VIP customers identified yet - that needs a bit more sales history.";
+      }
+      if (/at risk|inactive|haven't bought|dormant|lapsed|win.?back/.test(lower)) {
+        return atRiskCustomers.length ? "Customers who've gone quiet: " + atRiskCustomers.map((c) => c.name).join(", ") + " - worth a check-in message." : "No customers currently flagged as at-risk.";
+      }
+      if (/purchase order|reorder|supplier|incoming stock/.test(lower)) {
+        return openPurchaseOrders.length ? "Open purchase orders: " + openPurchaseOrders.map((po) => `${po.supplierName} (${po.status}, ${money(po.totalCost)})`).join(", ") + "." : "No open purchase orders right now.";
+      }
+      if (/profit|expense|spend|cost/.test(lower)) {
+        return profitLoss ? `This month: ${money(profitLoss.revenue)} revenue, ${money(profitLoss.expensesTotal)} in expenses, ${money(profitLoss.netProfit)} net profit.` : "Log some expenses to see a profit breakdown here.";
+      }
       if (/summar|how.*(doing|business)|today|revenue/.test(lower)) {
         return `You have ${state.orders.length} orders on record and ${money(revenue)} in paid revenue so far.`;
       }
-      return `I can help with questions about payments, restocking, and top sellers. Right now: ${state.orders.length} orders, ${money(revenue)} paid revenue, best seller ${bestSeller || "none yet"}, ${pending.length} orders pending payment.`;
+      return `I can help with questions about payments, restocking, top sellers, VIP/at-risk customers, purchase orders, and profit. Right now: ${state.orders.length} orders, ${money(revenue)} paid revenue, best seller ${bestSeller || "none yet"}, ${pending.length} orders pending payment.`;
     }
     // "insight" - a single trend-based observation for the dashboard,
     // comparing each product's units sold in the last 7 days against the
@@ -888,12 +922,34 @@ app.post(
       : bestSeller
       ? `${bestSeller} is your best seller so far. Keep it well stocked.`
       : "Add a few orders to start seeing trend insights here.";
+    // "briefing" - a multi-point daily briefing (Slice Three item 2: "daily
+    // briefings, sales trends, profit recommendations, risk alerts"),
+    // distinct from "insight"'s single sentence. Rendered client-side as a
+    // bullet list by splitting on newlines - both the fallback and the AI
+    // prompt use "- " line prefixes so the two are visually consistent
+    // regardless of which one actually produced the text.
+    function briefingFallback() {
+      const lines = [];
+      lines.push(trending ? `${trending.name} is selling ${trending.growthPct}% faster than last week.` : bestSeller ? `${bestSeller} remains your best seller.` : "Not enough sales yet for a trend read.");
+      lines.push(profitLoss ? `This month so far: ${money(profitLoss.revenue)} revenue, ${money(profitLoss.expensesTotal)} expenses, ${money(profitLoss.netProfit)} net profit.` : "Log expenses to see a profit breakdown here.");
+      const risk = overdueCredit.length
+        ? `${overdueCredit.length} overdue credit sale${overdueCredit.length === 1 ? "" : "s"} need${overdueCredit.length === 1 ? "s" : ""} following up.`
+        : atRiskCustomers.length
+        ? `${atRiskCustomers.length} customer${atRiskCustomers.length === 1 ? "" : "s"} gone quiet - worth a check-in.`
+        : lowStock.length
+        ? `${lowStock.length} item${lowStock.length === 1 ? "" : "s"} running low on stock.`
+        : "No urgent risks flagged today.";
+      lines.push(risk);
+      lines.push(openPurchaseOrders.length ? `${openPurchaseOrders.length} purchase order${openPurchaseOrders.length === 1 ? "" : "s"} still open with suppliers.` : vipCustomers.length ? `Keep your ${vipCustomers.length} VIP customer${vipCustomers.length === 1 ? "" : "s"} happy - they're your biggest spenders.` : "Add a purchase order once you're low on stock to track restocking.");
+      return lines.map((l) => `- ${l}`).join("\n");
+    }
     // Fallback templates - used when OPENROUTER_API_KEY isn't configured, or
     // if the OpenRouter call itself fails, so the feature degrades instead
     // of breaking outright.
     const templates = {
       ask: askFallback(question || "summary"),
       insight: insightFallback,
+      briefing: briefingFallback(),
       caption: `New arrival: ${product?.name || "our product"}.\n\nClean quality, fair price, and ready for fast delivery. Price: ${money(product?.price || 0)}.\n\nSend a message now to order before stock runs out.`,
       reply: `Hello ${customer?.name || "there"}, thanks for reaching out.\n\n${(detail || "").trim() || "Yes, this item is available."}\n\nI can reserve it for you now and send your invoice immediately.`,
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
@@ -901,8 +957,9 @@ app.post(
       description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}${draftExtra ? `. ${draftExtra}` : ""}, with fast delivery and great value for the price.`,
     };
     const prompts = {
-      ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.business.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
+      ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.business.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}, this month's profit: ${profitLoss ? `${money(profitLoss.revenue)} revenue minus ${money(profitLoss.expensesTotal)} expenses = ${money(profitLoss.netProfit)} net` : "no expenses logged yet"}, VIP customers: ${vipCustomers.map((c) => c.name).join(", ") || "none yet"}, at-risk (gone quiet) customers: ${atRiskCustomers.map((c) => c.name).join(", ") || "none"}, open purchase orders: ${openPurchaseOrders.map((po) => `${po.supplierName} (${po.status})`).join(", ") || "none"}, overdue credit sales: ${overdueCredit.length || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
       insight: `You are an AI business assistant for a Nigerian small business called "${state.business.businessName}". Write ONE short, specific, actionable insight (1-2 sentences, plain text, no markdown) based ONLY on this real data - never invent numbers: ${trending ? `"${trending.name}" sold ${trending.growthPct}% more units in the last 7 days than the 7 days before that.` : "no clear week-over-week sales trend yet."} Low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}. Best seller overall: ${bestSeller || "none yet"}. Sound like a sharp business advisor, not a generic tip.`,
+      briefing: `You are an AI business assistant writing a short daily briefing for a Nigerian small business owner running "${state.business.businessName}". Using ONLY this real data - never invent numbers or names - write exactly 4 short bullet points (each starting with "- ", plain text, no markdown headers, one line each): (1) a sales trend observation: ${trending ? `"${trending.name}" sold ${trending.growthPct}% more units in the last 7 days than the 7 days before` : "no clear week-over-week trend yet"}; (2) this month's profit: ${profitLoss ? `${money(profitLoss.revenue)} revenue, ${money(profitLoss.expensesTotal)} expenses, ${money(profitLoss.netProfit)} net profit` : "no expenses logged yet"}; (3) the single most urgent risk right now, choosing from: ${overdueCredit.length} overdue credit sale(s), ${atRiskCustomers.length} at-risk/dormant customer(s), ${lowStock.length} low-stock item(s) - pick whichever is most urgent, or say nothing urgent if all are zero; (4) one concrete, specific recommended action for today. Sound like a sharp, direct business advisor, not generic startup advice.`,
       caption: `Write a short, upbeat WhatsApp-style product caption (3-4 sentences max, no hashtags) for a Nigerian small business selling "${product?.name || "a product"}" priced at ${money(product?.price || 0)}. Make it sound like a real seller, not an ad agency.`,
       reply: `Write a short, friendly WhatsApp reply from a Nigerian small business to a customer named ${customer?.name || "a customer"} who asked: "${(detail || "is this available?").trim()}". Confirm availability and offer to send an invoice. 2-4 sentences.`,
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,

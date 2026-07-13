@@ -620,17 +620,37 @@ if($("logout"))$("logout").onclick=()=>window.Auth.logout();
 
 if($("resetForm"))$("resetForm").onsubmit=async e=>{e.preventDefault();const password=$("resetPassword").value;if(!password)return toast("Enter your password to confirm");if(!confirm("This permanently deletes all your products, customers, and orders. Continue?"))return;try{const supabase=await window.supabaseReady;const{error}=await supabase.auth.signInWithPassword({email:userEmail,password});if(error)return toast("Incorrect password");applyState(await api("POST","/api/reset"));e.target.reset();render();toast("All data reset")}catch(err){toast(err.message)}};
 
-async function loadInsight(){
+function renderBriefingText(text){
+  const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+  $("aiInsightText").innerHTML=lines.length>1?`<ul class="ai-briefing-list">${lines.map(l=>`<li>${clean(l.replace(/^-\s*/,""))}</li>`).join("")}</ul>`:`<p>${clean(text)}</p>`;
+}
+// Daily briefing is cached client-side (once per calendar day, per business)
+// so normal dashboard visits don't quietly burn the AI monthly quota - a
+// seller checking their dashboard 10 times in a day would otherwise exhaust
+// an entire Starter-plan month's worth of credits just from page loads.
+// "Refresh" always regenerates on demand (an explicit, metered action).
+async function loadInsight(force){
   if(!$("aiInsightCard"))return;
+  const cacheKey=`sp_briefing_${state.id||"unknown"}`;
+  const today=new Date().toISOString().slice(0,10);
+  if(!force){
+    try{
+      const cached=JSON.parse(localStorage.getItem(cacheKey)||"null");
+      if(cached&&cached.date===today){renderBriefingText(cached.text);$("aiInsightCard").style.display="block";return}
+    }catch{}
+  }
   try{
-    const result=await api("POST","/api/ai/generate",{tool:"insight"});
-    $("aiInsightText").textContent=result.text;
+    const result=await api("POST","/api/ai/generate",{tool:"briefing"});
+    renderBriefingText(result.text);
     $("aiInsightCard").style.display="block";
+    localStorage.setItem(cacheKey,JSON.stringify({date:today,text:result.text}));
   }catch(err){
-    // Insight is a nice-to-have on the dashboard, not worth an error toast
-    // interrupting page load (e.g. AI limit already reached this month).
+    // Briefing is a nice-to-have on the dashboard, not worth an error toast
+    // interrupting page load (e.g. AI limit already reached this month) -
+    // but a manual Refresh click should tell the seller why nothing happened.
+    if(force)toast(err.message);
   }
 }
-if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=loadInsight;
+if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
 
 (async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));
