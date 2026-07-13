@@ -559,6 +559,12 @@ create table if not exists whatsapp_messages (
 create index if not exists whatsapp_messages_business_id_idx on whatsapp_messages(business_id);
 create index if not exists whatsapp_messages_wasender_id_idx on whatsapp_messages(wasender_message_id);
 alter table whatsapp_messages enable row level security;
+-- Distinguishes automated message kinds ('reminder', 'paid_confirmation',
+-- 'other') so a specific automation (e.g. the paid-confirmation below) can
+-- check "have I already sent this kind of message for this order?" without
+-- fragile body-text matching, and stay idempotent across repeated status
+-- changes (Paid -> Packed -> Paid shouldn't re-send a confirmation).
+alter table whatsapp_messages add column if not exists message_type text not null default 'other';
 
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the

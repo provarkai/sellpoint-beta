@@ -2029,14 +2029,14 @@ async function listAllPayments() {
 // --- WhatsApp automation (Slice Five) ---------------------------------------
 
 function toWhatsAppMessageJson(m) {
-  return { id: m.id, orderId: m.order_id, direction: m.direction, phone: m.phone, body: m.body, status: m.status, createdAt: m.created_at };
+  return { id: m.id, orderId: m.order_id, direction: m.direction, phone: m.phone, body: m.body, status: m.status, messageType: m.message_type, createdAt: m.created_at };
 }
 
-async function recordWhatsAppMessage(businessId, { orderId, direction, phone, body, status, wasenderMessageId }) {
+async function recordWhatsAppMessage(businessId, { orderId, direction, phone, body, status, wasenderMessageId, messageType }) {
   const { rows } = await query(
-    `INSERT INTO whatsapp_messages (business_id, order_id, direction, phone, body, status, wasender_message_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [businessId || null, orderId || null, direction, phone, body || "", status || "sent", wasenderMessageId || null]
+    `INSERT INTO whatsapp_messages (business_id, order_id, direction, phone, body, status, wasender_message_id, message_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [businessId || null, orderId || null, direction, phone, body || "", status || "sent", wasenderMessageId || null, messageType || "other"]
   );
   return toWhatsAppMessageJson(rows[0]);
 }
@@ -2076,8 +2076,62 @@ async function sendPaymentReminder(businessId, orderId, whatsapp) {
   const total = Number(order.price) * order.qty;
   const text = `Hello ${order.customer_name || "there"}, this is a friendly reminder from ${business?.name || "us"} about your pending order for ${order.product_name} x ${order.qty} (${currency} ${total.toLocaleString()}). Please complete payment so we can process it. Thank you!`;
   const result = await whatsapp.sendMessage(order.customer_phone, text);
-  await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId });
+  await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType: "reminder" });
   return { sent: true, phone: order.customer_phone };
+}
+
+// Best-effort, idempotent per order (checked via message_type, not the
+// status-transition that triggered it, so Paid -> Packed -> Paid doesn't
+// re-send) - callers in server/index.js call this unconditionally after any
+// order-create/status-change that results in "Paid" and it silently no-ops
+// if WhatsApp isn't configured, the order has no phone on file, or a
+// confirmation was already sent. Errors are swallowed (logged, not thrown)
+// so a WhatsApp hiccup never fails the underlying order operation.
+async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp) {
+  if (!whatsapp.isConfigured() || !order || order.status !== "Paid") return;
+  try {
+    const { rows: existing } = await query("SELECT 1 FROM whatsapp_messages WHERE order_id = $1 AND message_type = 'paid_confirmation'", [order.id]);
+    if (existing[0]) return;
+    const { rows: custRows } = await query("SELECT phone, name FROM customers WHERE id = $1", [order.customerId]);
+    const customerPhone = custRows[0]?.phone;
+    if (!customerPhone) return;
+    const { rows: bizRows } = await query("SELECT name, currency FROM businesses WHERE id = $1", [businessId]);
+    const business = bizRows[0];
+    const total = Number(order.price) * order.qty;
+    const text = `Hello ${custRows[0]?.name || "there"}, we've received your payment for ${order.productName} x ${order.qty} (${business?.currency || "NGN"} ${total.toLocaleString()}). Thank you for shopping with ${business?.name || "us"}!`;
+    const result = await whatsapp.sendMessage(customerPhone, text);
+    await recordWhatsAppMessage(businessId, { orderId: order.id, direction: "out", phone: customerPhone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType: "paid_confirmation" });
+  } catch (err) {
+    console.error("WhatsApp paid confirmation failed:", err.message);
+  }
+}
+
+// Bulk-sends reminders for every Pending-payment order over 24h old with a
+// phone on file, stopping early on what looks like a rate-limit error
+// (rather than hammering the API and failing every remaining send too) -
+// the free WasenderAPI trial this was built against is limited to 1
+// request/minute, so a real business's whole overdue list often can't
+// finish in one call; the caller reports how many sent vs. how many are
+// left to retry.
+async function sendAllReminders(businessId, whatsapp) {
+  const { rows } = await query(
+    `SELECT o.id FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+     WHERE o.business_id = $1 AND o.status = 'Pending payment' AND c.phone IS NOT NULL AND c.phone != ''
+       AND o.created_at < now() - interval '24 hours'
+     ORDER BY o.created_at ASC`,
+    [businessId]
+  );
+  const results = [];
+  for (const row of rows) {
+    try {
+      await sendPaymentReminder(businessId, row.id, whatsapp);
+      results.push({ orderId: row.id, sent: true });
+    } catch (err) {
+      results.push({ orderId: row.id, sent: false, error: err.message });
+      if (/rate limit|too many|429/i.test(err.message)) break;
+    }
+  }
+  return { total: rows.length, sent: results.filter((r) => r.sent).length, results };
 }
 
 module.exports = {
@@ -2087,6 +2141,8 @@ module.exports = {
   updateWhatsAppMessageStatusByWasenderId,
   listWhatsAppMessages,
   sendPaymentReminder,
+  sendPaidConfirmationIfNeeded,
+  sendAllReminders,
   EXPENSE_CATEGORIES,
   createExpense,
   listExpenses,

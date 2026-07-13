@@ -43,7 +43,7 @@ function render(){
   $("summary").innerHTML=`<b>${state.orders.length}</b> orders recorded.<br><b>${pending}</b> orders need payment follow-up.<br>Best seller: <b>${clean(bestProduct()||"Not enough sales yet")}</b>.<br>Paid revenue: <b>${money(rev)}</b>.`;
   $("restock").innerHTML=low.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} left - restock soon</span></div>`).join("");
   renderActivationChecklist();
-  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId),p=product(o.productId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
+  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId),p=product(o.productId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
   renderSmartAlerts();
   opts($("oCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("oProduct"),state.products,p=>`${p.name} - ${p.discountPrice?money(p.discountPrice)+" (was "+money(p.price)+")":money(p.price)} - ${p.stock} left`,"Add a product first");opts($("aiProduct"),state.products,p=>p.name,"Add a product first");opts($("aiCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("invSelect"),state.orders,o=>`${customer(o.customerId)?.name||"Customer"} - ${money(total(o))}`,"No orders yet");renderInvoice();
 }
@@ -224,6 +224,13 @@ async function paymentBlockFor(id,status){
 async function orderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello, your order for ${p?.name||o.productName} x ${o.qty} is ${o.status}. Total: ${money(total(o))}.${paymentBlock}\n\nThank you.`}
 async function paymentReminderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId),c=customer(o.customerId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello ${c?.name||"there"}, this is a friendly reminder about your order for ${p?.name||o.productName} x ${o.qty} (${money(total(o))}).${paymentBlock}\n\nPlease complete payment so we can process it. Thank you!`}
 async function sendOrderWhatsApp(id,phone){wa(await orderMsg(id),phone)}
+if($("followUpRemindAll"))$("followUpRemindAll").onclick=async()=>{
+  try{
+    const result=await api("POST","/api/orders/remind-all-whatsapp",{});
+    if(result.sent===result.total)toast(`Sent ${result.sent} reminder${result.sent===1?"":"s"} via WhatsApp`);
+    else toast(`Sent ${result.sent}/${result.total} - stopped early (likely a rate limit), try again shortly for the rest`);
+  }catch(err){toast(err.message)}
+};
 async function sendReminderWhatsApp(id,phone){
   try{
     await api("POST",`/api/orders/${id}/send-reminder-whatsapp`,{});

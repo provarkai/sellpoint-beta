@@ -495,6 +495,17 @@ app.post(
     res.json(await db.sendPaymentReminder(req.businessId, req.params.id, whatsapp));
   })
 );
+// Bulk version of the above for the "Follow up on payments" list - may stop
+// partway through on a free-trial rate limit (see sendAllReminders), so the
+// response reports how many actually sent rather than assuming full success.
+app.post(
+  "/api/orders/remind-all-whatsapp",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
+    res.json(await db.sendAllReminders(req.businessId, whatsapp));
+  })
+);
 
 // --- Storefront coupon codes -------------------------------------------------
 
@@ -611,7 +622,11 @@ app.delete(
 app.post(
   "/api/pos/checkout",
   requireAuth,
-  handle(async (req, res) => res.status(201).json(await db.posCheckout(req.businessId, req.body || {})))
+  handle(async (req, res) => {
+    const orders = await db.posCheckout(req.businessId, req.body || {});
+    orders.forEach((o) => db.sendPaidConfirmationIfNeeded(req.businessId, o, whatsapp));
+    res.status(201).json(orders);
+  })
 );
 
 app.post(
@@ -722,12 +737,20 @@ app.delete(
 app.post(
   "/api/orders",
   requireAuth,
-  handle(async (req, res) => res.status(201).json(await db.createOrder(req.businessId, req.body || {})))
+  handle(async (req, res) => {
+    const order = await db.createOrder(req.businessId, req.body || {});
+    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp);
+    res.status(201).json(order);
+  })
 );
 app.patch(
   "/api/orders/:id",
   requireAuth,
-  handle(async (req, res) => res.json(await db.updateOrder(req.businessId, req.params.id, req.body || {})))
+  handle(async (req, res) => {
+    const order = await db.updateOrder(req.businessId, req.params.id, req.body || {});
+    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp);
+    res.json(order);
+  })
 );
 app.post(
   "/api/orders/:id/convert",
