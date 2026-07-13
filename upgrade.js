@@ -26,6 +26,15 @@ function featuresFor(key, t) {
   }
   if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " branch" + (t.branchLimit > 1 ? "es" : ""));
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
+  if (t.whatsappLimit > 0 || unlimited(t.whatsappLimit)) {
+    list.push(unlimited(t.whatsappLimit) ? "Unlimited automated WhatsApp sends" : t.whatsappLimit + " automated WhatsApp sends/month");
+  }
+  if (t.supplierLimit > 0 || unlimited(t.supplierLimit)) {
+    list.push(unlimited(t.supplierLimit) ? "Unlimited suppliers" : t.supplierLimit + " suppliers on file");
+  }
+  if (t.batchLimit > 0 || unlimited(t.batchLimit)) list.push("Batch/lot tracking");
+  if (t.posLimit > 0 || unlimited(t.posLimit)) list.push("POS mode");
+  if (t.loyaltyAvailable) list.push("Loyalty points & wallet");
   const reportLabel = REPORT_LABELS[t.reportsTier];
   if (reportLabel) list.push(reportLabel);
   return list;
@@ -61,8 +70,16 @@ function comparisonTableHtml() {
     ["Products", (t) => (unlimited(t.productLimit) ? "Unlimited" : t.productLimit)],
     ["Staff", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
+    ["WhatsApp sends", (t) => (unlimited(t.whatsappLimit) ? "Unlimited" : t.whatsappLimit > 0 ? t.whatsappLimit + "/month" : "wa.me link only")],
     ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? t.branchLimit : "Single location")],
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
+    ["Expense entries", (t) => (unlimited(t.expenseLimit) ? "Unlimited" : t.expenseLimit + "/month")],
+    ["P&L / cashbook history", (t) => (unlimited(t.plHistoryDays) ? "Full history" : t.plHistoryDays + " days")],
+    ["Suppliers", (t) => (unlimited(t.supplierLimit) ? "Unlimited" : t.supplierLimit)],
+    ["Purchase orders", (t) => (unlimited(t.poLimit) ? "Unlimited" : t.poLimit + "/month")],
+    ["Loyalty & wallet", (t) => (t.loyaltyAvailable ? "Included" : "-")],
+    ["Batch/lot tracking", (t) => (unlimited(t.batchLimit) ? "Unlimited" : t.batchLimit > 0 ? t.batchLimit + "/month" : "-")],
+    ["POS mode", (t) => (unlimited(t.posLimit) ? "Unlimited" : t.posLimit > 0 ? t.posLimit + " sales/month" : "-")],
     ["Reports", (t) => (REPORT_LABELS[t.reportsTier] || "-")],
   ];
   const head = "<tr><th>Feature</th>" + keys.map((k) => "<th>" + pricing[k].name + "</th>").join("") + "</tr>";
