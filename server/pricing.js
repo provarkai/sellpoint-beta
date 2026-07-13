@@ -17,8 +17,9 @@ const ADDON_WHATSAPP_CREDITS = 100;
 // strategy section.
 // receiptLimit is separate from orderLimit - the standalone Receipt
 // Generator (server/index.js /api/receipts/generate) is a free-standing
-// lead-magnet tool, not tied to the orders/invoicing flow, so it gets its
-// own monthly cap that's generous even on Starter.
+// lead-magnet tool, not tied to the orders/invoicing flow, so it's
+// unlimited on every tier including Starter rather than being a paywall
+// lever at all.
 // branchLimit is the number of branches allowed beyond the business's main
 // location (0 = single location only).
 // reportsTier is "none"/"basic"/"standard"/"advanced" - see db.js#getReports
@@ -49,17 +50,17 @@ const ADDON_WHATSAPP_CREDITS = 100;
 const TIERS = {
   starter: {
     name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0,
-    reportsTier: "none", receiptLimit: 50, storefront: true,
+    reportsTier: "none", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 2, poLimit: 5,
     loyaltyAvailable: false, batchLimit: 0, posLimit: 0,
-    tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, a public storefront, and manual WhatsApp messaging",
+    tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, unlimited free receipts, a public storefront, and manual WhatsApp messaging",
   },
   growth: {
-    name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 50, branchLimit: 0,
+    name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 100, branchLimit: 0,
     reportsTier: "basic", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 100, expenseLimit: 200, plHistoryDays: 180, supplierLimit: 10, poLimit: 25,
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
-    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, unlimited free receipts, loyalty & wallet, and 100 automated WhatsApp sends/month",
+    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, loyalty & wallet, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
   pro: {
     name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 3, aiLimit: 500, branchLimit: 1,

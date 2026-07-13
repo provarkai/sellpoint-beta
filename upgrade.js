@@ -19,12 +19,9 @@ function featuresFor(key, t) {
     unlimited(t.orderLimit) ? "Unlimited orders" : t.orderLimit + " orders/month",
     unlimited(t.productLimit) ? "Unlimited products" : t.productLimit + " products",
   ];
-  if (key === "growth") {
-    list.push("Unlimited free receipt generator");
-  } else if (t.staffLimit > 0) {
-    list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
-  }
+  if (t.staffLimit > 0) list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
   if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " branch" + (t.branchLimit > 1 ? "es" : ""));
+  list.push(unlimited(t.receiptLimit) ? "Unlimited free receipts" : t.receiptLimit + " free receipts/month");
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
   if (t.whatsappLimit > 0 || unlimited(t.whatsappLimit)) {
     list.push(unlimited(t.whatsappLimit) ? "Unlimited automated WhatsApp sends" : t.whatsappLimit + " automated WhatsApp sends/month");
