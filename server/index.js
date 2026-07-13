@@ -11,6 +11,7 @@ const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
 const whatsapp = require("./whatsapp");
+const { renderReceiptPng } = require("./receiptImage");
 
 // Optional - error monitoring. Falls back to console.error-only (already
 // happening in handle() below) when SENTRY_DSN isn't set, same
@@ -506,6 +507,21 @@ app.post(
     res.json(await db.sendAllReminders(req.businessId, whatsapp));
   })
 );
+// Public, no auth - WasenderAPI's servers fetch this URL directly when
+// sending the paid-confirmation image attachment (their API requires a
+// public image URL, not base64 - see server/whatsapp.js). Trust model is
+// the same as the order id itself: unguessable, not sequential, so this is
+// an acceptable exposure for a receipt image containing only that order's
+// own details (see getOrderReceiptInfo in db.js for the full reasoning).
+app.get(
+  "/api/receipts/:orderId/image.png",
+  handle(async (req, res) => {
+    const info = await db.getOrderReceiptInfo(req.params.orderId);
+    const png = await renderReceiptPng(info);
+    res.set("Content-Type", "image/png");
+    res.send(png);
+  })
+);
 
 // --- Storefront coupon codes -------------------------------------------------
 
@@ -624,7 +640,8 @@ app.post(
   requireAuth,
   handle(async (req, res) => {
     const orders = await db.posCheckout(req.businessId, req.body || {});
-    orders.forEach((o) => db.sendPaidConfirmationIfNeeded(req.businessId, o, whatsapp));
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    orders.forEach((o) => db.sendPaidConfirmationIfNeeded(req.businessId, o, whatsapp, baseUrl));
     res.status(201).json(orders);
   })
 );
@@ -739,7 +756,7 @@ app.post(
   requireAuth,
   handle(async (req, res) => {
     const order = await db.createOrder(req.businessId, req.body || {});
-    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp);
+    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
     res.status(201).json(order);
   })
 );
@@ -748,7 +765,7 @@ app.patch(
   requireAuth,
   handle(async (req, res) => {
     const order = await db.updateOrder(req.businessId, req.params.id, req.body || {});
-    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp);
+    db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
     res.json(order);
   })
 );

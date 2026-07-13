@@ -2087,7 +2087,12 @@ async function sendPaymentReminder(businessId, orderId, whatsapp) {
 // if WhatsApp isn't configured, the order has no phone on file, or a
 // confirmation was already sent. Errors are swallowed (logged, not thrown)
 // so a WhatsApp hiccup never fails the underlying order operation.
-async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp) {
+// baseUrl (e.g. "https://sellpoint-beta-production.up.railway.app", built
+// per-request from req.protocol/req.get("host") by the caller - same
+// pattern already used for Paystack callback URLs elsewhere in
+// server/index.js) is used to build a publicly fetchable receipt-image URL,
+// since WasenderAPI's image attachments require a public URL, not base64.
+async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp, baseUrl) {
   if (!whatsapp.isConfigured() || !order || order.status !== "Paid") return;
   try {
     const { rows: existing } = await query("SELECT 1 FROM whatsapp_messages WHERE order_id = $1 AND message_type = 'paid_confirmation'", [order.id]);
@@ -2099,11 +2104,42 @@ async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp) {
     const business = bizRows[0];
     const total = Number(order.price) * order.qty;
     const text = `Hello ${custRows[0]?.name || "there"}, we've received your payment for ${order.productName} x ${order.qty} (${business?.currency || "NGN"} ${total.toLocaleString()}). Thank you for shopping with ${business?.name || "us"}!`;
-    const result = await whatsapp.sendMessage(customerPhone, text);
+    const imageUrl = baseUrl ? `${baseUrl}/api/receipts/${encodeURIComponent(order.id)}/image.png` : undefined;
+    const result = await whatsapp.sendMessage(customerPhone, text, { imageUrl });
     await recordWhatsAppMessage(businessId, { orderId: order.id, direction: "out", phone: customerPhone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType: "paid_confirmation" });
   } catch (err) {
     console.error("WhatsApp paid confirmation failed:", err.message);
   }
+}
+
+// Backs the public (unauthenticated) receipt-image endpoint that
+// WasenderAPI's servers fetch when sending the paid-confirmation image -
+// looked up by order id alone (no business scoping), same trust model as
+// the order id itself: unguessable (timestamp + random hex, see uid()), not
+// sequential/enumerable, so this is an acceptable exposure for a receipt
+// image containing only that one order's own details.
+async function getOrderReceiptInfo(orderId) {
+  const { rows } = await query(
+    `SELECT o.*, c.name AS customer_name, b.name AS business_name, b.currency
+     FROM orders o
+     LEFT JOIN customers c ON c.id = o.customer_id
+     JOIN businesses b ON b.id = o.business_id
+     WHERE o.id = $1`,
+    [orderId]
+  );
+  const row = rows[0];
+  if (!row) throw new OrderError("Order not found");
+  return {
+    businessName: row.business_name,
+    productName: row.product_name,
+    qty: row.qty,
+    unitPrice: Number(row.price),
+    total: Number(row.price) * row.qty,
+    currency: row.currency || "NGN",
+    customerName: row.customer_name,
+    orderId: row.id,
+    date: new Date(row.created_at).toISOString().slice(0, 10),
+  };
 }
 
 // Bulk-sends reminders for every Pending-payment order over 24h old with a
@@ -2143,6 +2179,7 @@ module.exports = {
   sendPaymentReminder,
   sendPaidConfirmationIfNeeded,
   sendAllReminders,
+  getOrderReceiptInfo,
   EXPENSE_CATEGORIES,
   createExpense,
   listExpenses,

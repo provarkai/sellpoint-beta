@@ -36,7 +36,10 @@ function toE164(phone) {
   return "+" + digits;
 }
 
-async function sendMessage(phone, text) {
+// imageUrl must be a publicly fetchable URL (WasenderAPI's send-message
+// endpoint requires that for image attachments - no base64 support), and
+// text becomes the image's caption when imageUrl is present.
+async function sendMessage(phone, text, { imageUrl } = {}) {
   if (!isConfigured()) throw new Error("WhatsApp sending is not configured");
   const res = await fetch(`${WASENDER_BASE_URL}/send-message`, {
     method: "POST",
@@ -44,7 +47,7 @@ async function sendMessage(phone, text) {
       Authorization: `Bearer ${WASENDER_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ to: toE164(phone), text }),
+    body: JSON.stringify({ to: toE164(phone), text, ...(imageUrl ? { imageUrl } : {}) }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.success === false) throw new Error(body.message || body.error || "WhatsApp send failed");
