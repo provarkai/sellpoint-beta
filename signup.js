@@ -7,7 +7,14 @@ async function boot() {
   // founding-members waitlist link that led here) carries the code as
   // ?ref=CODE - stashed in user_metadata now since it's only usable once
   // the account (and its business) actually exists a moment from now.
-  const referredByCode = new URLSearchParams(location.search).get("ref") || "";
+  const params = new URLSearchParams(location.search);
+  const referredByCode = params.get("ref") || "";
+  // Prefills from the quick sign-up box on the WordPress homepage
+  // (sellerspoint.ng), which only collects business name + email before
+  // redirecting here to finish - so the visitor is one step from done
+  // instead of retyping what they already gave.
+  if (params.get("businessName")) $("businessName").value = params.get("businessName");
+  if (params.get("email")) $("email").value = params.get("email");
 
   $("signupForm").onsubmit = async (e) => {
     e.preventDefault();
