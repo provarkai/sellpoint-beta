@@ -19,6 +19,11 @@ create table if not exists businesses (
 );
 alter table businesses add column if not exists address text not null default '';
 
+-- ShipBubble (real courier aggregator behind "SellersPoint Logistics").
+-- Set once via a "verify pickup address" flow in Settings; required before
+-- any shipment can be booked for this business's orders.
+alter table businesses add column if not exists shipbubble_sender_address_code text;
+
 -- Public storefront (Growth plan and above - see pricing.js#storefrontEnabledFor).
 -- slug is the shareable URL segment (/store/<slug>); storefront_enabled is a
 -- seller-controlled switch so a business isn't publicly visible before
@@ -237,6 +242,50 @@ alter table orders add column if not exists due_date timestamptz;
 -- specifically, not every order regardless of channel.
 alter table orders add column if not exists source text not null default 'dashboard';
 
+-- Real multi-item orders: one order can now contain several products, each
+-- its own line with its own qty/unit price (discount-aware, same as the
+-- old orders.price meant before). orders.product_id/product_name/
+-- product_type/qty/price stay on the table (never dropped) so pre-existing
+-- single-product orders keep working unchanged - new orders just leave
+-- those columns at their schema defaults and store real detail here instead.
+create table if not exists order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id text not null references orders(id) on delete cascade,
+  product_id text not null,
+  product_name text not null,
+  product_type text,
+  qty integer not null,
+  price numeric not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists order_items_order_id_idx on order_items(order_id);
+
+-- Authoritative order total going forward - computed once at creation from
+-- the sum of all line items, the same role orders.price*orders.qty played
+-- before. Keeping this as one stored number (rather than requiring every
+-- revenue query to JOIN+SUM order_items) is what keeps this change from
+-- touching every piece of money-math code in the app - P&L, cashbook,
+-- loyalty, segments, and reports read a per-order total either way.
+alter table orders add column if not exists subtotal numeric;
+
+-- One-time backfill so every existing order (which stored exactly one
+-- product directly on the orders row) gets an equivalent order_items row
+-- and a populated subtotal - every downstream query can then read from
+-- order_items/subtotal uniformly, no "legacy vs new order" branching
+-- anywhere. Idempotent (WHERE NOT EXISTS / WHERE subtotal IS NULL), safe
+-- to re-run like the rest of this file.
+insert into order_items (order_id, product_id, product_name, product_type, qty, price)
+  select id, product_id, product_name, product_type, qty, price from orders o
+  where product_id is not null
+    and not exists (select 1 from order_items oi where oi.order_id = o.id);
+update orders set subtotal = price * qty where subtotal is null and price is not null;
+
+-- Optional per-product shipping weight (kg) - used to compute a whole
+-- order's total package weight for ShipBubble rate quotes (sum of each
+-- cart item's weight*qty, floored at 1kg) instead of asking the seller/
+-- customer to type a weight manually at checkout time.
+alter table products add column if not exists weight numeric;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying
@@ -346,6 +395,31 @@ alter table businesses add column if not exists why_buy_text text not null defau
 alter table platform_settings add column if not exists logistics_settings jsonb not null default '{}'::jsonb;
 alter table orders add column if not exists delivery_fee numeric not null default 0;
 
+-- Populated once a seller books a real shipment via ShipBubble for an
+-- order (delivery_method = 'sellerspoint'). Null until booked. tracking_url
+-- is an external ShipBubble link shown to the seller/customer - no in-app
+-- tracking sync in this pass (webhook-based status sync is a fast-follow).
+alter table orders add column if not exists shipbubble_order_id text;
+alter table orders add column if not exists shipbubble_tracking_url text;
+alter table orders add column if not exists shipbubble_status text;
+alter table orders add column if not exists shipbubble_courier_name text;
+-- Null until the courier actually assigns a waybill (not available at
+-- booking time) - populated via a manual "Refresh Tracking" pull against
+-- ShipBubble's tracking endpoint (see refreshShipbubbleTracking in db.js).
+alter table orders add column if not exists shipbubble_tracking_code text;
+
+-- A "SellersPoint Logistics" order locks in its real ShipBubble rate at
+-- order-creation time (before the customer pays), not at booking time -
+-- otherwise the customer could never pay the accurate total in one
+-- payment. These three hold the seller's chosen courier from that
+-- pre-payment quote (ShipBubble's request_token is valid 7 days, comfortably
+-- longer than the pending-payment window) so bookShipbubbleShipment can
+-- finalize the real shipment later without re-quoting. Cleared to null once
+-- the shipment is actually booked.
+alter table orders add column if not exists shipbubble_pending_request_token text;
+alter table orders add column if not exists shipbubble_pending_service_code text;
+alter table orders add column if not exists shipbubble_pending_courier_id text;
+
 -- Seller online payments (Paystack subaccounts) - entirely optional, off by
 -- default. payment_mode 'manual' is the existing WhatsApp + bank transfer
 -- flow (via payment_details above); 'paystack' means storefront customers
@@ -444,6 +518,13 @@ alter table businesses add column if not exists loyalty_earn_rate numeric not nu
 alter table businesses add column if not exists loyalty_redeem_value numeric not null default 1;
 alter table customers add column if not exists loyalty_points integer not null default 0;
 alter table customers add column if not exists wallet_balance numeric not null default 0;
+
+-- AI Automation (Slice Three item 3): opt-in proactive payment reminders,
+-- sent by the daily scheduler (server/scheduler.js) instead of a manual
+-- click. auto_reminder_days_after is configurable per business since
+-- payment-follow-up cadence isn't one-size-fits-all.
+alter table businesses add column if not exists auto_reminder_enabled boolean not null default false;
+alter table businesses add column if not exists auto_reminder_days_after integer not null default 2;
 
 -- Ledgers, not just running totals, so a customer's timeline can show the
 -- full history of how their balance got where it is (matches the cashbook's
@@ -569,6 +650,11 @@ alter table whatsapp_messages enable row level security;
 -- fragile body-text matching, and stay idempotent across repeated status
 -- changes (Paid -> Packed -> Paid shouldn't re-send a confirmation).
 alter table whatsapp_messages add column if not exists message_type text not null default 'other';
+-- Groups every message sent by one campaign action under a shared id, so a
+-- business can see "this batch went to 40 people" without re-deriving it
+-- from timestamps. Null for one-off sends (manual reminder, paid confirmation).
+alter table whatsapp_messages add column if not exists campaign_id uuid;
+create index if not exists whatsapp_messages_campaign_id_idx on whatsapp_messages(campaign_id);
 
 -- Row Level Security -------------------------------------------------------
 -- The server only ever talks to Postgres directly via DATABASE_URL as the

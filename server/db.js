@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { Pool, types } = require("pg");
 const {
   orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor,
@@ -97,6 +98,9 @@ function toBusinessJson(b) {
     loyaltyEnabled: !!b.loyalty_enabled,
     loyaltyEarnRate: Number(b.loyalty_earn_rate ?? 1),
     loyaltyRedeemValue: Number(b.loyalty_redeem_value ?? 1),
+    autoReminderEnabled: !!b.auto_reminder_enabled,
+    autoReminderDaysAfter: Number(b.auto_reminder_days_after ?? 2),
+    shipbubbleSenderAddressCode: b.shipbubble_sender_address_code || null,
   };
 }
 function effectivePlan(b) {
@@ -119,26 +123,51 @@ function toProductJson(p) {
     images: p.images || [],
     description: p.description,
     barcode: p.barcode || "",
+    weight: p.weight != null ? Number(p.weight) : null,
   };
 }
 function toCustomerJson(c) {
-  return { id: c.id, name: c.name, phone: c.phone, email: c.email, location: c.location, loyaltyPoints: Number(c.loyalty_points ?? 0), walletBalance: Number(c.wallet_balance ?? 0) };
+  return { id: c.id, name: c.name, phone: c.phone, email: c.email, location: c.location, loyaltyPoints: Number(c.loyalty_points ?? 0), walletBalance: Number(c.wallet_balance ?? 0), createdAt: c.created_at };
 }
+// o.items, when present, is the raw order_items rows (or the in-memory
+// lineItems createOrder just inserted) for this order - real multi-item
+// orders always have at least one. Legacy top-level productId/productName/
+// qty/price fields are kept and derived from the FIRST item (falling back
+// to the orders row's own legacy columns for pre-migration orders that
+// somehow have zero order_items) purely so any code that hasn't been
+// updated to read `items` yet still shows something reasonable rather than
+// breaking outright.
 function toOrderJson(o) {
+  const items = (o.items || []).map((i) => ({
+    productId: i.product_id ?? i.productId,
+    productName: i.product_name ?? i.productName,
+    productType: i.product_type ?? i.productType,
+    qty: i.qty,
+    price: Number(i.price),
+  }));
+  const first = items[0] || { productId: o.product_id, productName: o.product_name, productType: o.product_type, qty: o.qty, price: Number(o.price || 0) };
   return {
     id: o.id,
-    productId: o.product_id,
-    productName: o.product_name,
-    productType: o.product_type,
+    items,
+    itemsSummary: items.length > 1 ? `${items[0].productName} +${items.length - 1} more` : first.productName,
+    subtotal: Number(o.subtotal ?? first.price * (first.qty || 1)),
+    productId: first.productId,
+    productName: first.productName,
+    productType: first.productType,
     customerId: o.customer_id,
-    qty: o.qty,
-    price: Number(o.price),
+    qty: first.qty,
+    price: first.price,
     status: o.status,
     createdAt: o.created_at,
     delivered: !!o.delivered,
     deliveryMethod: o.delivery_method,
     deliveryFee: Number(o.delivery_fee || 0),
     dueDate: o.due_date,
+    shipbubbleOrderId: o.shipbubble_order_id || null,
+    shipbubbleTrackingUrl: o.shipbubble_tracking_url || null,
+    shipbubbleStatus: o.shipbubble_status || null,
+    shipbubbleCourierName: o.shipbubble_courier_name || null,
+    shipbubbleTrackingCode: o.shipbubble_tracking_code || null,
   };
 }
 function toEventJson(e) {
@@ -247,11 +276,12 @@ async function getState(businessId) {
     query("SELECT * FROM events WHERE business_id = $1 ORDER BY at DESC LIMIT 80", [businessId]),
   ]);
   if (!business.rows[0]) throw new OrderError("Business not found");
+  const itemsByOrder = await loadItemsForOrders(orders.rows.map((o) => o.id));
   return {
     business: toBusinessJson(business.rows[0]),
     products: products.rows.map(toProductJson),
     customers: customers.rows.map(toCustomerJson),
-    orders: orders.rows.map(toOrderJson),
+    orders: orders.rows.map((o) => toOrderJson({ ...o, items: itemsByOrder[o.id] || [] })),
     events: events.rows.map(toEventJson),
   };
 }
@@ -265,25 +295,28 @@ async function getReports(businessId, tier = "basic") {
   const includeTop = tier !== "basic";
   const [revenueByMonth, topProducts, topCustomers, statusBreakdown] = await Promise.all([
     query(
-      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, SUM(price * qty) AS revenue
+      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, SUM(subtotal) AS revenue
        FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered')
        GROUP BY 1 ORDER BY 1 DESC LIMIT $2`,
       [businessId, months]
     ),
     // Quotes aren't real sales yet and Refunded orders no longer are -
     // excluded from both so "top products/customers" reflects actual
-    // committed business, not estimates or reversed sales.
+    // committed business, not estimates or reversed sales. Queries
+    // order_items directly (not orders) since this is inherently about
+    // individual products sold across potentially multi-item orders.
     includeTop
       ? query(
-          `SELECT product_name, SUM(qty) AS units, SUM(price * qty) AS revenue
-           FROM orders WHERE business_id = $1 AND status NOT IN ('Quote', 'Refunded')
-           GROUP BY product_name ORDER BY units DESC LIMIT $2`,
+          `SELECT oi.product_name, SUM(oi.qty) AS units, SUM(oi.price * oi.qty) AS revenue
+           FROM order_items oi JOIN orders o ON o.id = oi.order_id
+           WHERE o.business_id = $1 AND o.status NOT IN ('Quote', 'Refunded')
+           GROUP BY oi.product_name ORDER BY units DESC LIMIT $2`,
           [businessId, topN]
         )
       : Promise.resolve({ rows: [] }),
     includeTop
       ? query(
-          `SELECT c.name, SUM(o.price * o.qty) AS spend, COUNT(*) AS orders
+          `SELECT c.name, SUM(o.subtotal) AS spend, COUNT(*) AS orders
            FROM orders o JOIN customers c ON c.id = o.customer_id
            WHERE o.business_id = $1 AND o.status NOT IN ('Quote', 'Refunded') GROUP BY c.name ORDER BY spend DESC LIMIT $2`,
           [businessId, topN]
@@ -298,6 +331,41 @@ async function getReports(businessId, tier = "basic") {
     topCustomers: topCustomers.rows.map((r) => ({ name: r.name, spend: Number(r.spend), orders: Number(r.orders) })),
     statusBreakdown: statusBreakdown.rows.map((r) => ({ status: r.status, count: Number(r.n) })),
   };
+}
+
+// Day-bucketed series backing the Reports tab's chart (revenue, order
+// count, and net profit over a date range) - same revenue/expense sources
+// as getProfitAndLoss, just grouped per day instead of summed once.
+async function getReportsChart(businessId, { from, to } = {}) {
+  const rangeFrom = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rangeTo = to || new Date().toISOString().slice(0, 10);
+  const [revenueRows, expenseRows] = await Promise.all([
+    query(
+      `SELECT created_at::date AS day, COALESCE(SUM(subtotal), 0) AS revenue, COUNT(*) AS orders
+       FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date >= $2 AND created_at::date <= $3
+       GROUP BY 1`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+    query(
+      `SELECT expense_date AS day, COALESCE(SUM(amount), 0) AS total FROM expenses
+       WHERE business_id = $1 AND expense_date >= $2 AND expense_date <= $3
+       GROUP BY 1`,
+      [businessId, rangeFrom, rangeTo]
+    ),
+  ]);
+  const revenueByDay = {}, ordersByDay = {}, expensesByDay = {};
+  revenueRows.rows.forEach((r) => { revenueByDay[r.day] = Number(r.revenue); ordersByDay[r.day] = Number(r.orders); });
+  expenseRows.rows.forEach((r) => { expensesByDay[r.day] = Number(r.total); });
+  const days = [];
+  for (let d = new Date(rangeFrom + "T00:00:00Z"); d <= new Date(rangeTo + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return days.map((day) => ({
+    date: day,
+    revenue: revenueByDay[day] || 0,
+    orders: ordersByDay[day] || 0,
+    profit: (revenueByDay[day] || 0) - (expensesByDay[day] || 0),
+  }));
 }
 
 // --- Expenses, cashbook, P&L, daily reconciliation ---------------------
@@ -400,9 +468,11 @@ async function getCashbook(businessId, { from, to } = {}) {
   const rangeTo = to || new Date().toISOString().slice(0, 10);
   const [orderRows, expenseRows] = await Promise.all([
     query(
-      `SELECT id, created_at::date AS date, product_name, qty, price, (price * qty) AS amount
-       FROM orders WHERE business_id = $1 AND status IN ('Paid', 'Delivered')
-         AND created_at::date >= $2 AND created_at::date <= $3`,
+      `SELECT o.id, o.created_at::date AS date, o.subtotal AS amount,
+         (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
+         (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id ORDER BY oi.created_at ASC LIMIT 1) AS first_item_name
+       FROM orders o WHERE o.business_id = $1 AND o.status IN ('Paid', 'Delivered')
+         AND o.created_at::date >= $2 AND o.created_at::date <= $3`,
       [businessId, rangeFrom, rangeTo]
     ),
     query(
@@ -415,7 +485,7 @@ async function getCashbook(businessId, { from, to } = {}) {
     ...orderRows.rows.map((o) => ({
       date: o.date,
       type: "in",
-      description: `${o.product_name} x ${o.qty}`,
+      description: Number(o.item_count) > 1 ? `${o.first_item_name} +${Number(o.item_count) - 1} more` : o.first_item_name || "Order",
       amount: Number(o.amount),
       refId: o.id,
     })),
@@ -450,7 +520,7 @@ async function getProfitAndLoss(businessId, { from, to } = {}) {
   const rangeTo = to || new Date().toISOString().slice(0, 10);
   const [revenueRows, expenseRows, categoryRows] = await Promise.all([
     query(
-      `SELECT COALESCE(SUM(price * qty), 0) AS revenue FROM orders
+      `SELECT COALESCE(SUM(subtotal), 0) AS revenue FROM orders
        WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date >= $2 AND created_at::date <= $3`,
       [businessId, rangeFrom, rangeTo]
     ),
@@ -499,7 +569,7 @@ async function upsertReconciliation(businessId, data) {
   const notes = (data.notes || "").toString().slice(0, 2000);
   const [revenueRows, expenseRows] = await Promise.all([
     query(
-      `SELECT COALESCE(SUM(price * qty), 0) AS revenue FROM orders
+      `SELECT COALESCE(SUM(subtotal), 0) AS revenue FROM orders
        WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date = $2`,
       [businessId, date]
     ),
@@ -560,11 +630,14 @@ async function updateBusiness(businessId, fields) {
     loyalty_enabled: fields.loyaltyEnabled ?? current.loyalty_enabled,
     loyalty_earn_rate: fields.loyaltyEarnRate !== undefined ? requireNumber(fields.loyaltyEarnRate, "Loyalty earn rate", { min: 0 }) : current.loyalty_earn_rate,
     loyalty_redeem_value: fields.loyaltyRedeemValue !== undefined ? requireNumber(fields.loyaltyRedeemValue, "Loyalty redeem value", { min: 0 }) : current.loyalty_redeem_value,
+    auto_reminder_enabled: fields.autoReminderEnabled ?? current.auto_reminder_enabled,
+    auto_reminder_days_after: fields.autoReminderDaysAfter !== undefined ? requireNumber(fields.autoReminderDaysAfter, "Days after due", { min: 1, max: 30, integer: true }) : current.auto_reminder_days_after,
   };
   const { rows: updated } = await query(
     `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
-       payment_details=$7, currency=$8, loyalty_enabled=$9, loyalty_earn_rate=$10, loyalty_redeem_value=$11
-     WHERE id = $12 RETURNING *`,
+       payment_details=$7, currency=$8, loyalty_enabled=$9, loyalty_earn_rate=$10, loyalty_redeem_value=$11,
+       auto_reminder_enabled=$12, auto_reminder_days_after=$13
+     WHERE id = $14 RETURNING *`,
     [
       merged.name,
       merged.phone,
@@ -577,6 +650,8 @@ async function updateBusiness(businessId, fields) {
       merged.loyalty_enabled,
       merged.loyalty_earn_rate,
       merged.loyalty_redeem_value,
+      merged.auto_reminder_enabled,
+      merged.auto_reminder_days_after,
       businessId,
     ]
   );
@@ -722,6 +797,15 @@ async function getStorefront(slug) {
     "SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status IN ('Paid','Delivered')",
     [business.id]
   );
+  // Storefront customers can only pick SellersPoint Logistics if the
+  // platform admin has it enabled AND this specific business has set up a
+  // pickup address (same two gates the dashboard's order form checks).
+  const logistics = await getRawLogisticsSettings();
+  const shippingAvailable = logistics.enabled && !!business.shipbubble_sender_address_code;
+  // Shown client-side so the displayed total (courier quote + markup)
+  // matches exactly what checkoutStorefront actually charges - the
+  // storefront never sees ShipBubble credentials, just this one number.
+  const shippingMarkup = shippingAvailable ? Number(logistics.flatFee || 0) : 0;
   return {
     businessName: business.name,
     businessLogo: business.logo,
@@ -734,6 +818,8 @@ async function getStorefront(slug) {
     completedOrders: completedRows[0].n,
     whyBuyText: business.why_buy_text || "",
     onlinePaymentEnabled: business.payment_mode === "paystack" && !!business.paystack_subaccount_code,
+    shippingAvailable,
+    shippingMarkup,
     products: products.map(toStorefrontProductJson),
   };
 }
@@ -842,7 +928,7 @@ async function redeemCoupon(couponId) {
 // Public checkout path (no session) - looks the business up by slug the same
 // way the storefront itself does, re-checking storefront eligibility so a
 // downgraded/disabled store can't still take payments through a stale link.
-async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode }) {
+async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode, deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost }) {
   const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
   const business = rows[0];
   if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) {
@@ -856,13 +942,17 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
   const email = requireString(buyerEmail, "Your email");
 
   const customer = await findOrCreateCustomerByPhone(business.id, { name, phone: buyerPhone || "", email, location: buyerLocation || "" });
-  const orderIds = [];
-  let total = 0;
-  for (const item of items) {
-    const order = await createOrder(business.id, { productId: item.productId, customerId: customer.id, qty: item.qty || 1, status: "Pending payment", source: "storefront" });
-    orderIds.push(order.id);
-    total += Number(order.price) * order.qty;
-  }
+  // One multi-item order per storefront purchase (not one order per cart
+  // product) - a customer buying several products now gets a single
+  // order/receipt/WhatsApp confirmation instead of N of each. Delivery/
+  // shipping fields (if the buyer picked SellersPoint Logistics and already
+  // got a quote via getShipbubbleQuotePublic) pass straight into
+  // createOrder, same as the dashboard's pre-payment quote flow.
+  const order = await createOrder(business.id, {
+    items, customerId: customer.id, status: "Pending payment", source: "storefront",
+    deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost,
+  });
+  let total = Number(order.subtotal) + Number(order.deliveryFee || 0);
   // Re-validate server-side rather than trusting a client-supplied discount -
   // the storefront's "Apply" button is just a preview.
   let couponId = null;
@@ -872,7 +962,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
     total = result.total;
   }
   if (couponId) await redeemCoupon(couponId);
-  return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, plan: effectivePlan(business), orderIds, total, email };
+  return { businessId: business.id, subaccountCode: business.paystack_subaccount_code, absorbFees: !!business.absorb_fees, plan: effectivePlan(business), orderIds: [order.id], total, email };
 }
 
 // Looks up a single business-owned order (created directly in the
@@ -882,7 +972,7 @@ async function checkoutStorefront(slug, { items, buyerName, buyerPhone, buyerEma
 // involved here, just one existing order.
 async function getOrderForPaymentLink(businessId, orderId) {
   const { rows } = await query(
-    `SELECT o.id, o.price, o.qty, o.status, c.email AS customer_email
+    `SELECT o.id, o.subtotal, o.status, c.email AS customer_email
      FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
      WHERE o.id = $1 AND o.business_id = $2`,
     [orderId, businessId]
@@ -896,7 +986,7 @@ async function getOrderForPaymentLink(businessId, orderId) {
     throw new OrderError("Online payments are not set up for this business");
   }
   return {
-    amountNaira: Number(row.price) * row.qty,
+    amountNaira: Number(row.subtotal),
     email: row.customer_email,
     subaccountCode: business.paystack_subaccount_code,
     absorbFees: !!business.absorb_fees,
@@ -1270,9 +1360,10 @@ async function createProduct(businessId, data) {
   const barcode = normalizeBarcode(data.barcode);
   await assertBarcodeAvailable(businessId, barcode);
   const id = uid("p");
+  const weight = data.weight !== undefined && data.weight !== "" ? requireNumber(data.weight, "Weight", { min: 0 }) : null;
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode, weight)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
     [
       id,
       businessId,
@@ -1288,6 +1379,7 @@ async function createProduct(businessId, data) {
       JSON.stringify(images),
       data.description || "",
       barcode,
+      weight,
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -1306,9 +1398,10 @@ async function updateProduct(businessId, id, data) {
   const image = data.images !== undefined ? images[0] || "" : data.image !== undefined ? data.image : current.image;
   const barcode = data.barcode !== undefined ? normalizeBarcode(data.barcode) : current.barcode;
   if (data.barcode !== undefined) await assertBarcodeAvailable(businessId, barcode, id);
+  const weight = data.weight !== undefined ? (data.weight === "" ? null : requireNumber(data.weight, "Weight", { min: 0 })) : current.weight;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12
-     WHERE id = $13 AND business_id = $14 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12, weight=$13
+     WHERE id = $14 AND business_id = $15 RETURNING *`,
     [
       name,
       price,
@@ -1322,6 +1415,7 @@ async function updateProduct(businessId, id, data) {
       JSON.stringify(images),
       data.description !== undefined ? data.description : current.description,
       barcode,
+      weight,
       id,
       businessId,
     ]
@@ -1389,6 +1483,11 @@ async function deleteBatch(businessId, id) {
 // stock decrement, plan order-limit, loyalty accrual, and delivery-fee
 // logic all stay in one place. customerId is optional - a walk-in sale
 // with no customer record on file is a normal POS case.
+// One multi-item order per checkout (not one order per cart product) - a
+// real POS sale with several products now produces a single order/receipt,
+// matching how createOrder supports items[] directly. The POS monthly
+// limit counts checkouts ("sales"), not line items, so it's now a flat +1
+// per call regardless of cart size.
 async function posCheckout(businessId, { items, customerId }) {
   if (!Array.isArray(items) || !items.length) throw new OrderError("Cart is empty");
   const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
@@ -1399,14 +1498,10 @@ async function posCheckout(businessId, { items, customerId }) {
       "SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND source = 'pos' AND created_at >= date_trunc('month', now())",
       [businessId]
     );
-    if (countRows[0].n + items.length > limit) throw new OrderError("POS sale limit reached for the current plan this month");
+    if (countRows[0].n + 1 > limit) throw new OrderError("POS sale limit reached for the current plan this month");
   }
-  const orders = [];
-  for (const item of items) {
-    const order = await createOrder(businessId, { productId: item.productId, customerId: customerId || null, qty: item.qty || 1, status: "Paid", source: "pos" });
-    orders.push(order);
-  }
-  return orders;
+  const order = await createOrder(businessId, { items, customerId: customerId || null, status: "Paid", source: "pos" });
+  return [order];
 }
 
 async function deleteProduct(businessId, id) {
@@ -1478,7 +1573,7 @@ function computeSegments(customers) {
 async function listCustomersWithSegments(businessId) {
   const { rows } = await query(
     `SELECT c.*,
-       COALESCE(SUM(CASE WHEN o.status IN ('Paid','Delivered') THEN o.price * o.qty ELSE 0 END), 0) AS total_spend,
+       COALESCE(SUM(CASE WHEN o.status IN ('Paid','Delivered') THEN o.subtotal ELSE 0 END), 0) AS total_spend,
        COUNT(CASE WHEN o.status IN ('Paid','Delivered') THEN 1 END) AS paid_order_count,
        MAX(CASE WHEN o.status IN ('Paid','Delivered') THEN o.created_at END) AS last_order_at
      FROM customers c
@@ -1532,9 +1627,10 @@ async function getCustomerTimeline(businessId, customerId) {
     query("SELECT * FROM wallet_ledger WHERE customer_id = $1 AND business_id = $2 ORDER BY created_at DESC", [customerId, businessId]),
   ]);
   const customer = segmented.find((c) => c.id === customerId) || { ...toCustomerJson(customerRows[0]), totalSpend: 0, paidOrderCount: 0, lastOrderAt: null, segment: "New" };
+  const itemsByOrder = await loadItemsForOrders(orderRows.rows.map((o) => o.id));
   return {
     customer,
-    orders: orderRows.rows.map(toOrderJson),
+    orders: orderRows.rows.map((o) => toOrderJson({ ...o, items: itemsByOrder[o.id] || [] })),
     notes: noteRows.rows.map(toCustomerNoteJson),
     loyaltyLedger: loyaltyRows.rows.map((r) => ({ id: r.id, points: r.points, reason: r.reason, createdAt: r.created_at })),
     walletLedger: walletRows.rows.map((r) => ({ id: r.id, amount: Number(r.amount), reason: r.reason, createdAt: r.created_at })),
@@ -1717,7 +1813,7 @@ async function awardLoyaltyPointsIfNeeded(businessId, order) {
   if (!business?.loyalty_enabled) return;
   const { rows: existing } = await query("SELECT 1 FROM loyalty_ledger WHERE order_id = $1", [order.id]);
   if (existing[0]) return;
-  const orderTotal = Number(order.price) * order.qty;
+  const orderTotal = Number(order.subtotal);
   const points = Math.floor((orderTotal / 100) * Number(business.loyalty_earn_rate));
   if (points <= 0) return;
   await query("UPDATE customers SET loyalty_points = loyalty_points + $1 WHERE id = $2 AND business_id = $3", [points, order.customer_id, businessId]);
@@ -1759,68 +1855,140 @@ async function adjustWallet(businessId, customerId, amount, reason) {
 
 // --- Orders ---------------------------------------------------------------
 
+async function loadItemsForOrder(orderId) {
+  const { rows } = await query("SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at ASC", [orderId]);
+  return rows;
+}
+
+// Batched (avoids N+1) - used wherever orders are listed in bulk (getState,
+// reports use their own aggregate queries instead). Returns a map keyed by
+// order_id so callers can attach `.items` to each order row before mapping
+// through toOrderJson.
+async function loadItemsForOrders(orderIds) {
+  if (!orderIds.length) return {};
+  const { rows } = await query("SELECT * FROM order_items WHERE order_id = ANY($1) ORDER BY created_at ASC", [orderIds]);
+  const map = {};
+  rows.forEach((r) => {
+    (map[r.order_id] = map[r.order_id] || []).push(r);
+  });
+  return map;
+}
+
 // Quotes are a pre-commitment estimate, not a real sale yet - they don't
 // touch stock and don't count against the plan's order limit (both only
 // apply once a quote is actually converted into a real order via
 // convertQuoteToOrder below).
+//
+// data.items is [{productId, qty}] - a real multi-item order, one row per
+// order plus N order_items rows. For back-compat with any caller still
+// passing a single {productId, qty} directly (none should after this
+// change, but kept as a safe fallback), that shape is normalized into a
+// one-item array below.
 async function createOrder(businessId, data) {
   const isQuote = data.status === "Quote";
-  const qty = requireNumber(data.qty ?? 1, "Quantity", { min: 1, integer: true });
+  const items = Array.isArray(data.items) && data.items.length ? data.items : data.productId ? [{ productId: data.productId, qty: data.qty }] : [];
+  if (!items.length) throw new OrderError("Add at least one product");
   const dueDate = data.dueDate ? new Date(data.dueDate).toISOString() : null;
 
-  let product;
-  if (isQuote) {
-    const { rows: productRows } = await query("SELECT * FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
-    product = productRows[0];
-    if (!product) throw new OrderError("Product not found");
-  } else {
+  if (!isQuote) {
     const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-    const business = businessRows[0];
     const { rows: countRows } = await query("SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status != 'Quote'", [businessId]);
-    const limit = orderLimitFor(effectivePlan(business));
+    const limit = orderLimitFor(effectivePlan(businessRows[0]));
     if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
-
-    // Atomic check-and-decrement: baking "enough stock?" into the UPDATE's
-    // WHERE clause (instead of reading stock, checking it in JS, then
-    // writing a computed value back) closes a race where two concurrent
-    // checkouts for the same product could both pass a stale read and
-    // oversell it.
-    const { rows: productRows } = await query(
-      "UPDATE products SET stock = stock - $1 WHERE id = $2 AND business_id = $3 AND stock >= $1 RETURNING *",
-      [qty, data.productId, businessId]
-    );
-    product = productRows[0];
-    if (!product) {
-      const { rows: existing } = await query("SELECT 1 FROM products WHERE id = $1 AND business_id = $2", [data.productId, businessId]);
-      throw new OrderError(existing[0] ? "Not enough stock" : "Product not found");
-    }
   }
+
   const id = uid("o");
   const deliveryMethod = ["self", "rider", "sellerspoint"].includes(data.deliveryMethod) ? data.deliveryMethod : "self";
-  // Orders bill at the discounted price when one's active - the discount is
-  // a real selling price, not just a display label.
-  const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
-  const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : product.price;
   let deliveryFee = 0;
+  let pendingRequestToken = null, pendingServiceCode = null, pendingCourierId = null;
   if (deliveryMethod === "sellerspoint") {
     const logistics = await getRawLogisticsSettings();
     if (!logistics.enabled) throw new OrderError("SellersPoint Logistics isn't available yet - choose self delivery or a dispatch rider instead.");
-    deliveryFee = computeLogisticsFee(sellingPrice * qty, logistics);
+    // The real ShipBubble cost must be quoted (getShipbubbleQuote) and a
+    // courier chosen BEFORE the order is created, not after - otherwise the
+    // customer can never pay the accurate total (products + real shipping)
+    // in one payment. The chosen courier's request_token/service_code/
+    // courier_id are stored so bookShipbubbleShipment can finalize the
+    // actual shipment later without re-quoting or re-charging.
+    pendingRequestToken = requireString(data.shipbubbleRequestToken, "Shipping quote");
+    pendingServiceCode = requireString(data.shipbubbleServiceCode, "Courier selection");
+    pendingCourierId = requireString(data.shipbubbleCourierId, "Courier selection");
+    const quotedCost = requireNumber(data.shipbubbleQuotedCost, "Quoted shipping cost", { min: 0 });
+    deliveryFee = quotedCost + Number(logistics.flatFee || 0);
   }
   const source = ["dashboard", "pos", "storefront"].includes(data.source) ? data.source : "dashboard";
-  const { rows } = await query(
-    `INSERT INTO orders (id, business_id, product_id, product_name, product_type, customer_id, qty, price, status, delivered, delivery_method, due_date, delivery_fee, source)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,$11,$12,$13) RETURNING *`,
-    [id, businessId, product.id, product.name, product.type, data.customerId, qty, sellingPrice, data.status || "Pending payment", deliveryMethod, dueDate, deliveryFee, source]
-  );
-  await logEvent(businessId, isQuote ? "quote_created" : "order_created", `${product.name} x ${qty}`);
-  await awardLoyaltyPointsIfNeeded(businessId, rows[0]);
-  return toOrderJson(rows[0]);
+
+  // Wrapped in a transaction (same pattern as createPurchaseOrder above) -
+  // with multiple items, a stock decrement on item 2 failing must not
+  // leave item 1's already-decremented stock stranded uncommitted.
+  const client = await pool.connect();
+  let lineItems = [], subtotal = 0, orderRow;
+  try {
+    await client.query("BEGIN");
+    for (const item of items) {
+      const qty = requireNumber(item.qty ?? 1, "Quantity", { min: 1, integer: true });
+      let product;
+      if (isQuote) {
+        // Quotes don't touch stock - only a real order (below) does, since
+        // a quote is a pre-commitment estimate, not a reservation.
+        const { rows: productRows } = await client.query("SELECT * FROM products WHERE id = $1 AND business_id = $2", [item.productId, businessId]);
+        product = productRows[0];
+        if (!product) throw new OrderError("Product not found");
+      } else {
+        // Atomic check-and-decrement: baking "enough stock?" into the
+        // UPDATE's WHERE clause (instead of reading stock, checking it in
+        // JS, then writing a computed value back) closes a race where two
+        // concurrent checkouts for the same product could both pass a
+        // stale read and oversell it.
+        const { rows: productRows } = await client.query(
+          "UPDATE products SET stock = stock - $1 WHERE id = $2 AND business_id = $3 AND stock >= $1 RETURNING *",
+          [qty, item.productId, businessId]
+        );
+        product = productRows[0];
+        if (!product) {
+          const { rows: existing } = await client.query("SELECT 1 FROM products WHERE id = $1 AND business_id = $2", [item.productId, businessId]);
+          throw new OrderError(existing[0] ? "Not enough stock for one of the items in this order" : "Product not found");
+        }
+      }
+      // Orders bill at the discounted price when one's active - the
+      // discount is a real selling price, not just a display label.
+      const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
+      const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : Number(product.price);
+      lineItems.push({ productId: product.id, productName: product.name, productType: product.type, qty, price: sellingPrice });
+      subtotal += sellingPrice * qty;
+    }
+
+    const { rows } = await client.query(
+      `INSERT INTO orders (id, business_id, customer_id, status, delivered, delivery_method, due_date, delivery_fee, source, subtotal, shipbubble_pending_request_token, shipbubble_pending_service_code, shipbubble_pending_courier_id)
+       VALUES ($1,$2,$3,$4,false,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [id, businessId, data.customerId, data.status || "Pending payment", deliveryMethod, dueDate, deliveryFee, source, subtotal, pendingRequestToken, pendingServiceCode, pendingCourierId]
+    );
+    for (const li of lineItems) {
+      await client.query(
+        `INSERT INTO order_items (order_id, product_id, product_name, product_type, qty, price) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [id, li.productId, li.productName, li.productType, li.qty, li.price]
+      );
+    }
+    await client.query("COMMIT");
+    orderRow = { ...rows[0], items: lineItems };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const itemsSummary = lineItems.map((li) => `${li.productName} x ${li.qty}`).join(", ");
+  await logEvent(businessId, isQuote ? "quote_created" : "order_created", itemsSummary);
+  await awardLoyaltyPointsIfNeeded(businessId, orderRow);
+  return toOrderJson(orderRow);
 }
 
 // Turns a Quote into a real order - this is the moment stock actually gets
 // reserved and the plan's order limit actually gets checked, since a quote
-// itself was neither.
+// itself was neither. Wrapped in a transaction (same reasoning as
+// createOrder) since multiple items must all reserve stock together or not
+// at all.
 async function convertQuoteToOrder(businessId, id) {
   const { rows } = await query("SELECT * FROM orders WHERE id = $1 AND business_id = $2", [id, businessId]);
   const current = rows[0];
@@ -1832,32 +2000,50 @@ async function convertQuoteToOrder(businessId, id) {
   const limit = orderLimitFor(effectivePlan(businessRows[0]));
   if (countRows[0].n >= limit) throw new OrderError("Order limit reached for the current plan");
 
-  const { rows: productRows } = await query(
-    "UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING *",
-    [current.qty, current.product_id]
-  );
-  if (!productRows[0]) throw new OrderError("Not enough stock to convert this quote");
-
-  const { rows: updated } = await query("UPDATE orders SET status='Pending payment' WHERE id=$1 RETURNING *", [id]);
-  await logEvent(businessId, "quote_converted", current.product_name);
-  return toOrderJson(updated[0]);
+  const items = await loadItemsForOrder(id);
+  const client = await pool.connect();
+  let updated;
+  try {
+    await client.query("BEGIN");
+    for (const item of items) {
+      const { rows: productRows } = await client.query(
+        "UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING *",
+        [item.qty, item.product_id]
+      );
+      if (!productRows[0]) throw new OrderError(`Not enough stock to convert this quote (${item.product_name})`);
+    }
+    const { rows: updatedRows } = await client.query("UPDATE orders SET status='Pending payment' WHERE id=$1 RETURNING *", [id]);
+    updated = updatedRows[0];
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+  await logEvent(businessId, "quote_converted", items.map((i) => `${i.product_name} x ${i.qty}`).join(", "));
+  return toOrderJson({ ...updated, items });
 }
 
 async function updateOrder(businessId, id, changes) {
   const { rows } = await query("SELECT * FROM orders WHERE id = $1 AND business_id = $2", [id, businessId]);
   const current = rows[0];
   if (!current) throw new OrderError("Order not found");
+  const items = await loadItemsForOrder(id);
+  const itemsSummary = items.map((i) => `${i.product_name} x ${i.qty}`).join(", ") || current.product_name;
 
   if (changes.markPaid) {
-    const { rows: productRows } = await query("SELECT * FROM products WHERE id = $1", [current.product_id]);
-    const delivered = productRows[0]?.type === "Digital product" ? true : !!current.delivered;
+    // Auto-delivered only when EVERY item is a digital product - a mixed
+    // cart (one digital + one physical item) still needs real delivery.
+    const delivered = items.length > 0 ? items.every((i) => i.product_type === "Digital product") : !!current.delivered;
     const { rows: updated } = await query("UPDATE orders SET status='Paid', delivered=$1 WHERE id=$2 RETURNING *", [
       delivered,
       id,
     ]);
-    await logEvent(businessId, "order_paid", current.product_name);
-    await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
-    return toOrderJson(updated[0]);
+    await logEvent(businessId, "order_paid", itemsSummary);
+    const orderRow = { ...updated[0], items };
+    await awardLoyaltyPointsIfNeeded(businessId, orderRow);
+    return toOrderJson(orderRow);
   }
   if (changes.deliver) {
     const newStatus = current.status === "Pending payment" ? "Paid" : current.status;
@@ -1865,16 +2051,23 @@ async function updateOrder(businessId, id, changes) {
       newStatus,
       id,
     ]);
-    await logEvent(businessId, "digital_delivered", current.product_name);
-    await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
-    return toOrderJson(updated[0]);
+    await logEvent(businessId, "digital_delivered", itemsSummary);
+    const orderRow = { ...updated[0], items };
+    await awardLoyaltyPointsIfNeeded(businessId, orderRow);
+    return toOrderJson(orderRow);
   }
   if (changes.refund) {
     if (current.status === "Refunded") throw new OrderError("This order is already refunded");
-    if (changes.restock) await query("UPDATE products SET stock = stock + $1 WHERE id = $2", [current.qty, current.product_id]);
+    // Restocks every line item, not just one product - a refund on a
+    // multi-item order returns everything in it.
+    if (changes.restock) {
+      for (const item of items) {
+        await query("UPDATE products SET stock = stock + $1 WHERE id = $2", [item.qty, item.product_id]);
+      }
+    }
     const { rows: updated } = await query("UPDATE orders SET status='Refunded' WHERE id=$1 RETURNING *", [id]);
-    await logEvent(businessId, "order_refunded", `${current.product_name}${changes.restock ? " (restocked)" : ""}`);
-    return toOrderJson(updated[0]);
+    await logEvent(businessId, "order_refunded", `${itemsSummary}${changes.restock ? " (restocked)" : ""}`);
+    return toOrderJson({ ...updated[0], items });
   }
   const status = changes.status ?? current.status;
   const delivered = changes.delivered ?? current.delivered;
@@ -1883,8 +2076,9 @@ async function updateOrder(businessId, id, changes) {
     delivered,
     id,
   ]);
-  await awardLoyaltyPointsIfNeeded(businessId, updated[0]);
-  return toOrderJson(updated[0]);
+  const orderRow = { ...updated[0], items };
+  await awardLoyaltyPointsIfNeeded(businessId, orderRow);
+  return toOrderJson(orderRow);
 }
 
 async function deleteOrder(businessId, id) {
@@ -2120,11 +2314,11 @@ function toWhatsAppMessageJson(m) {
   return { id: m.id, orderId: m.order_id, direction: m.direction, phone: m.phone, body: m.body, status: m.status, messageType: m.message_type, createdAt: m.created_at };
 }
 
-async function recordWhatsAppMessage(businessId, { orderId, direction, phone, body, status, wasenderMessageId, messageType }) {
+async function recordWhatsAppMessage(businessId, { orderId, direction, phone, body, status, wasenderMessageId, messageType, campaignId }) {
   const { rows } = await query(
-    `INSERT INTO whatsapp_messages (business_id, order_id, direction, phone, body, status, wasender_message_id, message_type)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [businessId || null, orderId || null, direction, phone, body || "", status || "sent", wasenderMessageId || null, messageType || "other"]
+    `INSERT INTO whatsapp_messages (business_id, order_id, direction, phone, body, status, wasender_message_id, message_type, campaign_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [businessId || null, orderId || null, direction, phone, body || "", status || "sent", wasenderMessageId || null, messageType || "other", campaignId || null]
   );
   return toWhatsAppMessageJson(rows[0]);
 }
@@ -2153,7 +2347,7 @@ async function assertWhatsAppQuotaAvailable(businessId) {
   if (used >= limit) throw new OrderError("You've used all your WhatsApp sends for this month. Upgrade your plan or buy more WhatsApp credits to keep sending.");
 }
 
-async function sendPaymentReminder(businessId, orderId, whatsapp) {
+async function sendPaymentReminder(businessId, orderId, whatsapp, messageType = "reminder") {
   await assertWhatsAppQuotaAvailable(businessId);
   const { rows } = await query(
     `SELECT o.*, c.phone AS customer_phone, c.name AS customer_name FROM orders o
@@ -2167,10 +2361,12 @@ async function sendPaymentReminder(businessId, orderId, whatsapp) {
   const { rows: businessRows } = await query("SELECT name, currency FROM businesses WHERE id = $1", [businessId]);
   const business = businessRows[0];
   const currency = business?.currency || "NGN";
-  const total = Number(order.price) * order.qty;
-  const text = `Hello ${order.customer_name || "there"}, this is a friendly reminder from ${business?.name || "us"} about your pending order for ${order.product_name} x ${order.qty} (${currency} ${total.toLocaleString()}). Please complete payment so we can process it. Thank you!`;
+  const total = Number(order.subtotal);
+  const items = await loadItemsForOrder(orderId);
+  const itemsText = items.map((i) => `${i.product_name} x ${i.qty}`).join(", ") || order.product_name;
+  const text = `Hello ${order.customer_name || "there"}, this is a friendly reminder from ${business?.name || "us"} about your pending order for ${itemsText} (${currency} ${total.toLocaleString()}). Please complete payment so we can process it. Thank you!`;
   const result = await whatsapp.sendMessage(order.customer_phone, text);
-  await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType: "reminder" });
+  await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType });
   return { sent: true, phone: order.customer_phone };
 }
 
@@ -2198,8 +2394,9 @@ async function sendPaidConfirmationIfNeeded(businessId, order, whatsapp, baseUrl
     if (!customerPhone) return;
     const { rows: bizRows } = await query("SELECT name, currency FROM businesses WHERE id = $1", [businessId]);
     const business = bizRows[0];
-    const total = Number(order.price) * order.qty;
-    const text = `Hello ${custRows[0]?.name || "there"}, we've received your payment for ${order.productName} x ${order.qty} (${business?.currency || "NGN"} ${total.toLocaleString()}). Thank you for shopping with ${business?.name || "us"}!`;
+    const total = Number(order.subtotal ?? Number(order.price) * order.qty);
+    const itemsText = order.itemsSummary || `${order.productName} x ${order.qty}`;
+    const text = `Hello ${custRows[0]?.name || "there"}, we've received your payment for ${itemsText} (${business?.currency || "NGN"} ${total.toLocaleString()}). Thank you for shopping with ${business?.name || "us"}!`;
     const imageUrl = baseUrl ? `${baseUrl}/api/receipts/${encodeURIComponent(order.id)}/image.png` : undefined;
     const result = await whatsapp.sendMessage(customerPhone, text, { imageUrl });
     await recordWhatsAppMessage(businessId, { orderId: order.id, direction: "out", phone: customerPhone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType: "paid_confirmation" });
@@ -2225,12 +2422,13 @@ async function getOrderReceiptInfo(orderId) {
   );
   const row = rows[0];
   if (!row) throw new OrderError("Order not found");
+  const items = await loadItemsForOrder(orderId);
   return {
     businessName: row.business_name,
-    productName: row.product_name,
-    qty: row.qty,
-    unitPrice: Number(row.price),
-    total: Number(row.price) * row.qty,
+    items: items.length
+      ? items.map((i) => ({ productName: i.product_name, qty: i.qty, unitPrice: Number(i.price) }))
+      : [{ productName: row.product_name, qty: row.qty, unitPrice: Number(row.price) }],
+    total: Number(row.subtotal ?? Number(row.price) * row.qty),
     currency: row.currency || "NGN",
     customerName: row.customer_name,
     orderId: row.id,
@@ -2266,6 +2464,260 @@ async function sendAllReminders(businessId, whatsapp) {
   return { total: rows.length, sent: results.filter((r) => r.sent).length, results };
 }
 
+// --- AI Automation: campaigns + proactive reminders (Slice Three item 3) --
+
+// Resolves a campaign's audience spec to customers with a phone on file.
+// "segment" reuses the same CRM segmentation shown as filter pills in the
+// Customers tab; "overdue" reuses the same Pending-payment population as
+// sendAllReminders but grouped by customer (one message per customer, not
+// per order, since a customer with 3 overdue orders shouldn't get 3 texts).
+async function resolveCampaignAudience(businessId, audience) {
+  if (audience?.type === "segment") {
+    const valid = ["New", "At Risk", "VIP", "Repeat", "Active"];
+    if (!valid.includes(audience.segment)) throw new OrderError("Invalid segment");
+    const customers = await listCustomersWithSegments(businessId);
+    return customers.filter((c) => c.segment === audience.segment && c.phone).map((c) => ({ customerId: c.id, phone: c.phone, name: c.name }));
+  }
+  if (audience?.type === "overdue") {
+    const { rows } = await query(
+      `SELECT DISTINCT c.id AS customer_id, c.phone, c.name FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       WHERE o.business_id = $1 AND o.status = 'Pending payment' AND c.phone IS NOT NULL AND c.phone != ''`,
+      [businessId]
+    );
+    return rows.map((r) => ({ customerId: r.customer_id, phone: r.phone, name: r.name }));
+  }
+  throw new OrderError("Invalid audience type");
+}
+
+// Sends one composed message to every matching customer's WhatsApp, grouped
+// under a single campaign_id so the send history can be reported as one
+// batch. Stops early on quota/rate-limit (same shape as sendAllReminders)
+// and reports partial success rather than throwing away completed sends.
+async function sendCampaign(businessId, { audience, message }, whatsapp) {
+  const text = requireString(message, "Message");
+  const recipients = await resolveCampaignAudience(businessId, audience);
+  const campaignId = crypto.randomUUID();
+  const results = [];
+  for (const r of recipients) {
+    try {
+      await assertWhatsAppQuotaAvailable(businessId);
+      const personalized = text.replace(/\{name\}/g, r.name || "there");
+      const result = await whatsapp.sendMessage(r.phone, personalized);
+      await recordWhatsAppMessage(businessId, { orderId: null, direction: "out", phone: r.phone, body: personalized, status: result.status, wasenderMessageId: result.messageId, messageType: "campaign", campaignId });
+      results.push({ customerId: r.customerId, sent: true });
+    } catch (err) {
+      results.push({ customerId: r.customerId, sent: false, error: err.message });
+      if (/used all your WhatsApp sends|rate limit|too many|429/i.test(err.message)) break;
+    }
+  }
+  return { campaignId, total: recipients.length, sent: results.filter((r) => r.sent).length, results };
+}
+
+// Pure - no query() calls, directly unit-testable. daysAfter is the
+// business's configured delay; lastAutoReminderAt is null if this order
+// never got one. Once-per-order: once lastAutoReminderAt is set, this
+// returns false forever for that order (matches sendPaidConfirmationIfNeeded's
+// existing once-per-order idempotency pattern).
+function isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, daysAfter, now = new Date() }) {
+  if (lastAutoReminderAt) return false;
+  const cutoff = new Date(now.getTime() - daysAfter * 24 * 60 * 60 * 1000);
+  return new Date(orderCreatedAt) < cutoff;
+}
+
+async function listBusinessesWithAutoReminderEnabled() {
+  const { rows } = await query("SELECT id, auto_reminder_days_after FROM businesses WHERE auto_reminder_enabled = true");
+  return rows;
+}
+
+// Called by the scheduler (server/scheduler.js) once per business opted
+// into auto-reminders. Fetches candidate orders with their last auto-reminder
+// timestamp (if any) via a LEFT JOIN, then filters in JS with
+// isOrderDueForAutoReminder rather than duplicating the date math in SQL -
+// keeps the eligibility rule in one place and independently unit-testable.
+async function sendAutoRemindersForBusiness(businessId, daysAfter, whatsapp) {
+  const { rows } = await query(
+    `SELECT o.id, o.created_at, MAX(wm.created_at) AS last_auto_reminder_at
+     FROM orders o
+     JOIN customers c ON c.id = o.customer_id
+     LEFT JOIN whatsapp_messages wm ON wm.order_id = o.id AND wm.message_type = 'auto_reminder'
+     WHERE o.business_id = $1 AND o.status = 'Pending payment' AND c.phone IS NOT NULL AND c.phone != ''
+     GROUP BY o.id, o.created_at`,
+    [businessId]
+  );
+  const due = rows.filter((r) => isOrderDueForAutoReminder({ orderCreatedAt: r.created_at, lastAutoReminderAt: r.last_auto_reminder_at, daysAfter }));
+  const results = [];
+  for (const row of due) {
+    try {
+      await assertWhatsAppQuotaAvailable(businessId);
+      await sendPaymentReminder(businessId, row.id, whatsapp, "auto_reminder");
+      results.push({ orderId: row.id, sent: true });
+    } catch (err) {
+      results.push({ orderId: row.id, sent: false, error: err.message });
+      if (/used all your WhatsApp sends|rate limit|too many|429/i.test(err.message)) break;
+    }
+  }
+  return { businessId, total: due.length, sent: results.filter((r) => r.sent).length };
+}
+
+// --- ShipBubble: real courier booking behind "SellersPoint Logistics" ------
+// shipbubble client is passed in by the caller (server/index.js), same
+// convention as sendPaymentReminder(businessId, orderId, whatsapp) - keeps
+// db.js provider-agnostic rather than importing ./shipbubble directly.
+
+async function setShipbubbleSenderAddress(businessId, addressCode) {
+  const { rows } = await query("UPDATE businesses SET shipbubble_sender_address_code = $1 WHERE id = $2 RETURNING *", [addressCode, businessId]);
+  if (!rows[0]) throw new OrderError("Business not found");
+  return toBusinessJson(rows[0]);
+}
+
+// Computes a whole cart's shipping weight from each product's own stored
+// weight (see the "weight" column on products) rather than asking the
+// seller/customer to type one in - sum(product.weight * qty), floored at
+// 1kg so a quote never fails just because every item in the cart has an
+// unset/zero weight.
+function computeCartWeight(items) {
+  const total = items.reduce((sum, i) => sum + (Number(i.weight) || 0) * i.qty, 0);
+  return Math.max(1, total);
+}
+
+// Quotes ShipBubble rates BEFORE the order exists (and before the customer
+// pays) - so the customer can pay the real, accurate total (products +
+// actual shipping cost) in one payment instead of paying an estimate now
+// and a shipping top-up later. Takes the cart's items/customer directly
+// (there's no order row yet) rather than looking them up by orderId, unlike
+// the old post-order-creation rate fetch this replaces. Returns the raw
+// ShipBubble response (request_token + couriers list) for the client to
+// render and choose from; the client's choice then travels into
+// createOrder (see above) to lock in the price.
+// Shared by both getShipbubbleQuote (dashboard, existing customer) and
+// getShipbubbleQuotePublic (storefront, no customer row yet) - resolves
+// products into ShipBubble package_items with weight split proportionally
+// by quantity (see computeCartWeight), validates the receiver address, and
+// fetches rates. senderAddressCode/receiver are pre-resolved by the caller
+// since dashboard and storefront look them up differently.
+async function fetchShipbubbleQuoteRates(businessId, { items, senderAddressCode, receiverName, receiverEmail, receiverPhone, receiverAddress, dimensions, categoryId }, shipbubble) {
+  const packageItems = [];
+  const cartWithWeights = [];
+  for (const item of items) {
+    const qty = requireNumber(item.qty ?? 1, "Quantity", { min: 1, integer: true });
+    const { rows: productRows } = await query("SELECT name, price, weight FROM products WHERE id = $1 AND business_id = $2", [item.productId, businessId]);
+    const product = productRows[0];
+    if (!product) throw new OrderError("Product not found");
+    cartWithWeights.push({ weight: product.weight, qty });
+    packageItems.push({ name: product.name, description: product.name, unit_weight: "0", unit_amount: String(product.price), quantity: String(qty) });
+  }
+  // ShipBubble wants a weight per item line, but this app only tracks one
+  // total package weight (computeCartWeight) - split it proportionally by
+  // quantity so the sum across lines still equals the real total, rather
+  // than reporting a misleadingly precise per-product weight we don't have.
+  const totalWeight = computeCartWeight(cartWithWeights);
+  const totalQty = cartWithWeights.reduce((s, i) => s + i.qty, 0) || 1;
+  packageItems.forEach((pi) => { pi.unit_weight = String((totalWeight / totalQty).toFixed(2)); });
+
+  const receiver = await shipbubble.validateAddress({
+    name: receiverName || "Customer",
+    email: receiverEmail || "noemail@sellerspoint.ng",
+    phone: receiverPhone || "",
+    address: receiverAddress,
+  });
+  return shipbubble.fetchRates({
+    senderAddressCode,
+    receiverAddressCode: receiver.address_code,
+    pickupDate: new Date().toISOString().slice(0, 10),
+    categoryId,
+    packageItems,
+    packageDimension: dimensions || { length: 20, width: 20, height: 20 },
+  });
+}
+
+async function getShipbubbleQuote(businessId, { items, customerId, receiverAddress, dimensions, categoryId }, shipbubble) {
+  requireString(receiverAddress, "Delivery address");
+  requireString(categoryId, "Package category");
+  if (!Array.isArray(items) || !items.length) throw new OrderError("Add at least one product");
+  const { rows: bizRows } = await query("SELECT shipbubble_sender_address_code FROM businesses WHERE id = $1", [businessId]);
+  const senderAddressCode = bizRows[0]?.shipbubble_sender_address_code;
+  if (!senderAddressCode) throw new OrderError("Set up your pickup address in Settings first");
+  const { rows: customerRows } = await query("SELECT name, phone, email FROM customers WHERE id = $1 AND business_id = $2", [customerId, businessId]);
+  const customer = customerRows[0];
+  if (!customer) throw new OrderError("Customer not found");
+  return fetchShipbubbleQuoteRates(businessId, {
+    items, senderAddressCode, receiverName: customer.name, receiverEmail: customer.email, receiverPhone: customer.phone, receiverAddress, dimensions, categoryId,
+  }, shipbubble);
+}
+
+// Public (unauthenticated) storefront variant - no customer row exists yet
+// at quote time (that only happens at actual checkout, via
+// findOrCreateCustomerByPhone), so the buyer's name/phone/email are passed
+// straight through instead of looked up. categoryId defaults to a generic
+// catch-all so anonymous storefront shoppers aren't asked to pick a
+// ShipBubble package category themselves.
+const STOREFRONT_DEFAULT_CATEGORY_ID = "20754594"; // "Light weight items"
+async function getShipbubbleQuotePublic(slug, { items, buyerName, buyerEmail, buyerPhone, receiverAddress }, shipbubble) {
+  requireString(receiverAddress, "Delivery address");
+  if (!Array.isArray(items) || !items.length) throw new OrderError("Your cart is empty");
+  const { rows } = await query("SELECT * FROM businesses WHERE lower(slug) = lower($1)", [slug]);
+  const business = rows[0];
+  if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) {
+    throw new OrderError("This storefront is not available");
+  }
+  const senderAddressCode = business.shipbubble_sender_address_code;
+  if (!senderAddressCode) throw new OrderError("Shipping isn't set up for this store yet");
+  const logistics = await getRawLogisticsSettings();
+  if (!logistics.enabled) throw new OrderError("SellersPoint Logistics isn't available yet");
+  return fetchShipbubbleQuoteRates(business.id, {
+    items, senderAddressCode, receiverName: buyerName, receiverEmail: buyerEmail, receiverPhone: buyerPhone, receiverAddress,
+    dimensions: { length: 20, width: 20, height: 20 }, categoryId: STOREFRONT_DEFAULT_CATEGORY_ID,
+  }, shipbubble);
+}
+
+// Finalizes the real shipment using the courier already chosen and locked
+// in at order-creation time (see createOrder + getShipbubbleQuote above) -
+// no re-quoting, and delivery_fee is NOT recomputed here, since the
+// customer already paid based on the quoted cost; this just turns that
+// quote into a real, dispatched shipment. Clears the pending fields once
+// booked so this can't be called twice for the same order.
+async function bookShipbubbleShipment(businessId, orderId, shipbubble) {
+  const { rows: existing } = await query(
+    "SELECT shipbubble_pending_request_token, shipbubble_pending_service_code, shipbubble_pending_courier_id FROM orders WHERE id = $1 AND business_id = $2",
+    [orderId, businessId]
+  );
+  const order = existing[0];
+  if (!order) throw new OrderError("Order not found");
+  if (!order.shipbubble_pending_request_token) throw new OrderError("This order has no shipping quote to book - it may already be booked, or was created before shipping was set up.");
+  const shipment = await shipbubble.createShipment({
+    requestToken: order.shipbubble_pending_request_token,
+    serviceCode: order.shipbubble_pending_service_code,
+    courierId: order.shipbubble_pending_courier_id,
+  });
+  const { rows } = await query(
+    `UPDATE orders SET shipbubble_order_id=$1, shipbubble_tracking_url=$2, shipbubble_status=$3, shipbubble_courier_name=$4,
+       shipbubble_pending_request_token=NULL, shipbubble_pending_service_code=NULL, shipbubble_pending_courier_id=NULL
+     WHERE id=$5 AND business_id=$6 RETURNING *`,
+    [shipment.order_id, shipment.tracking_url, shipment.status, shipment.courier?.name || null, orderId, businessId]
+  );
+  if (!rows[0]) throw new OrderError("Order not found");
+  return toOrderJson({ ...rows[0], items: await loadItemsForOrder(orderId) });
+}
+
+// Manual "Refresh Tracking" pull - the courier's own tracking_code is null
+// at booking time (only assigned once the courier processes the shipment),
+// so this re-fetches current status + tracking_code on demand rather than
+// relying on a webhook (deliberately out of scope for this pass).
+async function refreshShipbubbleTracking(businessId, orderId, shipbubble) {
+  const { rows: existing } = await query("SELECT shipbubble_order_id FROM orders WHERE id = $1 AND business_id = $2", [orderId, businessId]);
+  const order = existing[0];
+  if (!order) throw new OrderError("Order not found");
+  if (!order.shipbubble_order_id) throw new OrderError("This order has no shipment booked yet");
+  const shipment = await shipbubble.getShipment(order.shipbubble_order_id);
+  const { rows } = await query(
+    `UPDATE orders SET shipbubble_status=$1, shipbubble_tracking_code=$2
+     WHERE id=$3 AND business_id=$4 RETURNING *`,
+    [shipment?.status || null, shipment?.courier?.tracking_code || null, orderId, businessId]
+  );
+  return toOrderJson({ ...rows[0], items: await loadItemsForOrder(orderId) });
+}
+
 module.exports = {
   OrderError,
   healthCheck,
@@ -2275,6 +2727,17 @@ module.exports = {
   sendPaymentReminder,
   sendPaidConfirmationIfNeeded,
   sendAllReminders,
+  resolveCampaignAudience,
+  sendCampaign,
+  isOrderDueForAutoReminder,
+  listBusinessesWithAutoReminderEnabled,
+  sendAutoRemindersForBusiness,
+  computeSegments,
+  setShipbubbleSenderAddress,
+  getShipbubbleQuote,
+  getShipbubbleQuotePublic,
+  bookShipbubbleShipment,
+  refreshShipbubbleTracking,
   getOrderReceiptInfo,
   EXPENSE_CATEGORIES,
   createExpense,
@@ -2376,5 +2839,6 @@ module.exports = {
   deleteBranch,
   effectiveBranchLimit,
   getReports,
+  getReportsChart,
   recordAddonPurchase,
 };

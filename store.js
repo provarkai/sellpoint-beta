@@ -41,8 +41,16 @@ function cartCount() {
 function cartTotal() {
   return Object.entries(cart).reduce((s, [id, q]) => s + (product(id) ? effectivePrice(product(id)) : 0) * q, 0);
 }
+// Shipping shown/charged is the real ShipBubble quote plus the platform's
+// markup (store.shippingMarkup, same number the server adds in
+// checkoutStorefront) - once a courier's been chosen via "Get Delivery
+// Quote", this is what actually gets added to the Paystack charge.
+let storeShipbubbleQuote = null; // {requestToken, serviceCode, courierId, quotedCost}
+function shippingFee() {
+  return storeShipbubbleQuote ? storeShipbubbleQuote.quotedCost + Number(store.shippingMarkup || 0) : 0;
+}
 function finalTotal() {
-  return appliedCoupon ? appliedCoupon.total : cartTotal();
+  return (appliedCoupon ? appliedCoupon.total : cartTotal()) + shippingFee();
 }
 
 function renderCartBar() {
@@ -187,6 +195,9 @@ function renderCartModal() {
     $("payOnlineFields").style.display = "block";
     $("payOnline").style.display = "inline-grid";
   }
+  if (store.onlinePaymentEnabled && store.shippingAvailable) {
+    $("shippingFields").style.display = "block";
+  }
 }
 
 $("viewCart").onclick = () => { renderCartModal(); $("cartModal").showModal(); };
@@ -234,6 +245,62 @@ $("orderWhatsApp").onclick = () => {
   $("cartModal").close();
 };
 
+// Delivery-by-courier option (SellersPoint Logistics) - only shown when
+// both the platform and this specific business have shipping set up (see
+// store.shippingAvailable, from getStorefront in db.js). A real ShipBubble
+// quote must be obtained BEFORE paying, same "pay the accurate total in
+// one payment" principle as the dashboard's order form.
+if ($("storeDeliveryMethod")) $("storeDeliveryMethod").onchange = () => {
+  const isCourier = $("storeDeliveryMethod").value === "sellerspoint";
+  $("storeShipAddressWrap").style.display = isCourier ? "block" : "none";
+  storeShipbubbleQuote = null;
+  $("storeShipChosenNote").textContent = "";
+  $("storeShipRatesList").innerHTML = "";
+  renderCartModal();
+};
+if ($("storeGetShippingQuote")) $("storeGetShippingQuote").onclick = async () => {
+  const entries = Object.entries(cart);
+  if (!entries.length) return toast("Your cart is empty");
+  const buyerName = $("buyerName").value.trim();
+  const buyerEmail = $("buyerEmail").value.trim();
+  const receiverAddress = $("storeShipAddress").value.trim();
+  if (!buyerName || !buyerEmail) return toast("Enter your name and email first");
+  if (!receiverAddress) return toast("Enter a delivery address");
+  const btn = $("storeGetShippingQuote");
+  btn.disabled = true;
+  btn.textContent = "Getting rates...";
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(getSlug())}/shipbubble-quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: entries.map(([productId, qty]) => ({ productId, qty })),
+        buyerName, buyerEmail, buyerPhone: $("buyerPhone").value.trim(), receiverAddress,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Could not get delivery rates");
+    const cheapestId = result.cheapest_courier?.courier_id, fastestId = result.fastest_courier?.courier_id;
+    $("storeShipRatesList").innerHTML = (result.couriers || []).map((c) => {
+      const tags = [c.courier_id === cheapestId ? "Cheapest" : "", c.courier_id === fastestId ? "Fastest" : ""].filter(Boolean).join(" · ");
+      const displayTotal = c.total + Number(store.shippingMarkup || 0);
+      return `<div class="item" style="cursor:pointer" onclick="selectStoreCourier('${c.courier_id}','${c.service_code}',${c.total},'${result.request_token}',this)"><div class="item-top"><strong>${clean(c.courier_name)}</strong><span>${money(displayTotal)}</span></div><div class="meta">${clean(c.delivery_eta_time || "")}${tags ? " - " + tags : ""}</div></div>`;
+    }).join("") || `<div class="item"><span class="meta">No couriers available for this address</span></div>`;
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Get Delivery Quote";
+  }
+};
+function selectStoreCourier(courierId, serviceCode, quotedCost, requestToken, el) {
+  storeShipbubbleQuote = { requestToken, serviceCode, courierId, quotedCost };
+  $("storeShipRatesList").querySelectorAll(".item").forEach((i) => (i.style.outline = "none"));
+  el.style.outline = "2px solid var(--primary, #147d64)";
+  $("storeShipChosenNote").textContent = `Selected - ${money(shippingFee())} added to your total.`;
+  renderCartModal();
+}
+
 // Optional alternative to the WhatsApp flow above - only shown when the
 // seller has set up Paystack subaccount payments (store.onlinePaymentEnabled).
 if ($("payOnline")) $("payOnline").onclick = async () => {
@@ -242,6 +309,8 @@ if ($("payOnline")) $("payOnline").onclick = async () => {
   const buyerName = $("buyerName").value.trim();
   const buyerEmail = $("buyerEmail").value.trim();
   if (!buyerName || !buyerEmail) return toast("Enter your name and email to pay online");
+  const deliveryMethod = $("storeDeliveryMethod") ? $("storeDeliveryMethod").value : "self";
+  if (deliveryMethod === "sellerspoint" && !storeShipbubbleQuote) return toast("Get a delivery quote first");
   const btn = $("payOnline");
   btn.disabled = true;
   btn.textContent = "Redirecting...";
@@ -256,12 +325,20 @@ if ($("payOnline")) $("payOnline").onclick = async () => {
         buyerPhone: $("buyerPhone").value.trim(),
         buyerLocation: $("buyerLocation").value.trim(),
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        deliveryMethod,
+        ...(deliveryMethod === "sellerspoint" ? {
+          shipbubbleRequestToken: storeShipbubbleQuote.requestToken,
+          shipbubbleServiceCode: storeShipbubbleQuote.serviceCode,
+          shipbubbleCourierId: storeShipbubbleQuote.courierId,
+          shipbubbleQuotedCost: storeShipbubbleQuote.quotedCost,
+        } : {}),
       }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Could not start payment");
     cart = {};
     appliedCoupon = null;
+    storeShipbubbleQuote = null;
     saveCart();
     location.href = json.authorizationUrl;
   } catch (err) {

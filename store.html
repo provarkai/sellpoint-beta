@@ -64,6 +64,15 @@
       <label>Your email <span class="meta">(needed to pay online)</span><input id="buyerEmail" type="email" placeholder="you@example.com"></label>
       <label>Phone<input id="buyerPhone" placeholder="2348012345678"></label>
     </div>
+    <div id="shippingFields" style="display:none">
+      <label>Delivery method<select id="storeDeliveryMethod"><option value="self">Self-pickup / arrange my own delivery</option><option value="sellerspoint">Delivery by courier (SellersPoint Logistics)</option></select></label>
+      <div id="storeShipAddressWrap" style="display:none">
+        <label>Full delivery address<textarea id="storeShipAddress" rows="2" placeholder="Street, area, city, state"></textarea></label>
+        <p class="actions"><button type="button" id="storeGetShippingQuote">Get Delivery Quote</button></p>
+        <div id="storeShipRatesList" class="list"></div>
+        <p class="meta" id="storeShipChosenNote"></p>
+      </div>
+    </div>
     <p class="actions">
       <button id="closeCart">Cancel</button>
       <button id="orderWhatsApp">Order via WhatsApp</button>

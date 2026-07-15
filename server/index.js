@@ -11,7 +11,9 @@ const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
 const whatsapp = require("./whatsapp");
+const shipbubble = require("./shipbubble");
 const { renderReceiptPng } = require("./receiptImage");
+const { startScheduler } = require("./scheduler");
 
 // Optional - error monitoring. Falls back to console.error-only (already
 // happening in handle() below) when SENTRY_DSN isn't set, same
@@ -411,6 +413,68 @@ app.post(
   })
 );
 
+// ShipBubble pickup address setup (real courier behind "SellersPoint
+// Logistics") - a one-time verify step, same shape as the Paystack
+// subaccount flow above. req.user.email backs the address-validation
+// contact email since businesses don't store their own email column.
+// contactName (not the business name) is what's sent to ShipBubble as the
+// pickup contact - ShipBubble's validator specifically wants a two-word
+// person-style name ("who should the courier ask for"), which most business
+// names (often one word, e.g. "SellerPoint") don't satisfy.
+app.post(
+  "/api/business/shipbubble-pickup-address",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set this up" });
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    const { contactName, address } = req.body || {};
+    if (!contactName || !String(contactName).trim()) return res.status(400).json({ error: "Pickup contact name is required" });
+    if (!address || !String(address).trim()) return res.status(400).json({ error: "Pickup address is required" });
+    const business = await db.getBusiness(req.businessId);
+    const validated = await shipbubble.validateAddress({ name: contactName, email: req.user.email, phone: business.businessPhone, address });
+    res.json(await db.setShipbubbleSenderAddress(req.businessId, validated.address_code));
+  })
+);
+
+app.get(
+  "/api/shipbubble/categories",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    res.json(await shipbubble.listCategories());
+  })
+);
+
+// Quotes real ShipBubble rates BEFORE an order is created, so the customer
+// can pay the accurate total (product + real shipping) in one payment - see
+// db.js's getShipbubbleQuote for why this moved earlier than booking.
+app.post(
+  "/api/shipbubble/quote",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    res.json(await db.getShipbubbleQuote(req.businessId, req.body || {}, shipbubble));
+  })
+);
+
+app.post(
+  "/api/orders/:id/shipbubble-book",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    res.json(await db.bookShipbubbleShipment(req.businessId, req.params.id, shipbubble));
+  })
+);
+
+app.post(
+  "/api/orders/:id/shipbubble-refresh-tracking",
+  requireAuth,
+  handle(async (req, res) => {
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    res.json(await db.refreshShipbubbleTracking(req.businessId, req.params.id, shipbubble));
+  })
+);
+
 app.put(
   "/api/business/payment-settings",
   requireAuth,
@@ -432,13 +496,26 @@ app.post(
   })
 );
 
+// Public, no auth - quotes real ShipBubble rates for a storefront cart
+// before checkout, same "customer pays the accurate total in one payment"
+// principle as the dashboard's pre-order quote flow (see db.js's
+// getShipbubbleQuotePublic).
+app.post(
+  "/api/store/:slug/shipbubble-quote",
+  handle(async (req, res) => {
+    if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
+    const { items, buyerName, buyerEmail, buyerPhone, receiverAddress } = req.body || {};
+    res.json(await db.getShipbubbleQuotePublic(req.params.slug, { items, buyerName, buyerEmail, buyerPhone, receiverAddress }, shipbubble));
+  })
+);
+
 // Public, no auth - a storefront visitor paying for their cart online.
 app.post(
   "/api/store/:slug/checkout",
   handle(async (req, res) => {
     if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
-    const { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode } = req.body || {};
-    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode });
+    const { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode, deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost } = req.body || {};
+    const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode, deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost });
     const reference = `spord_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/store/${req.params.slug}?reference=${reference}`;
     const initialized = await payments.initializeStorefrontCheckout({
@@ -505,6 +582,30 @@ app.post(
   handle(async (req, res) => {
     if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
     res.json(await db.sendAllReminders(req.businessId, whatsapp));
+  })
+);
+// AI Automation (Slice Three item 3): segment-targeted campaign send. Owner-only
+// - composing and blasting a message to a whole segment is a higher-stakes
+// action than a single reminder, same trust boundary as coupons/staff invites.
+app.post(
+  "/api/campaigns/send",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can send campaigns" });
+    if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
+    const { audience, message } = req.body || {};
+    res.json(await db.sendCampaign(req.businessId, { audience, message }, whatsapp));
+  })
+);
+// AI Automation: opt-in toggle for proactive payment reminders, picked up by
+// the scheduler (server/scheduler.js) rather than a manual click.
+app.put(
+  "/api/business/auto-reminder-settings",
+  requireAuth,
+  handle(async (req, res) => {
+    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change this setting" });
+    const { enabled, daysAfter } = req.body || {};
+    res.json(await db.updateBusiness(req.businessId, { autoReminderEnabled: enabled, autoReminderDaysAfter: daysAfter }));
   })
 );
 // Public, no auth - WasenderAPI's servers fetch this URL directly when
@@ -878,13 +979,17 @@ app.post(
     // "Paid revenue" means what it says - Quotes aren't real sales yet and
     // Refunded orders no longer are, so both are excluded here (and from
     // the best-seller tally below) so the AI never states an inflated
-    // number as fact.
-    const revenue = state.orders.filter((o) => ["Paid", "Delivered"].includes(o.status)).reduce((s, o) => s + (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty, 0);
+    // number as fact. subtotal is the order's locked-in total (see
+    // createOrder in db.js), the same number the seller was actually
+    // charged/paid - authoritative over re-deriving from current product
+    // prices, which may have changed since the order was placed.
+    const revenue = state.orders.filter((o) => ["Paid", "Delivered"].includes(o.status)).reduce((s, o) => s + Number(o.subtotal || 0), 0);
     const tally = {};
     state.orders.forEach((o) => {
       if (o.status === "Quote" || o.status === "Refunded") return;
-      const n = state.products.find((p) => p.id === o.productId)?.name || o.productName;
-      if (n) tally[n] = (tally[n] || 0) + o.qty;
+      (o.items || []).forEach((item) => {
+        if (item.productName) tally[item.productName] = (tally[item.productName] || 0) + item.qty;
+      });
     });
     const bestSeller = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
     // "ask" answers free-form questions about the business ("Who owes me
@@ -896,8 +1001,7 @@ app.post(
     const owedByCustomer = {};
     pending.forEach((o) => {
       const name = state.customers.find((c) => c.id === o.customerId)?.name || "a customer";
-      const amt = (state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty;
-      owedByCustomer[name] = (owedByCustomer[name] || 0) + amt;
+      owedByCustomer[name] = (owedByCustomer[name] || 0) + Number(o.subtotal || 0);
     });
     const lowStock = state.products.filter((p) => p.stock < 5);
     // Broader business context beyond orders/products/customers, gathered
@@ -926,7 +1030,7 @@ app.post(
         return entries.length ? "Customers who owe you money: " + entries.map(([n, a]) => `${n} (${money(a)})`).join(", ") + "." : "No one currently owes you money - all orders are paid up.";
       }
       if (/overdue|credit sale|due date|late payment/.test(lower)) {
-        return overdueCredit.length ? "Overdue credit sales: " + overdueCredit.map((o) => `${state.customers.find((c) => c.id === o.customerId)?.name || "a customer"} (${money((state.products.find((p) => p.id === o.productId)?.price || o.price || 0) * o.qty)}, due ${new Date(o.dueDate).toISOString().slice(0, 10)})`).join(", ") + "." : "No overdue credit sales right now.";
+        return overdueCredit.length ? "Overdue credit sales: " + overdueCredit.map((o) => `${state.customers.find((c) => c.id === o.customerId)?.name || "a customer"} (${money(Number(o.subtotal || 0))}, due ${new Date(o.dueDate).toISOString().slice(0, 10)})`).join(", ") + "." : "No overdue credit sales right now.";
       }
       if (/restock|low stock|running out/.test(lower)) {
         return lowStock.length ? "Restock soon: " + lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") + "." : "Nothing is low on stock right now.";
@@ -959,10 +1063,11 @@ app.post(
     const recentQty = {}, previousQty = {};
     state.orders.forEach((o) => {
       const t = new Date(o.createdAt).getTime();
-      const name = state.products.find((p) => p.id === o.productId)?.name || o.productName;
-      if (!name) return;
-      if (t > now - 7 * DAY_MS) recentQty[name] = (recentQty[name] || 0) + o.qty;
-      else if (t > now - 14 * DAY_MS) previousQty[name] = (previousQty[name] || 0) + o.qty;
+      (o.items || []).forEach((item) => {
+        if (!item.productName) return;
+        if (t > now - 7 * DAY_MS) recentQty[item.productName] = (recentQty[item.productName] || 0) + item.qty;
+        else if (t > now - 14 * DAY_MS) previousQty[item.productName] = (previousQty[item.productName] || 0) + item.qty;
+      });
     });
     let trending = null;
     for (const name of Object.keys(recentQty)) {
@@ -1116,6 +1221,19 @@ app.get(
       return res.status(403).json({ error: "Reports are available on the Growth plan and above" });
     }
     res.json(await db.getReports(req.businessId, tier));
+  })
+);
+
+app.get(
+  "/api/reports/chart",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.getBusiness(req.businessId);
+    const tier = pricing.reportsTierFor(business.plan);
+    if (tier === "none") {
+      return res.status(403).json({ error: "Reports are available on the Growth plan and above" });
+    }
+    res.json(await db.getReportsChart(req.businessId, { from: req.query.from, to: req.query.to }));
   })
 );
 
@@ -1389,4 +1507,5 @@ app.put(
 
 app.listen(PORT, HOST, () => {
   console.log(`SellersPoint running at http://${HOST}:${PORT}`);
+  startScheduler();
 });

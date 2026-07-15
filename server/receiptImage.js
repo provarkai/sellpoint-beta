@@ -36,10 +36,11 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-function renderReceiptPng({ businessName, productName, qty, unitPrice, total, currency, customerName, orderId, date }) {
+function renderReceiptPng({ businessName, items, total, currency, customerName, orderId, date }) {
+  // One row per line item (a real multi-item order shows every product it
+  // contains, not just the first) followed by the fixed summary rows.
   const rows = [
-    ["Item", `${productName} x ${qty}`],
-    ["Unit price", `${currency} ${Number(unitPrice).toLocaleString()}`],
+    ...(items || []).map((i) => ["Item", `${i.productName} x ${i.qty} (${currency} ${Number(i.unitPrice).toLocaleString()} ea)`]),
     ["Total paid", `${currency} ${Number(total).toLocaleString()}`],
     ["Customer", customerName || "-"],
     ["Order ref", orderId],

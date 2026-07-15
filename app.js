@@ -14,13 +14,14 @@ async function api(method,url,body){const res=await fetch(url,{method,headers:{.
 function applyState(s){Object.assign(state,s.business,{products:s.products,customers:s.customers,orders:s.orders,events:s.events})}
 async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo)]);applyState(s);pricing=p;myRole=me.role;logisticsInfo=log;updateDeliveryMethodOptions()}
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
-const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>(product(o.productId)?.price||o.price||0)*o.qty;
+const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>Number(o.subtotal||0);
+const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName} x ${i.qty}`).join(", "):`${o.productName} x ${o.qty}`);
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Logistics",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Delivery",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
-function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;const n=product(o.productId)?.name||o.productName;if(n)t[n]=(t[n]||0)+o.qty});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
+function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
 function productDetailsHtml(p){if(p.type==="Digital product")return `<div class="delivery-box"><b>Digital delivery</b><br>${p.deliveryLink?`<a href="${p.deliveryLink}" target="_blank" rel="noopener">Download / access link</a><br>`:"No delivery link set.<br>"}<span>${clean(p.deliveryNote||"No delivery note added.")}</span></div>`;if(p.type==="Service")return `<div class="delivery-box"><b>Service details</b><br><span>${clean(p.deliveryNote||"No booking instructions added.")}</span></div>`;return `<div class="delivery-box"><b>Product details</b><br><span>Category: ${clean(p.category||"General")}</span></div>`}
 function render(){
@@ -29,7 +30,7 @@ function render(){
   const visibleCustomers=customerSegmentFilter?state.customers.filter(c=>(customerSegments[c.id]?.segment)===customerSegmentFilter):state.customers;
   $("cList").innerHTML=visibleCustomers.map(c=>{const seg=customerSegments[c.id]?.segment;return `<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}${c.email?` - ${clean(c.email)}`:""}${seg?` - ${segmentLabel(seg)}`:""}</div><div class="item-actions"><button onclick="openCustomerTimeline('${c.id}')">Timeline</button><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`}).join("");
   renderSegmentFilter();
-  $("oList").innerHTML=state.orders.map(o=>{const p=product(o.productId),c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}${o.deliveryFee?` - Delivery fee: ${money(o.deliveryFee)}`:""}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">Receipt</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button><button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
+  $("oList").innerHTML=state.orders.map(o=>{const c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;const isSellerspoint=o.deliveryMethod==="sellerspoint";const shipButton=!isSellerspoint?"":o.shipbubbleOrderId?`<a class="button-link" href="${o.shipbubbleTrackingUrl}" target="_blank" rel="noopener">Track Shipment</a><button onclick="refreshShipbubbleTracking('${o.id}')">Refresh Tracking</button>`:o.status==="Paid"?`<button onclick="bookShipbubbleShipment('${o.id}')">Book Shipment</button>`:"";const deliveryFeeLabel=o.deliveryFee?` - Delivery fee: ${money(o.deliveryFee)}${isSellerspoint&&!o.shipbubbleOrderId?" (courier not yet booked)":""}`:"";const trackingLabel=!o.shipbubbleOrderId?"":o.shipbubbleTrackingCode?` - Tracking code: ${clean(o.shipbubbleTrackingCode)}`:" - Tracking code: pending (courier hasn't assigned one yet)";return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}${deliveryFeeLabel}${trackingLabel}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">Receipt</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>${shipButton}<button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
   const pLimRaw=pricing[state.plan]?.productLimit,pLim=pLimRaw===null||pLimRaw===undefined?Infinity:pLimRaw;
   $("pCount").textContent=`${state.products.length}/${pLim===Infinity?"unlimited":pLim} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;if($("used"))$("used").textContent=state.orders.length;
   if($("planName"))$("planName").textContent=pricing[state.plan]?.name||state.plan;
@@ -40,11 +41,22 @@ function render(){
   if($("paywallPlans"))$("paywallPlans").innerHTML=Object.entries(pricing).filter(([key,t])=>key!=="starter"&&t.monthly!=null).map(([key,t],i)=>`<div class="${i===0?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
   const rev=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>s+total(o),0), low=state.products.filter(p=>p.stock<5), pending=state.orders.filter(o=>o.status==="Pending payment").length;
   $("rev").textContent=money(rev);$("ordMetric").textContent=state.orders.length;$("custMetric").textContent=state.customers.length;$("lowMetric").textContent=low.length;
-  $("summary").innerHTML=`<b>${state.orders.length}</b> orders recorded.<br><b>${pending}</b> orders need payment follow-up.<br>Best seller: <b>${clean(bestProduct()||"Not enough sales yet")}</b>.<br>Paid revenue: <b>${money(rev)}</b>.`;
+  $("summary").innerHTML=`Best seller: <b>${clean(bestProduct()||"Not enough sales yet")}</b>.<br><b>${pending}</b> orders need payment follow-up.`;
+  const isToday=iso=>{const d=new Date(iso),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
+  const todayOrders=state.orders.filter(o=>isToday(o.createdAt));
+  const todayPaid=todayOrders.filter(o=>["Paid","Delivered"].includes(o.status));
+  const todayRevenue=todayPaid.reduce((s,o)=>s+total(o),0);
+  const todayCustomers=state.customers.filter(c=>c.createdAt&&isToday(c.createdAt)).length;
+  const avgOrder=todayPaid.length?todayRevenue/todayPaid.length:0;
+  if($("todayRevenue"))$("todayRevenue").textContent=money(todayRevenue);
+  if($("todayOrders"))$("todayOrders").textContent=todayOrders.length;
+  if($("todayCustomers"))$("todayCustomers").textContent=todayCustomers;
+  if($("todayAvgOrder"))$("todayAvgOrder").textContent=money(avgOrder);
   $("restock").innerHTML=low.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} left - restock soon</span></div>`).join("");
   renderActivationChecklist();
-  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId),p=product(o.productId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(p?.name||o.productName)} x ${o.qty} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
+  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
   renderSmartAlerts();
+  renderShipbubbleStatus();
   opts($("oCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("oProduct"),state.products,p=>`${p.name} - ${p.discountPrice?money(p.discountPrice)+" (was "+money(p.price)+")":money(p.price)} - ${p.stock} left`,"Add a product first");opts($("aiProduct"),state.products,p=>p.name,"Add a product first");opts($("aiCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("invSelect"),state.orders,o=>`${customer(o.customerId)?.name||"Customer"} - ${money(total(o))}`,"No orders yet");renderInvoice();
 }
 function updateProductFields(){const t=$("pType").value;$("pDeliveryLinkField").style.display=t==="Digital product"?"block":"none";$("pNoteField").style.display=t==="Product"?"none":"block";$("pNoteLabel").textContent=t==="Service"?"Booking / service instructions":"Delivery note"}
@@ -55,7 +67,7 @@ let pendingImages=[];
 function renderImagePreview(){if($("pImagePreview"))$("pImagePreview").innerHTML=pendingImages.map((src,i)=>`<div class="product-photo-thumb"><img src="${src}" alt=""><button type="button" onclick="removePendingImage(${i})">&times;</button></div>`).join("")}
 function removePendingImage(i){pendingImages.splice(i,1);renderImagePreview()}
 if($("pImage"))$("pImage").onchange=async e=>{const files=[...e.target.files].slice(0,Math.max(0,5-pendingImages.length));for(const f of files){pendingImages.push(await readFileAsDataUrl(f))}renderImagePreview();e.target.value=""};
-function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
+function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;if($("pWeight"))$("pWeight").value=p.weight??"";$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
 function cancelEditProduct(){editingProductId=null;pendingImages=[];renderImagePreview();$("productForm").reset();updateProductFields();$("pFormTitle").textContent="Add product / service";$("pSubmitBtn").textContent="Save Item";$("pCancelEdit").style.display="none"}
 if($("pCancelEdit"))$("pCancelEdit").onclick=cancelEditProduct;
 async function loadBatches(){
@@ -102,11 +114,12 @@ if($("posCompleteSale"))$("posCompleteSale").onclick=async()=>{
   if(!posCart.length)return toast("Cart is empty");
   try{
     const created=await api("POST","/api/pos/checkout",{items:posCart.map(l=>({productId:l.productId,qty:l.qty})),customerId:$("posCustomer").value||undefined});
-    created.forEach(o=>{state.orders.unshift(o);const p=product(o.productId);if(p)p.stock-=o.qty});
+    created.forEach(o=>{state.orders.unshift(o);(o.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock-=item.qty})});
+    const itemCount=posCart.reduce((s,l)=>s+l.qty,0);
     posCart=[];
     renderPosCart();
     render();
-    toast(`Sale completed - ${created.length} item(s)`);
+    toast(`Sale completed - ${itemCount} item(s)`);
   }catch(err){toast(err.message)}
 };
 if($("batchForm"))$("batchForm").onsubmit=async e=>{e.preventDefault();try{if(!$("bProduct").value)return toast("Add a product first");await api("POST","/api/batches",{productId:$("bProduct").value,batchNumber:$("bNumber").value.trim(),quantity:+$("bQty").value,expiryDate:$("bExpiry").value||undefined,costPrice:$("bCost").value?+$("bCost").value:undefined});e.target.reset();loadBatches();toast("Batch logged")}catch(err){toast(err.message)}};
@@ -121,7 +134,7 @@ if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   }catch(err){toast(err.message)}
   finally{btn.disabled=false;btn.textContent="Write with AI"}
 };
-$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages};
+$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const weightRaw=$("pWeight")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,weight:weightRaw?+weightRaw:null,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages};
   if(editingProductId){const updated=await api("PUT",`/api/products/${editingProductId}`,payload);const idx=state.products.findIndex(x=>x.id===editingProductId);if(idx>-1)state.products[idx]=updated;cancelEditProduct();render();toast("Item updated")}
   else{const created=await api("POST","/api/products",payload);state.products.unshift(created);e.target.reset();pendingImages=[];renderImagePreview();updateProductFields();render();toast("Item saved")}
 }catch(err){toast(err.message)}};
@@ -160,7 +173,7 @@ function renderCustomerTimeline(t){
   $("ctName").textContent=t.customer.name;
   $("ctSegment").textContent=`${t.customer.segment} - ${money(t.customer.totalSpend)} total spend - ${t.customer.paidOrderCount} completed order${t.customer.paidOrderCount===1?"":"s"}`;
   $("ctBalances").textContent=`${t.customer.loyaltyPoints} loyalty points (worth ${money(t.customer.loyaltyPoints*(state.loyaltyRedeemValue??1))}) - ${money(t.customer.walletBalance)} wallet balance`;
-  const orderEntries=t.orders.map(o=>({type:"order",at:o.createdAt,html:`<div class="item"><div class="item-top"><strong>${clean(o.productName)} x ${o.qty}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(o.status)} - ${date(o.createdAt)}</div></div>`}));
+  const orderEntries=t.orders.map(o=>({type:"order",at:o.createdAt,html:`<div class="item"><div class="item-top"><strong>${clean(orderItemsText(o))}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(o.status)} - ${date(o.createdAt)}</div></div>`}));
   const noteEntries=t.notes.map(n=>({type:"note",at:n.createdAt,html:`<div class="item"><div class="item-top"><strong>Note</strong><span>${date(n.createdAt)}</span></div><div class="meta">${clean(n.note)}</div><div class="item-actions"><button onclick="delCustomerNote('${n.id}')">Delete</button></div></div>`}));
   const loyaltyEntries=(t.loyaltyLedger||[]).map(l=>({type:"loyalty",at:l.createdAt,html:`<div class="item"><div class="item-top"><strong>${l.points>0?"+":""}${l.points} points</strong><span>${date(l.createdAt)}</span></div><div class="meta">${clean(l.reason)}</div></div>`}));
   const walletEntries=(t.walletLedger||[]).map(w=>({type:"wallet",at:w.createdAt,html:`<div class="item"><div class="item-top"><strong>${w.amount>0?"+":""}${money(w.amount)} wallet</strong><span>${date(w.createdAt)}</span></div><div class="meta">${clean(w.reason)}</div></div>`}));
@@ -172,14 +185,44 @@ async function delCustomerNote(noteId){try{await api("DELETE",`/api/customers/${
 if($("ctRedeemForm"))$("ctRedeemForm").onsubmit=async e=>{e.preventDefault();try{const t=await api("POST",`/api/customers/${viewingCustomerId}/redeem-points`,{points:+$("ctRedeemPoints").value,reason:$("ctRedeemReason").value.trim()});$("ctRedeemForm").reset();renderCustomerTimeline(t);loadCustomerSegments();toast("Points redeemed")}catch(err){toast(err.message)}};
 if($("ctWalletForm"))$("ctWalletForm").onsubmit=async e=>{e.preventDefault();try{const t=await api("POST",`/api/customers/${viewingCustomerId}/wallet-adjust`,{amount:+$("ctWalletAmount").value,reason:$("ctWalletReason").value.trim()});$("ctWalletForm").reset();renderCustomerTimeline(t);toast("Wallet adjusted")}catch(err){toast(err.message)}};
 if($("closeCustomerTimeline"))$("closeCustomerTimeline").onclick=()=>$("customerTimelineModal").close();
-$("orderForm").onsubmit=async e=>{e.preventDefault();const p=product($("oProduct").value),c=customer($("oCustomer").value),q=+$("oQty").value,status=$("oStatus").value,isQuote=status==="Quote";if(!isQuote&&state.orders.filter(o=>o.status!=="Quote").length>=orderLimit()){showPaywall();return}if(!p||!c)return toast("Add product and customer first");if(!isQuote&&q>p.stock)return toast("Not enough stock");try{const created=await api("POST","/api/orders",{productId:p.id,customerId:c.id,qty:q,status,deliveryMethod:$("oDeliveryMethod")?.value||"self",dueDate:$("oDueDate")?.value||undefined});if(!isQuote)p.stock-=q;state.orders.unshift(created);e.target.reset();$("oQty").value=1;render();toast(isQuote?"Quote saved":"Order created")}catch(err){toast(err.message)}};
+// Real multi-item orders: a running cart on the New Order form itself
+// (same pattern as POS's posCart), added to via "Add to Order" instead of
+// one product/qty pair submitted directly.
+let orderCart=[];
+function renderOrderCart(){
+  if(!$("oCartList"))return;
+  $("oCartCount").textContent=orderCart.length?`(${orderCart.reduce((s,l)=>s+l.qty,0)} items)`:"";
+  $("oCartList").innerHTML=orderCart.map((l,i)=>`<div class="item"><div class="item-top"><strong>${clean(l.name)}</strong><span>${money(l.price*l.qty)}</span></div><div class="meta">${money(l.price)} each</div><div class="item-actions"><button type="button" onclick="orderAdjustQty(${i},-1)">-</button><span>${l.qty}</span><button type="button" onclick="orderAdjustQty(${i},1)">+</button><button type="button" onclick="orderRemoveLine(${i})">Remove</button></div></div>`).join("")||`<div class="item"><span class="meta">No items yet - pick a product above and click "Add to Order"</span></div>`;
+  $("oCartTotal").textContent=money(orderCart.reduce((s,l)=>s+l.price*l.qty,0));
+  clearShipbubbleQuoteAndUpdate();
+}
+function orderAdjustQty(i,delta){orderCart[i].qty+=delta;if(orderCart[i].qty<=0)orderCart.splice(i,1);renderOrderCart()}
+function orderRemoveLine(i){orderCart.splice(i,1);renderOrderCart()}
+if($("oAddItem"))$("oAddItem").onclick=()=>{
+  const p=product($("oProduct").value),q=+$("oQty").value||1;
+  if(!p)return toast("Choose a product first");
+  const existing=orderCart.find(l=>l.productId===p.id);
+  if(existing)existing.qty+=q;else orderCart.push({productId:p.id,name:p.name,price:p.discountPrice||p.price,qty:q});
+  $("oQty").value=1;
+  renderOrderCart();
+};
+$("orderForm").onsubmit=async e=>{e.preventDefault();const c=customer($("oCustomer").value),status=$("oStatus").value,isQuote=status==="Quote",method=$("oDeliveryMethod")?.value||"self";if(!orderCart.length)return toast("Add at least one item to the order");if(!isQuote&&state.orders.filter(o=>o.status!=="Quote").length>=orderLimit()){showPaywall();return}if(!c)return toast("Choose a customer first");if(method==="sellerspoint"&&!shipbubbleChosenQuote)return toast("Get a shipping quote first");try{const payload={items:orderCart.map(l=>({productId:l.productId,qty:l.qty})),customerId:c.id,status,deliveryMethod:method,dueDate:$("oDueDate")?.value||undefined};if(method==="sellerspoint"){payload.shipbubbleRequestToken=shipbubbleChosenQuote.requestToken;payload.shipbubbleServiceCode=shipbubbleChosenQuote.serviceCode;payload.shipbubbleCourierId=shipbubbleChosenQuote.courierId;payload.shipbubbleQuotedCost=shipbubbleChosenQuote.quotedCost}const created=await api("POST","/api/orders",payload);if(!isQuote)(created.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock-=item.qty});state.orders.unshift(created);e.target.reset();$("oQty").value=1;orderCart=[];renderOrderCart();shipbubbleChosenQuote=null;updateDeliveryFeeEstimate();render();toast(isQuote?"Quote saved":"Order created")}catch(err){toast(err.message)}};
 function updateDeliveryMethodOptions(){const opt=$("oDeliveryMethod")?.querySelector('option[value="sellerspoint"]');if(!opt)return;if(logisticsInfo.enabled){opt.disabled=false;opt.textContent="SellersPoint Logistics"}else{opt.disabled=true;opt.textContent="SellersPoint Logistics (not available yet)"}updateDeliveryFeeEstimate()}
-function updateDeliveryFeeEstimate(){const est=$("oDeliveryFeeEstimate");if(!est)return;const method=$("oDeliveryMethod")?.value;if(method!=="sellerspoint"||!logisticsInfo.enabled){est.textContent="";return}const p=product($("oProduct")?.value),q=+($("oQty")?.value||1);const subtotal=(p?.price||0)*q;const fee=Math.round(subtotal*(logisticsInfo.percentFee/100)+logisticsInfo.flatFee);est.textContent=`Estimated delivery fee: ${money(fee)}`}
-if($("oDeliveryMethod")){$("oDeliveryMethod").onchange=updateDeliveryFeeEstimate}
-if($("oProduct")){$("oProduct").addEventListener("change",updateDeliveryFeeEstimate)}
-if($("oQty")){$("oQty").addEventListener("input",updateDeliveryFeeEstimate)}
-async function convertOrder(id){try{const updated=await api("POST",`/api/orders/${id}/convert`,{});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;const p=product(updated.productId);if(p)p.stock-=updated.qty;render();toast("Quote converted to order")}catch(err){toast(err.message)}}
-async function refundOrder(id){const restock=confirm("Restock the item(s) from this order?");try{const updated=await api("PATCH",`/api/orders/${id}`,{refund:true,restock});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;if(restock){const p=product(updated.productId);if(p)p.stock+=updated.qty}render();toast("Order refunded")}catch(err){toast(err.message)}}
+// Real shipping cost comes from a locked-in ShipBubble quote (see the
+// "Get Shipping Quote" flow above), not a synchronous flat/percent
+// estimate - there's nothing to show until the seller has actually gotten
+// a quote for this order's cart.
+function updateDeliveryFeeEstimate(){
+  const est=$("oDeliveryFeeEstimate"),wrap=$("oGetShippingQuoteWrap");
+  if(!est)return;
+  const method=$("oDeliveryMethod")?.value;
+  if(method!=="sellerspoint"||!logisticsInfo.enabled){est.textContent="";if(wrap)wrap.style.display="none";return}
+  if(wrap)wrap.style.display=orderCart.length?"block":"none";
+  est.textContent=shipbubbleChosenQuote?`Delivery fee (real courier cost + markup): ${money(shipbubbleChosenQuote.quotedCost+logisticsInfo.flatFee)}`:"Get a shipping quote to see the real delivery cost before creating this order.";
+}
+function clearShipbubbleQuoteAndUpdate(){shipbubbleChosenQuote=null;updateDeliveryFeeEstimate()}
+async function convertOrder(id){try{const updated=await api("POST",`/api/orders/${id}/convert`,{});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;(updated.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock-=item.qty});render();toast("Quote converted to order")}catch(err){toast(err.message)}}
+async function refundOrder(id){const restock=confirm("Restock the item(s) from this order?");try{const updated=await api("PATCH",`/api/orders/${id}`,{refund:true,restock});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;if(restock){(updated.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock+=item.qty})}render();toast("Order refunded")}catch(err){toast(err.message)}}
 function numberToWords(num){
   if(num===0)return "Zero";
   const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
@@ -202,16 +245,18 @@ function renderInvoice(){
   const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];
   if(!o){$("invoiceBox").textContent="Create an order first.";return}
   $("invSelect").value=o.id;
-  const c=customer(o.customerId),p=product(o.productId);
+  const c=customer(o.customerId);
   const isReceipt=["Paid","Delivered"].includes(o.status);
   const docType=isReceipt?"Receipt":"Invoice";
   // Receipts are proof of a completed payment - no bank details belong on
   // them. Invoices are the pre-payment bill, so they carry payment details
   // for the customer to pay into.
   const paymentRow=isReceipt?"":`<div class="row"><span>Payment</span><b>${clean(state.paymentDetails||"Add payment details in Settings")}</b></div>`;
-  $("invoiceBox").innerHTML=`${watermarkHtml(state.businessName)}<div class="receipt-doc-head">${state.businessLogo?`<img class="invoice-logo" src="${state.businessLogo}" alt="Business logo">`:""}<div><strong class="receipt-biz-name">${clean(state.businessName)}</strong>${state.businessPhone?`<div class="meta">${clean(state.businessPhone)}</div>`:""}${state.businessAddress?`<div class="meta">${clean(state.businessAddress)}</div>`:""}</div><div class="receipt-doc-meta"><span class="meta">${docType}</span><span class="meta">${date(o.createdAt)}</span></div></div><div class="row"><span>Billed to</span><b>${clean(c?.name||"")}</b></div>${c?.phone?`<div class="row"><span>Phone</span><b>${clean(c.phone)}</b></div>`:""}<table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody><tr><td>${clean(p?.name||o.productName)}</td><td>${o.qty}</td><td>${money(p?.price||o.price||0)}</td><td>${money(total(o))}</td></tr></tbody></table><div class="row"><span>Status</span><b>${clean(o.status)}</b></div>${digitalDeliveryHtml(o,p)}<div class="row receipt-total"><span>Total</span><b>${money(total(o))}</b></div><div class="row"><span>Amount in words</span><b>${amountInWords(total(o))}</b></div>${paymentRow}<div class="receipt-signature">Signed by ${clean(state.businessName)}</div>`
+  const itemRows=(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty,price:o.price}]).map(i=>`<tr><td>${clean(i.productName)}</td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.price*i.qty)}</td></tr>`).join("");
+  const deliveryFeeRow=o.deliveryFee?`<div class="row"><span>Delivery fee</span><b>${money(o.deliveryFee)}</b></div>`:"";
+  $("invoiceBox").innerHTML=`${watermarkHtml(state.businessName)}<div class="receipt-doc-head">${state.businessLogo?`<img class="invoice-logo" src="${state.businessLogo}" alt="Business logo">`:""}<div><strong class="receipt-biz-name">${clean(state.businessName)}</strong>${state.businessPhone?`<div class="meta">${clean(state.businessPhone)}</div>`:""}${state.businessAddress?`<div class="meta">${clean(state.businessAddress)}</div>`:""}</div><div class="receipt-doc-meta"><span class="meta">${docType}</span><span class="meta">${date(o.createdAt)}</span></div></div><div class="row"><span>Billed to</span><b>${clean(c?.name||"")}</b></div>${c?.phone?`<div class="row"><span>Phone</span><b>${clean(c.phone)}</b></div>`:""}<table class="receipt-items"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table><div class="row"><span>Status</span><b>${clean(o.status)}</b></div>${digitalDeliveryHtml(o)}${deliveryFeeRow}<div class="row receipt-total"><span>Total</span><b>${money(total(o)+(o.deliveryFee||0))}</b></div><div class="row"><span>Amount in words</span><b>${amountInWords(total(o)+(o.deliveryFee||0))}</b></div>${paymentRow}<div class="receipt-signature">Signed by ${clean(state.businessName)}</div>`
 }
-function invoiceText(){const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return "";const c=customer(o.customerId),p=product(o.productId);return `${["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice"} from ${state.businessName}\nDate: ${date(o.createdAt)}\nCustomer: ${c?.name||""}\nProduct: ${p?.name||o.productName}\nQuantity: ${o.qty}\nStatus: ${o.status}\nTotal: ${money(total(o))}\nThank you for your order.`}
+function invoiceText(){const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return "";const c=customer(o.customerId);const itemLines=(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).map(i=>`  ${i.productName} x ${i.qty}`).join("\n");return `${["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice"} from ${state.businessName}\nDate: ${date(o.createdAt)}\nCustomer: ${c?.name||""}\nItems:\n${itemLines}\nStatus: ${o.status}\nTotal: ${money(total(o))}\nThank you for your order.`}
 const onlinePaymentReady=()=>state.paymentMode==="paystack"&&state.hasPaystackSubaccount;
 async function getOrderPaymentLink(id){try{return (await api("POST",`/api/orders/${id}/payment-link`,{})).authorizationUrl}catch{return null}}
 async function paymentBlockFor(id,status){
@@ -221,8 +266,8 @@ async function paymentBlockFor(id,status){
   if(state.paymentDetails)block+=`\n\n${block?"Or pay":"Please pay"} directly to:\n${state.paymentDetails}`;
   return block;
 }
-async function orderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello, your order for ${p?.name||o.productName} x ${o.qty} is ${o.status}. Total: ${money(total(o))}.${paymentBlock}\n\nThank you.`}
-async function paymentReminderMsg(id){const o=state.orders.find(x=>x.id===id),p=product(o.productId),c=customer(o.customerId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello ${c?.name||"there"}, this is a friendly reminder about your order for ${p?.name||o.productName} x ${o.qty} (${money(total(o))}).${paymentBlock}\n\nPlease complete payment so we can process it. Thank you!`}
+async function orderMsg(id){const o=state.orders.find(x=>x.id===id);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello, your order for ${orderItemsText(o)} is ${o.status}. Total: ${money(total(o))}.${paymentBlock}\n\nThank you.`}
+async function paymentReminderMsg(id){const o=state.orders.find(x=>x.id===id),c=customer(o.customerId);const paymentBlock=await paymentBlockFor(id,o.status);return `Hello ${c?.name||"there"}, this is a friendly reminder about your order for ${orderItemsText(o)} (${money(total(o))}).${paymentBlock}\n\nPlease complete payment so we can process it. Thank you!`}
 async function sendOrderWhatsApp(id,phone){wa(await orderMsg(id),phone)}
 if($("followUpRemindAll"))$("followUpRemindAll").onclick=async()=>{
   try{
@@ -242,6 +287,164 @@ async function sendReminderWhatsApp(id,phone){
     wa(await paymentReminderMsg(id),phone);
   }
 }
+// AI Automation (Slice Three item 3): segment-targeted campaign send.
+// Recipient count is a client-side estimate from state.customers'
+// already-computed segments (customerSegments, populated by
+// loadCustomerSegments) - shown before sending so the owner can see the
+// recipient count and quota impact up front rather than discovering it
+// mid-send. "overdue" is approximated by distinct customers with a
+// Pending-payment order; the server dedupes to one message per customer.
+function updateCampaignAudienceCount(){
+  if(!$("cmpAudienceCount"))return;
+  const type=$("cmpAudienceType").value;
+  let count;
+  if(type==="segment"){
+    const seg=$("cmpSegment").value;
+    count=state.customers.filter(c=>c.phone&&customerSegments[c.id]?.segment===seg).length;
+  }else{
+    const customerIds=new Set(state.orders.filter(o=>o.status==="Pending payment").map(o=>o.customerId));
+    count=state.customers.filter(c=>c.phone&&customerIds.has(c.id)).length;
+  }
+  $("cmpAudienceCount").textContent=`~${count} recipient${count===1?"":"s"}. This will use your WhatsApp quota.`;
+}
+if($("openCampaignModal"))$("openCampaignModal").onclick=()=>{updateCampaignAudienceCount();$("campaignModal").showModal()};
+if($("closeCampaignModal"))$("closeCampaignModal").onclick=()=>$("campaignModal").close();
+if($("cmpAudienceType"))$("cmpAudienceType").onchange=()=>{$("cmpSegmentWrap").style.display=$("cmpAudienceType").value==="segment"?"":"none";updateCampaignAudienceCount()};
+if($("cmpSegment"))$("cmpSegment").onchange=updateCampaignAudienceCount;
+if($("cmpSend"))$("cmpSend").onclick=async()=>{
+  const audience=$("cmpAudienceType").value==="segment"?{type:"segment",segment:$("cmpSegment").value}:{type:"overdue"};
+  const message=$("cmpMessage").value.trim();
+  if(!message)return toast("Write a message first");
+  try{
+    const r=await api("POST","/api/campaigns/send",{audience,message});
+    toast(r.sent===r.total?`Sent to ${r.sent} customer${r.sent===1?"":"s"}`:`Sent to ${r.sent}/${r.total} - stopped early (likely a rate limit or quota), try again shortly for the rest`);
+    $("campaignModal").close();
+    $("cmpMessage").value="";
+  }catch(err){toast(err.message)}
+};
+if($("autoReminderForm"))$("autoReminderForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    const updated=await api("PUT","/api/business/auto-reminder-settings",{enabled:$("arEnabled").checked,daysAfter:+$("arDaysAfter").value});
+    Object.assign(state,updated);
+    render();
+    toast("Reminder settings saved");
+  }catch(err){toast(err.message)}
+};
+// ShipBubble: real courier booking behind "SellersPoint Logistics".
+if($("verifyShipbubbleAddress"))$("verifyShipbubbleAddress").onclick=async()=>{
+  const contactName=$("sbContactName").value.trim();
+  const address=$("sbAddress").value.trim();
+  if(!contactName)return toast("Enter a pickup contact name first");
+  if(!address)return toast("Enter a pickup address first");
+  const btn=$("verifyShipbubbleAddress");
+  btn.disabled=true;btn.textContent="Verifying...";
+  try{
+    const updated=await api("POST","/api/business/shipbubble-pickup-address",{contactName,address});
+    Object.assign(state,updated);
+    renderShipbubbleStatus();
+    toast("Pickup address saved");
+  }catch(err){
+    toast(err.message);
+  }finally{
+    btn.disabled=false;btn.textContent="Verify & Save Pickup Address";
+  }
+};
+function renderShipbubbleStatus(){
+  if(!$("shipbubbleStatus"))return;
+  const set=!!state.shipbubbleSenderAddressCode;
+  $("shipbubbleStatus").innerHTML=set?`<p class="meta">✅ Pickup address set - you can book shipments from paid orders.</p>`:"";
+  if($("shipbubbleAddressForm"))$("shipbubbleAddressForm").style.display=set?"none":"block";
+}
+
+// Quoting now happens BEFORE the order exists (in the New Order form), not
+// after - the customer needs to pay the real shipping cost in one payment,
+// which means a courier must already be chosen before checkout. Once an
+// order is created with a locked-in quote, "Book Shipment" on that order
+// just finalizes it directly (bookShipbubbleShipment below) - no modal.
+let shipbubbleCategories=null;
+let shipbubbleRequestToken=null;
+let shipbubbleSelectedCourier=null;
+let shipbubbleChosenQuote=null;
+if($("oDeliveryMethod"))$("oDeliveryMethod").addEventListener("change",()=>{
+  shipbubbleChosenQuote=null;
+  updateDeliveryFeeEstimate();
+});
+if($("oGetShippingQuote"))$("oGetShippingQuote").onclick=async()=>{
+  const customerId=$("oCustomer").value;
+  if(!orderCart.length)return toast("Add at least one item to the order first");
+  if(!customerId)return toast("Choose a customer first");
+  shipbubbleRequestToken=null;
+  shipbubbleSelectedCourier=null;
+  $("sbReceiverAddress").value="";$("sbLength").value="20";$("sbWidth").value="20";$("sbHeight").value="20";
+  $("sbBookForm").style.display="block";
+  $("sbRatesList").innerHTML="";
+  $("sbBookSelected").style.display="none";
+  if(!shipbubbleCategories){
+    try{shipbubbleCategories=await api("GET","/api/shipbubble/categories")}catch(err){toast(err.message);shipbubbleCategories=[]}
+  }
+  $("sbCategory").innerHTML=shipbubbleCategories.map(c=>`<option value="${c.category_id}">${clean(c.category)}</option>`).join("");
+  $("shipbubbleBookModal").showModal();
+};
+if($("closeShipbubbleBookModal"))$("closeShipbubbleBookModal").onclick=()=>$("shipbubbleBookModal").close();
+if($("sbGetRates"))$("sbGetRates").onclick=async()=>{
+  const receiverAddress=$("sbReceiverAddress").value.trim();
+  const categoryId=$("sbCategory").value;
+  if(!receiverAddress)return toast("Enter a delivery address");
+  const btn=$("sbGetRates");
+  btn.disabled=true;btn.textContent="Getting rates...";
+  try{
+    const dimensions={length:+$("sbLength").value||20,width:+$("sbWidth").value||20,height:+$("sbHeight").value||20};
+    const items=orderCart.map(l=>({productId:l.productId,qty:l.qty}));
+    const result=await api("POST","/api/shipbubble/quote",{items,customerId:$("oCustomer").value,receiverAddress,dimensions,categoryId});
+    shipbubbleRequestToken=result.request_token;
+    const cheapestId=result.cheapest_courier?.courier_id,fastestId=result.fastest_courier?.courier_id;
+    $("sbRatesList").innerHTML=(result.couriers||[]).map(c=>{const tags=[c.courier_id===cheapestId?"Cheapest":"",c.courier_id===fastestId?"Fastest":""].filter(Boolean).join(" · ");return `<div class="item" style="cursor:pointer" onclick="selectShipbubbleCourier('${c.courier_id}','${c.service_code}',${c.total},this)"><div class="item-top"><strong>${clean(c.courier_name)}</strong><span>${money(c.total)}</span></div><div class="meta">${clean(c.delivery_eta_time||"")}${tags?` - ${tags}`:""}</div></div>`}).join("")||`<div class="item"><span class="meta">No couriers available for this shipment</span></div>`;
+  }catch(err){
+    toast(err.message);
+  }finally{
+    btn.disabled=false;btn.textContent="Get Rates";
+  }
+};
+function selectShipbubbleCourier(courierId,serviceCode,total,el){
+  shipbubbleSelectedCourier={courierId,serviceCode,total};
+  $("sbRatesList").querySelectorAll(".item").forEach(i=>i.style.outline="none");
+  el.style.outline="2px solid var(--sp-green, #0d3b2e)";
+  $("sbBookSelected").style.display="inline-grid";
+}
+// Doesn't book anything yet - just locks in the chosen courier/price so
+// order creation can charge the real total. The actual ShipBubble shipment
+// only gets created later, once the order is paid (see the order list's
+// "Book Shipment" button, which calls bookShipbubbleShipment directly).
+if($("sbBookSelected"))$("sbBookSelected").onclick=()=>{
+  if(!shipbubbleSelectedCourier||!shipbubbleRequestToken)return toast("Choose a courier first");
+  shipbubbleChosenQuote={requestToken:shipbubbleRequestToken,serviceCode:shipbubbleSelectedCourier.serviceCode,courierId:shipbubbleSelectedCourier.courierId,quotedCost:shipbubbleSelectedCourier.total};
+  $("shipbubbleBookModal").close();
+  updateDeliveryFeeEstimate();
+  toast("Courier selected - the real shipping cost will be charged with this order");
+};
+async function bookShipbubbleShipment(orderId){
+  try{
+    const updated=await api("POST",`/api/orders/${orderId}/shipbubble-book`,{});
+    const idx=state.orders.findIndex(x=>x.id===orderId);
+    if(idx>-1)state.orders[idx]=updated;
+    render();
+    toast("Shipment booked");
+  }catch(err){
+    toast(err.message);
+  }
+}
+async function refreshShipbubbleTracking(orderId){
+  try{
+    const updated=await api("POST",`/api/orders/${orderId}/shipbubble-refresh-tracking`,{});
+    const idx=state.orders.findIndex(x=>x.id===orderId);
+    if(idx>-1)state.orders[idx]=updated;
+    render();
+    toast(updated.shipbubbleTrackingCode?"Tracking code updated":"Status refreshed - no tracking code yet");
+  }catch(err){
+    toast(err.message);
+  }
+}
 function wa(msg,phone=""){open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank","noopener")}function copy(t){navigator.clipboard.writeText(t);toast("Copied")}
 function copyProductLink(id){copy(`${location.origin}/store/${state.slug||""}?product=${id}`)}
 function openInvoice(id){show("invoice");$("invSelect").value=id;renderInvoice()}
@@ -259,7 +462,7 @@ if($("aiSuggestions"))$("aiSuggestions").querySelectorAll("button[data-q]").forE
 async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;updateAiUsageDisplay(result.used,result.limit);toast("Message generated")}catch(err){toast(err.message);refreshAiUsage()}}
 if($("aiUpgradePlanBtn"))$("aiUpgradePlanBtn").onclick=()=>open("upgrade.html","_blank","noopener");
 if($("aiBuyCreditsBtn"))$("aiBuyCreditsBtn").onclick=()=>open("upgrade.html#addonCards","_blank","noopener");
-$("invSelect").onchange=renderInvoice;$("waInvoice").onclick=()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];wa(invoiceText(),customer(o?.customerId)?.phone||"")};$("genAI").onclick=generateAI;$("copyAI").onclick=()=>copy($("aiOut").value);$("upgrade").onclick=()=>open("upgrade.html","_blank","noopener");$("export").onclick=()=>{downloadCsv(["Name","Price","Stock","Category","Type"],state.products.map(p=>[p.name,p.price,p.stock,p.category||"",p.type||""]),"products.csv");downloadCsv(["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.csv");downloadCsv(["Customer","Product","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",product(o.productId)?.name||o.productName,o.qty,o.status,total(o),o.createdAt]),"orders.csv")};$("demo").onclick=async()=>{applyState(await api("POST","/api/demo"));render();toast("Demo loaded")};
+$("invSelect").onchange=renderInvoice;$("waInvoice").onclick=()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];wa(invoiceText(),customer(o?.customerId)?.phone||"")};$("genAI").onclick=generateAI;$("copyAI").onclick=()=>copy($("aiOut").value);$("upgrade").onclick=()=>open("upgrade.html","_blank","noopener");$("export").onclick=()=>{downloadCsv(["Name","Price","Stock","Category","Type"],state.products.map(p=>[p.name,p.price,p.stock,p.category||"",p.type||""]),"products.csv");downloadCsv(["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.csv");downloadCsv(["Customer","Items","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",orderItemsText(o),(o.items&&o.items.length?o.items.reduce((s,i)=>s+i.qty,0):o.qty),o.status,total(o),o.createdAt]),"orders.csv")};$("demo").onclick=async()=>{applyState(await api("POST","/api/demo"));render();toast("Demo loaded")};
 
 // Renders a narrow, receipt-style portrait layout for export/sharing (not
 // the wider on-screen preview) - captured from an off-screen clone so the
@@ -476,7 +679,36 @@ async function loadReports(){
     $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint:r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
   }catch(err){toast(err.message)}
+  loadReportsChart(currentRepRange);
 }
+let repChartInstance=null,currentRepRange="7";
+function repRangeDates(range){
+  const to=new Date();
+  if(range==="month")return{from:new Date(to.getFullYear(),to.getMonth(),1).toISOString().slice(0,10),to:to.toISOString().slice(0,10)};
+  const from=new Date(to.getTime()-Number(range)*24*60*60*1000);
+  return{from:from.toISOString().slice(0,10),to:to.toISOString().slice(0,10)};
+}
+async function loadReportsChart(range){
+  if(!$("repChart")||typeof Chart==="undefined")return;
+  currentRepRange=range;
+  document.querySelectorAll(".rep-range").forEach(b=>b.classList.toggle("active",b.dataset.range===range));
+  try{
+    const{from,to}=repRangeDates(range);
+    const series=await api("GET",`/api/reports/chart?from=${from}&to=${to}`);
+    const labels=series.map(d=>date(d.date));
+    if(repChartInstance)repChartInstance.destroy();
+    repChartInstance=new Chart($("repChart").getContext("2d"),{
+      type:"line",
+      data:{labels,datasets:[
+        {label:"Revenue",data:series.map(d=>d.revenue),borderColor:"#147d64",backgroundColor:"rgba(20,125,100,.1)",tension:.3,yAxisID:"y"},
+        {label:"Profit",data:series.map(d=>d.profit),borderColor:"#d36b2c",backgroundColor:"rgba(211,107,44,.1)",tension:.3,yAxisID:"y"},
+        {label:"Orders",data:series.map(d=>d.orders),borderColor:"#647067",backgroundColor:"rgba(100,112,103,.1)",tension:.3,yAxisID:"y1"},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},scales:{y:{position:"left",title:{display:true,text:"NGN"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Orders"}}}}
+    });
+  }catch(err){toast(err.message)}
+}
+if($("repChartFilter"))$("repChartFilter").querySelectorAll(".rep-range").forEach(b=>b.onclick=()=>loadReportsChart(b.dataset.range));
 if($("repExportExcel"))$("repExportExcel").onclick=()=>{
   if(!lastReport)return toast("Load reports first");
   if(!window.XLSX)return toast("Excel export isn't available right now - try again in a moment.");
@@ -586,14 +818,14 @@ if($("branchForm"))$("branchForm").onsubmit=async e=>{e.preventDefault();try{awa
 
 if($("sLogo"))$("sLogo").onchange=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{const updated=await api("PUT","/api/business",{businessLogo:reader.result});Object.assign(state,updated);render();toast("Logo saved")};reader.readAsDataURL(file)};
 
-function digitalDeliveryHtml(o,p){if((p?.type||o.productType)!=="Digital product")return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return '<div class="delivery-box"><b>Digital delivery locked</b><br><span class="meta">Mark order as paid to reveal download/access details.</span></div>';let link=p?.deliveryLink?'<a href="'+p.deliveryLink+'" target="_blank" rel="noopener">Open download / access link</a><br>':'';return '<div class="delivery-box"><b>Digital delivery</b><br>'+link+'<span>'+clean(p?.deliveryNote||'No delivery note added.')+'</span></div>'}
-function digitalDeliveryText(o,p){if((p?.type||o.productType)!=="Digital product")return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return "\nDigital delivery: Access details will be sent after payment.";return "\nDigital delivery link: "+(p?.deliveryLink||"No link added")+"\nDelivery note: "+(p?.deliveryNote||"No delivery note added")}
+function digitalDeliveryHtml(o){const items=(o.items&&o.items.length?o.items:[{productId:o.productId,productName:o.productName,productType:o.productType}]);const digitalItems=items.filter(i=>i.productType==="Digital product");if(!digitalItems.length)return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return '<div class="delivery-box"><b>Digital delivery locked</b><br><span class="meta">Mark order as paid to reveal download/access details.</span></div>';return digitalItems.map(i=>{const p=product(i.productId);const link=p?.deliveryLink?'<a href="'+p.deliveryLink+'" target="_blank" rel="noopener">Open download / access link</a><br>':'';return '<div class="delivery-box"><b>'+clean(i.productName)+' - Digital delivery</b><br>'+link+'<span>'+clean(p?.deliveryNote||'No delivery note added.')+'</span></div>'}).join("")}
+function digitalDeliveryText(o){const items=(o.items&&o.items.length?o.items:[{productId:o.productId,productName:o.productName,productType:o.productType}]);const digitalItems=items.filter(i=>i.productType==="Digital product");if(!digitalItems.length)return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return "\nDigital delivery: Access details will be sent after payment.";return digitalItems.map(i=>{const p=product(i.productId);return "\n"+i.productName+" - Digital delivery link: "+(p?.deliveryLink||"No link added")+"\nDelivery note: "+(p?.deliveryNote||"No delivery note added")}).join("")}
 function setupScore(){const checks=[state.businessName&&state.businessName!=="Your Business",state.businessPhone,state.paymentDetails||state.paymentLink,state.products.length,state.customers.length,state.orders.length,state.businessLogo];return Math.round(checks.filter(Boolean).length/checks.length*100)}
 function renderActivationChecklist(){const el=$("activationChecklist");if(!el)return;const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"]];const done=items.filter(x=>x[1]).length;if(done===items.length||localStorage.getItem("sp_checklist_dismissed")){el.style.display="none";return}el.style.display="block";$("activationChecklistCount").textContent=`${done}/${items.length} done`;$("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("")+`<p class="actions"><button id="dismissChecklist" class="wizard-skip">Dismiss</button></p>`;$("dismissChecklist").onclick=()=>{localStorage.setItem("sp_checklist_dismissed","1");render()}}
 function renderSmartAlerts(){
   if(!$("slowMovers"))return;
   const soldQty={};
-  state.orders.forEach(o=>{soldQty[o.productId]=(soldQty[o.productId]||0)+o.qty});
+  state.orders.forEach(o=>{(o.items&&o.items.length?o.items:[{productId:o.productId,qty:o.qty}]).forEach(i=>{soldQty[i.productId]=(soldQty[i.productId]||0)+i.qty})});
   const slow=state.products.filter(p=>p.stock>0&&!soldQty[p.id]).slice(0,5);
   $("slowMovers").innerHTML=slow.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} in stock - no sales yet</span></div>`).join("");
 
@@ -606,14 +838,14 @@ function renderSmartAlerts(){
   const large=state.orders.length>=3?state.orders.filter(o=>total(o)>avg*2).sort((a,b)=>total(b)-total(a)).slice(0,5):[];
   $("largeOrders").innerHTML=large.map(o=>{const c=customer(o.customerId);return `<div class="item"><strong>${clean(c?.name||"Deleted customer")}</strong><span class="meta">${money(total(o))} - avg is ${money(avg)}</span></div>`}).join("");
 }
-function renderBackend(){if(!$("devEvents"))return;const digitalRevenue=state.orders.filter(o=>(product(o.productId)?.type||o.productType)==="Digital product"&&["Paid","Delivered"].includes(o.status)).reduce((s,o)=>s+total(o),0);const storage=Math.round((JSON.stringify(state).length/1024)*10)/10;$("devEvents").textContent=state.events.length;$("devDigitalRevenue").textContent=money(digitalRevenue);$("devSetup").textContent=setupScore()+"%";$("devStorage").textContent=storage+" KB";const checks=[["Business profile",state.businessName&&state.businessName!=="Your Business"],["Logo uploaded",state.businessLogo],["Payment configured",state.paymentDetails||state.paymentLink],["First item added",state.products.length],["First customer added",state.customers.length],["First order created",state.orders.length],["Digital delivery ready",state.products.some(p=>p.type==="Digital product"&&p.deliveryLink)]];$("checklist").innerHTML=checks.map(x=>"<div class=\"check "+(x[1]?"done":"")+"\"><b>"+(x[1]?"✓":"!")+"</b><span>"+x[0]+"</span></div>").join("");const top=bestProduct()||"No sales yet";$("devSummary").innerHTML="<div class=\"item\"><strong>Top item</strong><span class=\"meta\">"+clean(top)+"</span></div><div class=\"item\"><strong>Orders</strong><span class=\"meta\">"+state.orders.length+" total, "+state.orders.filter(o=>o.status==="Pending payment").length+" pending payment</span></div><div class=\"item\"><strong>Catalog</strong><span class=\"meta\">"+state.products.filter(p=>p.type==="Product").length+" products, "+state.products.filter(p=>p.type==="Service").length+" services, "+state.products.filter(p=>p.type==="Digital product").length+" digital products</span></div>";$("eventLog").innerHTML=state.events.slice(0,12).map(e=>"<div class=\"item\"><strong><span class=\"badge\">"+clean(e.type)+"</span> "+clean(e.detail||"")+"</strong><span class=\"meta\">"+date(e.at)+"</span></div>").join("")}
+function renderBackend(){if(!$("devEvents"))return;const digitalRevenue=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>{const items=o.items&&o.items.length?o.items:[{productId:o.productId,productType:o.productType,qty:o.qty,price:o.price}];const digitalTotal=items.filter(i=>(i.productType||product(i.productId)?.type)==="Digital product").reduce((t,i)=>t+i.price*i.qty,0);return s+digitalTotal},0);const storage=Math.round((JSON.stringify(state).length/1024)*10)/10;$("devEvents").textContent=state.events.length;$("devDigitalRevenue").textContent=money(digitalRevenue);$("devSetup").textContent=setupScore()+"%";$("devStorage").textContent=storage+" KB";const checks=[["Business profile",state.businessName&&state.businessName!=="Your Business"],["Logo uploaded",state.businessLogo],["Payment configured",state.paymentDetails||state.paymentLink],["First item added",state.products.length],["First customer added",state.customers.length],["First order created",state.orders.length],["Digital delivery ready",state.products.some(p=>p.type==="Digital product"&&p.deliveryLink)]];$("checklist").innerHTML=checks.map(x=>"<div class=\"check "+(x[1]?"done":"")+"\"><b>"+(x[1]?"✓":"!")+"</b><span>"+x[0]+"</span></div>").join("");const top=bestProduct()||"No sales yet";$("devSummary").innerHTML="<div class=\"item\"><strong>Top item</strong><span class=\"meta\">"+clean(top)+"</span></div><div class=\"item\"><strong>Orders</strong><span class=\"meta\">"+state.orders.length+" total, "+state.orders.filter(o=>o.status==="Pending payment").length+" pending payment</span></div><div class=\"item\"><strong>Catalog</strong><span class=\"meta\">"+state.products.filter(p=>p.type==="Product").length+" products, "+state.products.filter(p=>p.type==="Service").length+" services, "+state.products.filter(p=>p.type==="Digital product").length+" digital products</span></div>";$("eventLog").innerHTML=state.events.slice(0,12).map(e=>"<div class=\"item\"><strong><span class=\"badge\">"+clean(e.type)+"</span> "+clean(e.detail||"")+"</strong><span class=\"meta\">"+date(e.at)+"</span></div>").join("")}
 function backendReport(){return "SellersPoint Beta report\nOrders: "+state.orders.length+"\nCustomers: "+state.customers.length+"\nItems: "+state.products.length+"\nSetup: "+setupScore()+"%\nTop item: "+(bestProduct()||"No sales yet")}
 if($("copyReport"))$("copyReport").onclick=()=>copy(backendReport());if($("exportAnalytics"))$("exportAnalytics").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({generatedAt:new Date().toISOString(),summary:backendReport(),state},null,2)],{type:"application/json"}));a.download="sellerspoint-analytics.json";a.click()};
 const renderForBackend=render;render=function(){renderForBackend();renderBackend()};
 
 if($("openUpgrade"))$("openUpgrade").onclick=()=>open("upgrade.html","_blank","noopener");
-function receiptText(o){if(!o)return "";const c=customer(o.customerId),p=product(o.productId);return "Receipt from "+state.businessName+"\nDate: "+date(new Date().toISOString())+"\nCustomer: "+(c?.name||"")+"\nItem: "+(p?.name||o.productName)+"\nQuantity: "+o.qty+"\nAmount paid: "+money(total(o))+" ("+amountInWords(total(o))+")\nPayment status: Paid"+digitalDeliveryText(o,p)+"\nThank you for your payment."}
-function showReceipt(id){const o=state.orders.find(x=>x.id===id);if(!o)return;const c=customer(o.customerId),p=product(o.productId);if($("receiptBox"))$("receiptBox").innerHTML=(state.businessLogo?"<img class=\"invoice-logo\" src=\""+state.businessLogo+"\" alt=\"Business logo\">":"")+"<h2>Receipt</h2><div class=\"row\"><span>Business</span><b>"+clean(state.businessName)+"</b></div><div class=\"row\"><span>Customer</span><b>"+clean(c?.name||"")+"</b></div><div class=\"row\"><span>Item</span><b>"+clean(p?.name||o.productName)+"</b></div><div class=\"row\"><span>Quantity</span><b>"+o.qty+"</b></div><div class=\"row\"><span>Amount paid</span><b>"+money(total(o))+"</b></div><div class=\"row\"><span>Amount in words</span><b>"+amountInWords(total(o))+"</b></div><div class=\"row\"><span>Status</span><b>Paid</b></div>"+digitalDeliveryHtml(o,p)+"<div class=\"receipt-signature\">Signed by "+clean(state.businessName)+"</div>";window.currentReceiptOrderId=id;if($("receiptModal")?.showModal)$("receiptModal").showModal()}
+function receiptText(o){if(!o)return "";const c=customer(o.customerId);const itemLines=(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).map(i=>`  ${i.productName} x ${i.qty}`).join("\n");return "Receipt from "+state.businessName+"\nDate: "+date(new Date().toISOString())+"\nCustomer: "+(c?.name||"")+"\nItems:\n"+itemLines+"\nAmount paid: "+money(total(o))+" ("+amountInWords(total(o))+")\nPayment status: Paid"+digitalDeliveryText(o)+"\nThank you for your payment."}
+function showReceipt(id){const o=state.orders.find(x=>x.id===id);if(!o)return;const c=customer(o.customerId);if($("receiptBox"))$("receiptBox").innerHTML=(state.businessLogo?"<img class=\"invoice-logo\" src=\""+state.businessLogo+"\" alt=\"Business logo\">":"")+"<h2>Receipt</h2><div class=\"row\"><span>Business</span><b>"+clean(state.businessName)+"</b></div><div class=\"row\"><span>Customer</span><b>"+clean(c?.name||"")+"</b></div><div class=\"row\"><span>Items</span><b>"+clean(orderItemsText(o))+"</b></div><div class=\"row\"><span>Amount paid</span><b>"+money(total(o))+"</b></div><div class=\"row\"><span>Amount in words</span><b>"+amountInWords(total(o))+"</b></div><div class=\"row\"><span>Status</span><b>Paid</b></div>"+digitalDeliveryHtml(o)+"<div class=\"receipt-signature\">Signed by "+clean(state.businessName)+"</div>";window.currentReceiptOrderId=id;if($("receiptModal")?.showModal)$("receiptModal").showModal()}
 if($("closeReceipt"))$("closeReceipt").onclick=()=>$("receiptModal").close();
 if($("copyReceipt"))$("copyReceipt").onclick=()=>copy(receiptText(state.orders.find(x=>x.id===window.currentReceiptOrderId)));
 if($("waReceipt"))$("waReceipt").onclick=()=>{const o=state.orders.find(x=>x.id===window.currentReceiptOrderId);wa(receiptText(o),customer(o?.customerId)?.phone||"")}
@@ -630,8 +862,8 @@ if($("pExportPdf"))$("pExportPdf").onclick=()=>exportTablePdf("Products",["Name"
 if($("pExportExcel"))$("pExportExcel").onclick=()=>exportExcel("Products",["Name","Price","Stock","Category","Type"],state.products.map(p=>[p.name,p.price,p.stock,p.category||"",p.type||""]),"products.xlsx");
 if($("cExportPdf"))$("cExportPdf").onclick=()=>exportTablePdf("Customers",["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.pdf");
 if($("cExportExcel"))$("cExportExcel").onclick=()=>exportExcel("Customers",["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.xlsx");
-if($("oExportPdf"))$("oExportPdf").onclick=()=>exportTablePdf("Orders",["Customer","Product","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",product(o.productId)?.name||o.productName,o.qty,o.status,money(total(o)),date(o.createdAt)]),"orders.pdf");
-if($("oExportExcel"))$("oExportExcel").onclick=()=>exportExcel("Orders",["Customer","Product","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",product(o.productId)?.name||o.productName,o.qty,o.status,total(o),date(o.createdAt)]),"orders.xlsx");
+if($("oExportPdf"))$("oExportPdf").onclick=()=>exportTablePdf("Orders",["Customer","Items","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",orderItemsText(o),(o.items&&o.items.length?o.items.reduce((s,i)=>s+i.qty,0):o.qty),o.status,money(total(o)),date(o.createdAt)]),"orders.pdf");
+if($("oExportExcel"))$("oExportExcel").onclick=()=>exportExcel("Orders",["Customer","Items","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",orderItemsText(o),(o.items&&o.items.length?o.items.reduce((s,i)=>s+i.qty,0):o.qty),o.status,total(o),date(o.createdAt)]),"orders.xlsx");
 
 if($("logout"))$("logout").onclick=()=>window.Auth.logout();
 
