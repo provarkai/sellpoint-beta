@@ -19,7 +19,7 @@ const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",logistics:"Delivery",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -55,6 +55,7 @@ function render(){
   $("restock").innerHTML=low.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} left - restock soon</span></div>`).join("");
   renderActivationChecklist();
   if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
+  renderDeliveries();
   renderSmartAlerts();
   renderShipbubbleStatus();
   opts($("oCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("oProduct"),state.products,p=>`${p.name} - ${p.discountPrice?money(p.discountPrice)+" (was "+money(p.price)+")":money(p.price)} - ${p.stock} left`,"Add a product first");opts($("aiProduct"),state.products,p=>p.name,"Add a product first");opts($("aiCustomer"),state.customers,c=>c.name,"Add a customer first");opts($("invSelect"),state.orders,o=>`${customer(o.customerId)?.name||"Customer"} - ${money(total(o))}`,"No orders yet");renderInvoice();
@@ -822,6 +823,29 @@ function digitalDeliveryHtml(o){const items=(o.items&&o.items.length?o.items:[{p
 function digitalDeliveryText(o){const items=(o.items&&o.items.length?o.items:[{productId:o.productId,productName:o.productName,productType:o.productType}]);const digitalItems=items.filter(i=>i.productType==="Digital product");if(!digitalItems.length)return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return "\nDigital delivery: Access details will be sent after payment.";return digitalItems.map(i=>{const p=product(i.productId);return "\n"+i.productName+" - Digital delivery link: "+(p?.deliveryLink||"No link added")+"\nDelivery note: "+(p?.deliveryNote||"No delivery note added")}).join("")}
 function setupScore(){const checks=[state.businessName&&state.businessName!=="Your Business",state.businessPhone,state.paymentDetails||state.paymentLink,state.products.length,state.customers.length,state.orders.length,state.businessLogo];return Math.round(checks.filter(Boolean).length/checks.length*100)}
 function renderActivationChecklist(){const el=$("activationChecklist");if(!el)return;const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"]];const done=items.filter(x=>x[1]).length;if(done===items.length||localStorage.getItem("sp_checklist_dismissed")){el.style.display="none";return}el.style.display="block";$("activationChecklistCount").textContent=`${done}/${items.length} done`;$("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("")+`<p class="actions"><button id="dismissChecklist" class="wizard-skip">Dismiss</button></p>`;$("dismissChecklist").onclick=()=>{localStorage.setItem("sp_checklist_dismissed","1");render()}}
+// Every paid order still awaiting delivery, any method (self/rider/
+// SellersPoint Logistics) - the one place to see everything that still
+// needs to go out, since the standalone Delivery tab was removed.
+function renderDeliveries(){
+  if(!$("deliveries"))return;
+  const pending=state.orders.filter(o=>!o.delivered&&["Paid","Packed"].includes(o.status));
+  $("deliveriesCount").textContent=pending.length?`(${pending.length})`:"";
+  $("deliveries").innerHTML=pending.map(o=>{
+    const c=customer(o.customerId);
+    const isSellerspoint=o.deliveryMethod==="sellerspoint";
+    const methodLabel=isSellerspoint?"SellersPoint Logistics":o.deliveryMethod==="rider"?"Dispatch rider":"Self / hand delivery";
+    let actions,trackingLabel="";
+    if(isSellerspoint&&o.shipbubbleOrderId){
+      trackingLabel=o.shipbubbleTrackingCode?` - Tracking: ${clean(o.shipbubbleTrackingCode)}`:"";
+      actions=`<a class="button-link" href="${o.shipbubbleTrackingUrl}" target="_blank" rel="noopener">Track Shipment</a><button onclick="refreshShipbubbleTracking('${o.id}')">Refresh Tracking</button><button onclick="setOrderStatus('${o.id}','Delivered')">Mark Delivered</button>`;
+    }else if(isSellerspoint){
+      actions=`<button onclick="bookShipbubbleShipment('${o.id}')">Book Shipment</button>`;
+    }else{
+      actions=`<button onclick="setOrderStatus('${o.id}','Delivered')">Mark Delivered</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>`;
+    }
+    return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${clean(methodLabel)}${trackingLabel} - ${date(o.createdAt)}</div><div class="item-actions">${actions}</div></div>`;
+  }).join("");
+}
 function renderSmartAlerts(){
   if(!$("slowMovers"))return;
   const soldQty={};
