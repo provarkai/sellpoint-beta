@@ -23,7 +23,7 @@ async function boot() {
     const email = $("email").value.trim();
     const password = $("password").value;
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName, businessPhone, referredByCode } } });
-    if (error) return toast(error.message);
+    if (error) return toast(error.message || error.error_description || "Something went wrong - please try again.");
     if (data.session) {
       // Email confirmation is off on this Supabase project - session is
       // already valid, so create the business now and go straight in.

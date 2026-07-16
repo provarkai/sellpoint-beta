@@ -27,10 +27,13 @@ loadPricing();
 // Duplicate the testimonial cards once so the CSS marquee (translateX -50%
 // to 0%) has a seamless second copy to hand off to - keeps the source HTML
 // to a single set of 9 real cards instead of hand-duplicating markup.
-const track = $("testimonialTrack");
-if (track) {
-  const clone = track.innerHTML;
-  track.innerHTML = clone + clone;
+// Named testiTrack (not track) since this is a classic script - a
+// top-level const/let here shadows window.track for any bare `track(...)`
+// call in later scripts on the same page, which broke landing_view analytics.
+const testiTrack = $("testimonialTrack");
+if (testiTrack) {
+  const clone = testiTrack.innerHTML;
+  testiTrack.innerHTML = clone + clone;
 }
 
 // Social icons - admin-configurable via backend.html, so only icons with a
