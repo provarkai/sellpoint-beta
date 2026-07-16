@@ -22,11 +22,23 @@ async function boot() {
     const businessPhone = $("businessPhone").value.replace(/\D/g, "");
     const email = $("email").value.trim();
     const password = $("password").value;
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { businessName, businessPhone, referredByCode } } });
+    // emailRedirectTo is explicit here rather than relying on Supabase
+    // dashboard's Site URL setting - login.html already knows how to pick
+    // up a session from the confirmation link's #access_token and route a
+    // new account through ensureBusiness()/onboarding.html (see login.js),
+    // so this is the one correct landing spot regardless of what Site URL
+    // happens to be configured as (it was previously pointing at the bare
+    // Railway domain with nothing to receive the token).
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { businessName, businessPhone, referredByCode }, emailRedirectTo: location.origin + "/login.html" },
+    });
     if (error) return toast(error.message || error.error_description || "Something went wrong - please try again.");
     if (data.session) {
-      // Email confirmation is off on this Supabase project - session is
-      // already valid, so create the business now and go straight in.
+      // Session is already valid (email confirmation off, or this project's
+      // confirm-email setting has changed) - create the business now and go
+      // straight in rather than waiting on the confirmation email at all.
       const justCreated = await window.Auth.ensureBusiness(data.session);
       if (justCreated && window.track) track("signup_completed");
       location.href = justCreated ? "onboarding.html" : "app.html";
