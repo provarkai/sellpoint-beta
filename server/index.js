@@ -75,6 +75,14 @@ app.use(
   })
 );
 
+// sellerspoint.app's root now serves the app itself, not the marketing
+// page - the marketing site moved to sellerspoint.ng (WordPress). app.html
+// already self-guards (app.js's requireSession() bounces to login.html if
+// there's no session), so this one route covers both logged-in and
+// logged-out visitors correctly. index.html is left in place and still
+// reachable directly if anything still links to it.
+app.get("/", (req, res) => res.sendFile(path.join(ROOT, "app.html")));
+
 // Static pages are served unauthenticated at the HTTP layer - auth now lives
 // in a Supabase session inside the browser, which a plain navigation/address
 // bar request has no way to attach as a header. Each page's own script
