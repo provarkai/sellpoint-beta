@@ -3,7 +3,11 @@
 // browser signals the app is installable. Shared by login.html and
 // app.html. No-ops silently on browsers that never fire
 // beforeinstallprompt (already installed, iOS Safari, etc.) or once the
-// user has dismissed it this session.
+// user has dismissed it this session. app.html's Settings tab also has a
+// persistent "Install App" button (#installAppBtn/#installAppCard) as a
+// fallback for when the automatic prompt hasn't fired yet - Chrome only
+// fires beforeinstallprompt after some engagement heuristics, not
+// guaranteed on a first visit.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
@@ -13,9 +17,24 @@ let deferredInstallPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
+  const card = document.getElementById("installAppCard");
+  if (card) card.style.display = "block";
   if (localStorage.getItem("sp_pwa_dismissed") === "1") return;
   showPwaBanner();
 });
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  const card = document.getElementById("installAppCard");
+  if (card) card.style.display = "none";
+});
+
+async function runInstallPrompt() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+}
 
 function showPwaBanner() {
   if (document.getElementById("pwaInstallBanner")) return;
@@ -34,9 +53,9 @@ function showPwaBanner() {
   };
   document.getElementById("pwaInstallGo").onclick = async () => {
     el.remove();
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
+    await runInstallPrompt();
   };
 }
+
+const installAppBtn = document.getElementById("installAppBtn");
+if (installAppBtn) installAppBtn.onclick = runInstallPrompt;
