@@ -41,7 +41,7 @@ function showPwaBanner() {
   const el = document.createElement("div");
   el.id = "pwaInstallBanner";
   el.innerHTML =
-    '<img src="/assets/branding/logo/icon.png" alt="">' +
+    '<img src="/assets/branding/logo/icon%202.png" alt="">' +
     '<div class="pwa-copy"><strong>Install SellersPoint</strong><span>Add to your home screen for quick access</span></div>' +
     '<div class="pwa-actions"><button id="pwaInstallDismiss" type="button">Not now</button><button id="pwaInstallGo" type="button">Install</button></div>';
   document.body.appendChild(el);
