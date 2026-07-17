@@ -8,7 +8,9 @@ let analytics = { totals: [] };
 let waitlistStats = { total: 0, countries: 0, categories: 0 };
 let auditLog = [];
 let logisticsSettings = { enabled: false, flatFee: 0, percentFee: 0, apiBase: "", apiKeySet: false, apiKeyMasked: "" };
+let platformAdmins = [];
 let authToken = null;
+let myEmail = null;
 let confirmDeleteId = null;
 let expandedId = null;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
@@ -20,7 +22,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, platformAdminsRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -30,6 +32,7 @@ async function loadAll() {
     api("GET", "/api/waitlist/stats"),
     api("GET", "/api/admin/audit-log"),
     api("GET", "/api/admin/logistics-settings"),
+    api("GET", "/api/admin/platform-admins"),
   ]);
   owner = ownerRes;
   businesses = businessesRes;
@@ -40,6 +43,7 @@ async function loadAll() {
   waitlistStats = waitlistRes;
   auditLog = auditRes;
   logisticsSettings = logisticsRes;
+  platformAdmins = platformAdminsRes;
 }
 
 function businessDetailHtml(b) {
@@ -93,7 +97,21 @@ function render() {
   $("logPercentFee").value = logisticsSettings.percentFee ?? 0;
   $("logApiBase").value = logisticsSettings.apiBase || "";
   $("logApiKeyStatus").textContent = logisticsSettings.apiKeySet ? `(set - ${logisticsSettings.apiKeyMasked})` : "(not set)";
+  $("platformAdminCount").textContent = `(${platformAdmins.length})`;
+  $("platformAdminList").innerHTML = platformAdmins.map((a) => {
+    const isMe = myEmail && a.email === myEmail;
+    return '<div class="item"><div class="item-top"><strong>' + clean(a.email) + '</strong>' + (isMe ? '<span class="meta">You</span>' : '') + '</div><div class="meta">Added ' + date(a.createdAt) + (a.addedBy ? ' by ' + clean(a.addedBy) : '') + '</div>' +
+      (isMe ? '' : '<div class="item-actions"><button class="danger" onclick="removePlatformAdmin(' + JSON.stringify(a.email) + ')">Remove</button></div>') +
+      '</div>';
+  }).join("");
 }
+
+function show(tab) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === tab));
+  $("title").textContent = { overview: "Overview", businesses: "Businesses & Payments", growth: "Growth", auditlog: "Audit Log", settings: "Platform Settings", admins: "Platform Admins" }[tab];
+}
+document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => show(b.dataset.tab)));
 
 $("ownerPaymentForm").onsubmit = async (e) => {
   e.preventDefault();
@@ -138,6 +156,29 @@ $("logisticsForm").onsubmit = async (e) => {
     toast(err.message);
   }
 };
+$("platformAdminForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api("POST", "/api/admin/platform-admins", { email: $("platformAdminEmail").value.trim() });
+    $("platformAdminForm").reset();
+    platformAdmins = await api("GET", "/api/admin/platform-admins");
+    render();
+    toast("Platform admin added");
+  } catch (err) {
+    toast(err.message);
+  }
+};
+async function removePlatformAdmin(email) {
+  try {
+    await api("DELETE", "/api/admin/platform-admins/" + encodeURIComponent(email));
+    platformAdmins = platformAdmins.filter((a) => a.email !== email);
+    render();
+    toast("Platform admin removed");
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
 $("businessExportCsv").onclick = () => downloadCsv(
   ["Business", "Plan", "Billing Cycle", "Phone", "Address", "Orders", "Customers", "AI Used", "AI Limit", "Storefront", "Joined"],
   businesses.map((b) => [b.businessName, b.plan, b.billingCycle || "", b.businessPhone || "", b.businessAddress || "", b.orderCount, b.customerCount, b.aiUsed, b.aiLimit === null ? "unlimited" : b.aiLimit, b.storefrontEnabled ? "Enabled" : "Disabled", b.createdAt]),
@@ -181,6 +222,7 @@ $("logout").onclick = async () => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return (location.href = "admin-login.html");
   authToken = session.access_token;
+  myEmail = (session.user?.email || "").toLowerCase();
   try {
     await loadAll();
     $("adminContent").style.display = "block";

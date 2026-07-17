@@ -13,11 +13,6 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const PLATFORM_ADMIN_EMAILS = (process.env.PLATFORM_ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 async function getBearerUser(req) {
   const header = req.headers.authorization || "";
   if (!header.startsWith("Bearer ")) return null;
@@ -65,9 +60,9 @@ function requirePermission(key) {
 
 function requirePlatformAdmin(req, res, next) {
   getBearerUser(req)
-    .then((user) => {
+    .then(async (user) => {
       if (!user) return res.status(401).json({ error: "Authentication required" });
-      if (!PLATFORM_ADMIN_EMAILS.includes((user.email || "").toLowerCase())) {
+      if (!(await db.isPlatformAdmin(user.email))) {
         return res.status(403).json({ error: "Not authorized" });
       }
       req.user = user;

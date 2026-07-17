@@ -2341,6 +2341,37 @@ async function listAllPayments() {
   return rows.map(toPaymentJson);
 }
 
+// --- Platform admins (who can access backend.html) --------------------------
+
+async function isPlatformAdmin(email) {
+  if (!email) return false;
+  const { rows } = await query("SELECT 1 FROM platform_admins WHERE email = $1", [email.toLowerCase()]);
+  return rows.length > 0;
+}
+
+async function listPlatformAdmins() {
+  const { rows } = await query("SELECT email, added_by, created_at FROM platform_admins ORDER BY created_at");
+  return rows.map((r) => ({ email: r.email, addedBy: r.added_by, createdAt: r.created_at }));
+}
+
+async function addPlatformAdmin(email, addedBy) {
+  const normalized = requireString(email, "Email").toLowerCase();
+  await query("INSERT INTO platform_admins (email, added_by) VALUES ($1,$2) ON CONFLICT (email) DO NOTHING", [normalized, addedBy || null]);
+  return { email: normalized };
+}
+
+async function removePlatformAdmin(email) {
+  await query("DELETE FROM platform_admins WHERE email = $1", [(email || "").toLowerCase()]);
+}
+
+// Called once on server start (see server/index.js) - keeps
+// PLATFORM_ADMIN_EMAILS as a self-healing bootstrap for platform_admins.
+async function seedPlatformAdminsFromEnv(emails) {
+  for (const email of emails) {
+    await query("INSERT INTO platform_admins (email, added_by) VALUES ($1,'env') ON CONFLICT (email) DO NOTHING", [email.toLowerCase()]);
+  }
+}
+
 // --- WhatsApp automation (Slice Five) ---------------------------------------
 
 function toWhatsAppMessageJson(m) {
@@ -2972,6 +3003,11 @@ module.exports = {
   getPaymentByReference,
   listAllBusinesses,
   listAllPayments,
+  isPlatformAdmin,
+  listPlatformAdmins,
+  addPlatformAdmin,
+  removePlatformAdmin,
+  seedPlatformAdminsFromEnv,
   createWaitlistEntry,
   getWaitlistStats,
   trackEvent,

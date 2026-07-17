@@ -1,8 +1,11 @@
 // One-off utility: node --env-file-if-exists=.env server/create-admin.js <email>
 // Creates (or resets the password for) a Supabase Auth user for the given
-// email, intended to be one of the addresses in PLATFORM_ADMIN_EMAILS so it
-// can sign in at admin-login.html. Prints the generated password once - it
-// is not stored anywhere, so save it immediately.
+// email, intended to be one of the addresses in PLATFORM_ADMIN_EMAILS (or
+// added later via backend.html's Platform Admins tab) so it can sign in at
+// admin-login.html. This script only creates the login - platform-admin
+// *access* comes from the platform_admins table (see server/db.js). Prints
+// the generated password once - it is not stored anywhere, so save it
+// immediately.
 const crypto = require("node:crypto");
 const { createClient } = require("@supabase/supabase-js");
 

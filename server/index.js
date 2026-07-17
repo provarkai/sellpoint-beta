@@ -1538,6 +1538,45 @@ app.get(
   handle(async (req, res) => res.json(await db.listAllAuditLog()))
 );
 
+// Who can access backend.html. Stored in platform_admins (see
+// server/db.js) rather than only the PLATFORM_ADMIN_EMAILS env var, so
+// admins can be added/removed here without a redeploy - see server.js's
+// boot-time seed for why the env var still matters as a fallback.
+app.get(
+  "/api/admin/platform-admins",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.listPlatformAdmins()))
+);
+
+app.post(
+  "/api/admin/platform-admins",
+  requirePlatformAdmin,
+  handle(async (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+    if (listErr) throw listErr;
+    const matchingUser = list.users.find((u) => (u.email || "").toLowerCase() === email);
+    if (!matchingUser) {
+      return res.status(400).json({ error: "No account exists for that email yet - create one with server/create-admin.js first" });
+    }
+    res.json(await db.addPlatformAdmin(email, req.user.email));
+  })
+);
+
+app.delete(
+  "/api/admin/platform-admins/:email",
+  requirePlatformAdmin,
+  handle(async (req, res) => {
+    const email = decodeURIComponent(req.params.email).toLowerCase();
+    if (email === (req.user.email || "").toLowerCase()) {
+      return res.status(400).json({ error: "You can't remove your own admin access - have another admin remove you" });
+    }
+    await db.removePlatformAdmin(email);
+    res.status(204).end();
+  })
+);
+
 // Permanently deletes a business and everything under it (products,
 // customers, orders, staff, invites, usage counters) - meant for clearing
 // out test/throwaway accounts created while building/verifying features,
@@ -1600,4 +1639,11 @@ app.put(
 app.listen(PORT, HOST, () => {
   console.log(`SellersPoint running at http://${HOST}:${PORT}`);
   startScheduler();
+  const bootAdminEmails = (process.env.PLATFORM_ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (bootAdminEmails.length) {
+    db.seedPlatformAdminsFromEnv(bootAdminEmails).catch((err) => console.error("Platform admin seed failed:", err));
+  }
 });

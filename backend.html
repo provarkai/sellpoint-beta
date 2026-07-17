@@ -6,33 +6,59 @@
   <title>SellersPoint Platform Admin</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="single-page">
+<body>
+  <aside>
+    <div class="brand"><b id="brandLogo"><img src="/assets/branding/logo/icon.png" alt="SellersPoint" onerror="this.style.display='none';this.parentElement.textContent='SP'"></b><span><strong>SellersPoint</strong><small>Platform Admin</small></span><button id="logout">Log Out</button></div>
+    <div class="tab-rows">
+      <button class="tab active" data-tab="overview">📊 Overview</button>
+      <button class="tab" data-tab="businesses">🏢 Businesses &amp; Payments</button>
+      <button class="tab" data-tab="growth">📈 Growth</button>
+      <button class="tab" data-tab="auditlog">📜 Audit Log</button>
+      <button class="tab" data-tab="settings">⚙️ Platform Settings</button>
+      <button class="tab" data-tab="admins">🔑 Platform Admins</button>
+    </div>
+  </aside>
   <main>
-    <header><div class="admin-header-brand"><img src="/assets/branding/logo/logo_1_main-real.png" alt="SellersPoint" class="admin-logo"><div><h1>SellersPoint Platform Admin</h1><p class="meta">Cross-tenant view - all businesses on SellersPoint, not just one.</p></div></div><div class="top-actions"><a class="button-link" href="app.html">Open App</a><a class="button-link" href="upgrade.html" target="_blank">Payment Page</a><button id="logout">Log Out</button></div></header>
+    <header><div class="admin-header-brand"><h1 id="title">Overview</h1><p class="meta">Cross-tenant view - all businesses on SellersPoint, not just one.</p></div><div class="top-actions"><a class="button-link" href="app.html">Open App</a><a class="button-link" href="upgrade.html" target="_blank">Payment Page</a></div></header>
     <div id="adminContent" style="display:none">
-      <section class="metrics"><div><small>Businesses</small><b id="totalBusinesses">0</b></div><div><small>Payments recorded</small><b id="totalPayments">0</b></div><div><small>Revenue collected</small><b id="totalRevenue">NGN 0</b></div></section>
-      <h2 class="admin-section-heading">Businesses &amp; Payments</h2>
-      <section class="grid">
-        <article><h2>Businesses <small id="businessCount"></small></h2><p class="actions"><button id="businessExportCsv">Export CSV</button></p><div id="businessList" class="list"></div></article>
-        <article><h2>Recent Payments (All Tenants)</h2><p class="actions"><button id="paymentExportCsv">Export CSV</button></p><div id="paymentLog" class="list"></div></article>
+      <section id="overview" class="page active"><div class="metrics"><div><small>Businesses</small><b id="totalBusinesses">0</b></div><div><small>Payments recorded</small><b id="totalPayments">0</b></div><div><small>Revenue collected</small><b id="totalRevenue">NGN 0</b></div></div></section>
+
+      <section id="businesses" class="page">
+        <div class="grid">
+          <article><h2>Businesses <small id="businessCount"></small></h2><p class="actions"><button id="businessExportCsv">Export CSV</button></p><div id="businessList" class="list"></div></article>
+          <article><h2>Recent Payments (All Tenants)</h2><p class="actions"><button id="paymentExportCsv">Export CSV</button></p><div id="paymentLog" class="list"></div></article>
+        </div>
       </section>
-      <h2 class="admin-section-heading">Growth</h2>
-      <section class="grid">
-        <article><h2>Analytics <small class="meta">(last 30 days)</small></h2><p class="meta">Top-of-funnel: landing views, signups, storefront traffic. Anonymous, no PII.</p><div id="analyticsSummary" class="list"></div></article>
-        <article><h2>Founding Members Waitlist</h2><div id="waitlistSummary" class="list"></div></article>
+
+      <section id="growth" class="page">
+        <div class="grid">
+          <article><h2>Analytics <small class="meta">(last 30 days)</small></h2><p class="meta">Top-of-funnel: landing views, signups, storefront traffic. Anonymous, no PII.</p><div id="analyticsSummary" class="list"></div></article>
+          <article><h2>Founding Members Waitlist</h2><div id="waitlistSummary" class="list"></div></article>
+        </div>
       </section>
-      <h2 class="admin-section-heading">Audit Log</h2>
-      <section class="grid">
-        <article><h2>Audit Log <small class="meta">(cross-tenant, last 100)</small></h2><p class="meta">Every mutating action across all businesses - who did what, when.</p><div id="auditLogList" class="list"></div></article>
+
+      <section id="auditlog" class="page">
+        <div class="grid">
+          <article><h2>Audit Log <small class="meta">(cross-tenant, last 100)</small></h2><p class="meta">Every mutating action across all businesses - who did what, when.</p><div id="auditLogList" class="list"></div></article>
+        </div>
       </section>
-      <h2 class="admin-section-heading">Platform Settings</h2>
-      <section class="grid">
-        <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><p class="meta">Subscription payments are collected via Paystack checkout - no manual bank details needed.</p><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<input value="Paystack" disabled></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><button>Save SellersPoint Payment Details</button></form>
-        <form id="pricingForm"><h2>Pricing Tiers</h2><p class="meta">Set the monthly price for each plan - yearly is automatically 10x monthly (2 months free). Starter is always free; Enterprise is always custom.</p><label>Growth (NGN/month)<input id="priceGrowth" type="number" min="0" required></label><label>Pro (NGN/month)<input id="pricePro" type="number" min="0" required></label><label>Business (NGN/month)<input id="priceBusiness" type="number" min="0" required></label><button>Save Pricing</button></form>
+
+      <section id="settings" class="page">
+        <div class="grid">
+          <form id="ownerPaymentForm"><h2>SellersPoint Payment Details</h2><p class="meta">Subscription payments are collected via Paystack checkout - no manual bank details needed.</p><label>Business/Account name<input id="ownerName" required placeholder="SellersPoint Technologies"></label><label>Payment provider<input value="Paystack" disabled></label><label>Payment link<input id="ownerLink" placeholder="https://paystack.shop/sellerspoint"></label><button>Save SellersPoint Payment Details</button></form>
+          <form id="pricingForm"><h2>Pricing Tiers</h2><p class="meta">Set the monthly price for each plan - yearly is automatically 10x monthly (2 months free). Starter is always free; Enterprise is always custom.</p><label>Growth (NGN/month)<input id="priceGrowth" type="number" min="0" required></label><label>Pro (NGN/month)<input id="pricePro" type="number" min="0" required></label><label>Business (NGN/month)<input id="priceBusiness" type="number" min="0" required></label><button>Save Pricing</button></form>
+        </div>
+        <div class="grid">
+          <form id="logisticsForm"><h2>SellersPoint Logistics</h2><p class="meta">Platform-run delivery, offered alongside a seller's own self/rider delivery. Charged the same way as online payments: a flat fee plus a percentage, added to the order when a seller selects it. API credentials are optional for now while a courier provider is still being evaluated - the fee and toggle work independently of that.</p><label><input id="logEnabled" type="checkbox"> Enable SellersPoint Logistics for sellers</label><label>Flat fee (NGN per order)<input id="logFlatFee" type="number" min="0" step="1" value="0"></label><label>Percent fee (% of order value)<input id="logPercentFee" type="number" min="0" max="100" step="0.1" value="0"></label><label>Courier API base URL <span class="meta">(optional, for later)</span><input id="logApiBase" placeholder="https://api.example-courier.com"></label><label>Courier API key <span class="meta" id="logApiKeyStatus">(not set)</span><input id="logApiKey" type="password" placeholder="Leave blank to keep the current key"></label><button>Save Logistics Settings</button></form>
+          <form id="socialLinksForm"><h2>Footer Social Links</h2><p class="meta">Shown as clickable icons in the public landing page footer. Leave blank to hide an icon.</p><label>Instagram<input id="socialInstagram" placeholder="https://instagram.com/sellerspoint"></label><label>Facebook<input id="socialFacebook" placeholder="https://facebook.com/sellerspoint"></label><label>TikTok<input id="socialTiktok" placeholder="https://tiktok.com/@sellerspoint"></label><label>X (Twitter)<input id="socialX" placeholder="https://x.com/sellerspoint"></label><label>WhatsApp<input id="socialWhatsapp" placeholder="https://wa.me/2348012345678"></label><label>LinkedIn<input id="socialLinkedin" placeholder="https://linkedin.com/company/sellerspoint"></label><button>Save Social Links</button></form>
+        </div>
       </section>
-      <section class="grid">
-        <form id="logisticsForm"><h2>SellersPoint Logistics</h2><p class="meta">Platform-run delivery, offered alongside a seller's own self/rider delivery. Charged the same way as online payments: a flat fee plus a percentage, added to the order when a seller selects it. API credentials are optional for now while a courier provider is still being evaluated - the fee and toggle work independently of that.</p><label><input id="logEnabled" type="checkbox"> Enable SellersPoint Logistics for sellers</label><label>Flat fee (NGN per order)<input id="logFlatFee" type="number" min="0" step="1" value="0"></label><label>Percent fee (% of order value)<input id="logPercentFee" type="number" min="0" max="100" step="0.1" value="0"></label><label>Courier API base URL <span class="meta">(optional, for later)</span><input id="logApiBase" placeholder="https://api.example-courier.com"></label><label>Courier API key <span class="meta" id="logApiKeyStatus">(not set)</span><input id="logApiKey" type="password" placeholder="Leave blank to keep the current key"></label><button>Save Logistics Settings</button></form>
-        <form id="socialLinksForm"><h2>Footer Social Links</h2><p class="meta">Shown as clickable icons in the public landing page footer. Leave blank to hide an icon.</p><label>Instagram<input id="socialInstagram" placeholder="https://instagram.com/sellerspoint"></label><label>Facebook<input id="socialFacebook" placeholder="https://facebook.com/sellerspoint"></label><label>TikTok<input id="socialTiktok" placeholder="https://tiktok.com/@sellerspoint"></label><label>X (Twitter)<input id="socialX" placeholder="https://x.com/sellerspoint"></label><label>WhatsApp<input id="socialWhatsapp" placeholder="https://wa.me/2348012345678"></label><label>LinkedIn<input id="socialLinkedin" placeholder="https://linkedin.com/company/sellerspoint"></label><button>Save Social Links</button></form>
+
+      <section id="admins" class="page">
+        <div class="grid">
+          <form id="platformAdminForm"><h2>Add Platform Admin</h2><p class="meta">Grants access to this console (backend.html). The email must already have a login - create one with server/create-admin.js first if it doesn't.</p><label>Email<input id="platformAdminEmail" type="email" required placeholder="admin@sellerspoint.app"></label><button>Add Admin</button></form>
+          <article><h2>Current Platform Admins <small id="platformAdminCount"></small></h2><div id="platformAdminList" class="list"></div></article>
+        </div>
       </section>
     </div>
   </main>

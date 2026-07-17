@@ -395,6 +395,16 @@ alter table platform_settings add column if not exists pricing_overrides jsonb n
 -- page footer, editable only from the platform-admin backend.
 alter table platform_settings add column if not exists social_links jsonb not null default '{}'::jsonb;
 
+-- Who can access backend.html (the platform admin console). Bootstrapped
+-- from PLATFORM_ADMIN_EMAILS on every server start (see server/index.js) so
+-- that env var stays a self-healing safety net - removing an admin here via
+-- the UI can't cause a permanent lockout, since a redeploy re-seeds it.
+create table if not exists platform_admins (
+  email text primary key,
+  added_by text,
+  created_at timestamptz not null default now()
+);
+
 -- Seller-written "Why buy from us" bullets (one per line) shown on the
 -- storefront - the seller's own claims about themselves, not numbers the
 -- app invents.
