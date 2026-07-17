@@ -225,8 +225,8 @@ async function createBusiness(userId, fields, email) {
     if (invite) {
       const { rows: businessRows } = await client.query("SELECT * FROM businesses WHERE id = $1", [invite.business_id]);
       await client.query(
-        `INSERT INTO business_members (business_id, user_id, email, role) VALUES ($1, $2, $3, 'staff')`,
-        [invite.business_id, userId, email]
+        `INSERT INTO business_members (business_id, user_id, email, role) VALUES ($1, $2, $3, $4)`,
+        [invite.business_id, userId, email, invite.role]
       );
       await client.query("DELETE FROM business_invites WHERE id = $1", [invite.id]);
       await client.query("COMMIT");
@@ -1179,8 +1179,10 @@ function toStaffJson(m) {
   return { userId: m.user_id, email: m.email, role: m.role, createdAt: m.created_at };
 }
 function toInviteJson(i) {
-  return { id: i.id, email: i.email, createdAt: i.created_at };
+  return { id: i.id, email: i.email, role: i.role, createdAt: i.created_at };
 }
+
+const NON_OWNER_ROLES = ["manager", "sales_staff", "accountant"];
 
 async function listStaff(businessId) {
   const [members, invites] = await Promise.all([
@@ -1189,7 +1191,7 @@ async function listStaff(businessId) {
   ]);
   return {
     owner: members.rows.filter((m) => m.role === "owner").map(toStaffJson)[0] || null,
-    staff: members.rows.filter((m) => m.role === "staff").map(toStaffJson),
+    staff: members.rows.filter((m) => NON_OWNER_ROLES.includes(m.role)).map(toStaffJson),
     invites: invites.rows.map(toInviteJson),
   };
 }
@@ -1200,8 +1202,9 @@ async function effectiveStaffLimit(businessId) {
   return base === Infinity ? base : base + (await getAddonSeatBonus(businessId));
 }
 
-async function inviteStaff(businessId, email) {
+async function inviteStaff(businessId, email, role) {
   const clean = requireString(email, "Email").toLowerCase();
+  if (!NON_OWNER_ROLES.includes(role)) throw new OrderError("Role must be manager, sales_staff, or accountant");
   const limit = await effectiveStaffLimit(businessId);
   const { staff } = await listStaff(businessId);
   if (staff.length >= limit) throw new OrderError("Staff seat limit reached for the current plan");
@@ -1211,8 +1214,8 @@ async function inviteStaff(businessId, email) {
   );
   if (existing.rows.length) throw new OrderError("This person is already on your team");
   await query(
-    "INSERT INTO business_invites (business_id, email) VALUES ($1, $2) ON CONFLICT (business_id, email) DO NOTHING",
-    [businessId, clean]
+    "INSERT INTO business_invites (business_id, email, role) VALUES ($1, $2, $3) ON CONFLICT (business_id, email) DO UPDATE SET role = excluded.role",
+    [businessId, clean, role]
   );
   return listStaff(businessId);
 }
@@ -1222,8 +1225,18 @@ async function revokeInvite(businessId, email) {
   return listStaff(businessId);
 }
 
+async function updateStaffRole(businessId, userId, role) {
+  if (!NON_OWNER_ROLES.includes(role)) throw new OrderError("Role must be manager, sales_staff, or accountant");
+  const { rows } = await query(
+    "UPDATE business_members SET role = $1 WHERE business_id = $2 AND user_id = $3 AND role != 'owner' RETURNING *",
+    [role, businessId, userId]
+  );
+  if (!rows[0]) throw new OrderError("Team member not found");
+  return listStaff(businessId);
+}
+
 async function removeStaff(businessId, userId) {
-  await query("DELETE FROM business_members WHERE business_id = $1 AND user_id = $2 AND role = 'staff'", [businessId, userId]);
+  await query("DELETE FROM business_members WHERE business_id = $1 AND user_id = $2 AND role != 'owner'", [businessId, userId]);
   return listStaff(businessId);
 }
 
@@ -2367,7 +2380,25 @@ async function assertWhatsAppQuotaAvailable(businessId) {
   if (used >= limit) throw new OrderError("You've used all your WhatsApp sends for this month. Upgrade your plan or buy more WhatsApp credits to keep sending.");
 }
 
-async function sendPaymentReminder(businessId, orderId, whatsapp, messageType = "reminder") {
+// stage (1/2/3) only varies the copy for the automated multi-touch
+// follow-up (see isOrderDueForAutoReminder below) - the manual "Remind via
+// WhatsApp" button in the dashboard calls this with no stage and keeps the
+// original one-size "friendly reminder" text.
+function reminderText({ stage, customerName, businessName, itemsText, currency, total }) {
+  const amount = `${currency} ${total.toLocaleString()}`;
+  if (stage === 2) {
+    return `Hi ${customerName}, following up again on your order for ${itemsText} (${amount}) - it's still reserved for you. Reply here or complete payment to secure it.`;
+  }
+  if (stage === 3) {
+    return `Hi ${customerName}, this is a final reminder about your pending order for ${itemsText} (${amount}) from ${businessName}. We'll release the stock if we don't hear back soon.`;
+  }
+  if (stage === 1) {
+    return `Hi ${customerName}, just checking in - your order for ${itemsText} (${amount}) from ${businessName} is still pending payment. Let us know if you have any questions!`;
+  }
+  return `Hello ${customerName}, this is a friendly reminder from ${businessName} about your pending order for ${itemsText} (${amount}). Please complete payment so we can process it. Thank you!`;
+}
+
+async function sendPaymentReminder(businessId, orderId, whatsapp, messageType = "reminder", stage) {
   await assertWhatsAppQuotaAvailable(businessId);
   const { rows } = await query(
     `SELECT o.*, c.phone AS customer_phone, c.name AS customer_name FROM orders o
@@ -2384,7 +2415,7 @@ async function sendPaymentReminder(businessId, orderId, whatsapp, messageType = 
   const total = Number(order.subtotal);
   const items = await loadItemsForOrder(orderId);
   const itemsText = items.map((i) => `${i.product_name} x ${i.qty}`).join(", ") || order.product_name;
-  const text = `Hello ${order.customer_name || "there"}, this is a friendly reminder from ${business?.name || "us"} about your pending order for ${itemsText} (${currency} ${total.toLocaleString()}). Please complete payment so we can process it. Thank you!`;
+  const text = reminderText({ stage, customerName: order.customer_name || "there", businessName: business?.name || "us", itemsText, currency, total });
   const result = await whatsapp.sendMessage(order.customer_phone, text);
   await recordWhatsAppMessage(businessId, { orderId, direction: "out", phone: order.customer_phone, body: text, status: result.status, wasenderMessageId: result.messageId, messageType });
   return { sent: true, phone: order.customer_phone };
@@ -2492,6 +2523,13 @@ async function sendAllReminders(businessId, whatsapp) {
 // sendAllReminders but grouped by customer (one message per customer, not
 // per order, since a customer with 3 overdue orders shouldn't get 3 texts).
 async function resolveCampaignAudience(businessId, audience) {
+  if (audience?.type === "all") {
+    const { rows } = await query(
+      `SELECT id, phone, name FROM customers WHERE business_id = $1 AND phone IS NOT NULL AND phone != ''`,
+      [businessId]
+    );
+    return rows.map((r) => ({ customerId: r.id, phone: r.phone, name: r.name }));
+  }
   if (audience?.type === "segment") {
     const valid = ["New", "At Risk", "VIP", "Repeat", "Active"];
     if (!valid.includes(audience.segment)) throw new OrderError("Invalid segment");
@@ -2534,15 +2572,107 @@ async function sendCampaign(businessId, { audience, message }, whatsapp) {
   return { campaignId, total: recipients.length, sent: results.filter((r) => r.sent).length, results };
 }
 
-// Pure - no query() calls, directly unit-testable. daysAfter is the
-// business's configured delay; lastAutoReminderAt is null if this order
-// never got one. Once-per-order: once lastAutoReminderAt is set, this
-// returns false forever for that order (matches sendPaidConfirmationIfNeeded's
-// existing once-per-order idempotency pattern).
-function isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, daysAfter, now = new Date() }) {
-  if (lastAutoReminderAt) return false;
-  const cutoff = new Date(now.getTime() - daysAfter * 24 * 60 * 60 * 1000);
-  return new Date(orderCreatedAt) < cutoff;
+// --- Recurring campaigns: a persisted, schedulable "Send Campaign" -----------
+// The one-off sendCampaign() above is reused as-is by the scheduler once a
+// campaign is due (see runRecurringCampaignScan in server/scheduler.js) -
+// this section only adds the CRUD + "what's due" query around it.
+
+function toRecurringCampaignJson(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    message: c.message,
+    audienceType: c.audience_type,
+    segment: c.segment,
+    frequency: c.frequency,
+    enabled: c.enabled,
+    lastSentAt: c.last_sent_at,
+    createdAt: c.created_at,
+  };
+}
+
+async function listRecurringCampaigns(businessId) {
+  const { rows } = await query("SELECT * FROM recurring_campaigns WHERE business_id = $1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toRecurringCampaignJson);
+}
+
+async function createRecurringCampaign(businessId, data) {
+  const name = requireString(data.name, "Name");
+  const message = requireString(data.message, "Message");
+  const frequency = ["weekly", "monthly"].includes(data.frequency) ? data.frequency : null;
+  if (!frequency) throw new OrderError("Frequency must be weekly or monthly");
+  const audienceType = data.audienceType === "segment" ? "segment" : "all";
+  const segment = audienceType === "segment" ? requireString(data.segment, "Segment") : null;
+  const { rows } = await query(
+    `INSERT INTO recurring_campaigns (business_id, name, message, audience_type, segment, frequency)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [businessId, name, message, audienceType, segment, frequency]
+  );
+  return toRecurringCampaignJson(rows[0]);
+}
+
+async function updateRecurringCampaign(businessId, id, data) {
+  const { rows } = await query("SELECT * FROM recurring_campaigns WHERE id = $1 AND business_id = $2", [id, businessId]);
+  const current = rows[0];
+  if (!current) throw new OrderError("Recurring campaign not found");
+  const name = data.name !== undefined ? requireString(data.name, "Name") : current.name;
+  const message = data.message !== undefined ? requireString(data.message, "Message") : current.message;
+  const frequency = data.frequency !== undefined ? data.frequency : current.frequency;
+  if (!["weekly", "monthly"].includes(frequency)) throw new OrderError("Frequency must be weekly or monthly");
+  const enabled = data.enabled !== undefined ? !!data.enabled : current.enabled;
+  const { rows: updated } = await query(
+    `UPDATE recurring_campaigns SET name=$1, message=$2, frequency=$3, enabled=$4 WHERE id=$5 AND business_id=$6 RETURNING *`,
+    [name, message, frequency, enabled, id, businessId]
+  );
+  return toRecurringCampaignJson(updated[0]);
+}
+
+async function deleteRecurringCampaign(businessId, id) {
+  const { rows } = await query("DELETE FROM recurring_campaigns WHERE id = $1 AND business_id = $2 RETURNING id", [id, businessId]);
+  if (!rows[0]) throw new OrderError("Recurring campaign not found");
+}
+
+// Cross-business: called once per scheduler tick, same shape as
+// listBusinessesWithAutoReminderEnabled. "Due" = never sent, or last sent
+// longer ago than the campaign's own frequency window.
+async function listDueRecurringCampaigns() {
+  const { rows } = await query(
+    `SELECT * FROM recurring_campaigns
+     WHERE enabled = true
+       AND (
+         last_sent_at IS NULL
+         OR (frequency = 'weekly' AND last_sent_at < now() - interval '7 days')
+         OR (frequency = 'monthly' AND last_sent_at < now() - interval '30 days')
+       )`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    businessId: r.business_id,
+    message: r.message,
+    audienceType: r.audience_type,
+    segment: r.segment,
+  }));
+}
+
+async function markRecurringCampaignSent(id) {
+  await query("UPDATE recurring_campaigns SET last_sent_at = now() WHERE id = $1", [id]);
+}
+// Multi-touch, not one-shot: up to 3 reminders per order at increasing
+// delays (1/3/7 days unpaid), then it stops entirely - matches a common
+// payment-recovery cadence without feeling spammy. daysAfter (the
+// business's configurable first-touch delay) only controls stage 1; stage
+// 2/3 offsets are fixed constants so the settings UI doesn't need to grow
+// three separate delay inputs. sentCount is how many auto_reminder rows
+// already exist for this order (0/1/2), so this doubles as "which stage is
+// next" - stage N is only offered once N-1 have already gone out.
+const FOLLOW_UP_STAGE_DAYS = [null, 1, 3, 7]; // index 0 unused, stage 1/2/3
+function isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, sentCount = 0, daysAfter, now = new Date() }) {
+  if (sentCount >= 3) return false;
+  const stage = sentCount + 1;
+  const delayDays = stage === 1 ? daysAfter : FOLLOW_UP_STAGE_DAYS[stage];
+  const anchor = lastAutoReminderAt ? new Date(lastAutoReminderAt) : new Date(orderCreatedAt);
+  const cutoff = new Date(now.getTime() - delayDays * 24 * 60 * 60 * 1000);
+  return anchor < cutoff;
 }
 
 async function listBusinessesWithAutoReminderEnabled() {
@@ -2552,12 +2682,12 @@ async function listBusinessesWithAutoReminderEnabled() {
 
 // Called by the scheduler (server/scheduler.js) once per business opted
 // into auto-reminders. Fetches candidate orders with their last auto-reminder
-// timestamp (if any) via a LEFT JOIN, then filters in JS with
+// timestamp and how many have gone out so far, then filters in JS with
 // isOrderDueForAutoReminder rather than duplicating the date math in SQL -
 // keeps the eligibility rule in one place and independently unit-testable.
 async function sendAutoRemindersForBusiness(businessId, daysAfter, whatsapp) {
   const { rows } = await query(
-    `SELECT o.id, o.created_at, MAX(wm.created_at) AS last_auto_reminder_at
+    `SELECT o.id, o.created_at, MAX(wm.created_at) AS last_auto_reminder_at, COUNT(wm.id)::int AS sent_count
      FROM orders o
      JOIN customers c ON c.id = o.customer_id
      LEFT JOIN whatsapp_messages wm ON wm.order_id = o.id AND wm.message_type = 'auto_reminder'
@@ -2565,12 +2695,12 @@ async function sendAutoRemindersForBusiness(businessId, daysAfter, whatsapp) {
      GROUP BY o.id, o.created_at`,
     [businessId]
   );
-  const due = rows.filter((r) => isOrderDueForAutoReminder({ orderCreatedAt: r.created_at, lastAutoReminderAt: r.last_auto_reminder_at, daysAfter }));
+  const due = rows.filter((r) => isOrderDueForAutoReminder({ orderCreatedAt: r.created_at, lastAutoReminderAt: r.last_auto_reminder_at, sentCount: r.sent_count, daysAfter }));
   const results = [];
   for (const row of due) {
     try {
       await assertWhatsAppQuotaAvailable(businessId);
-      await sendPaymentReminder(businessId, row.id, whatsapp, "auto_reminder");
+      await sendPaymentReminder(businessId, row.id, whatsapp, "auto_reminder", row.sent_count + 1);
       results.push({ orderId: row.id, sent: true });
     } catch (err) {
       results.push({ orderId: row.id, sent: false, error: err.message });
@@ -2749,6 +2879,12 @@ module.exports = {
   sendAllReminders,
   resolveCampaignAudience,
   sendCampaign,
+  listRecurringCampaigns,
+  createRecurringCampaign,
+  updateRecurringCampaign,
+  deleteRecurringCampaign,
+  listDueRecurringCampaigns,
+  markRecurringCampaignSent,
   isOrderDueForAutoReminder,
   listBusinessesWithAutoReminderEnabled,
   sendAutoRemindersForBusiness,
@@ -2847,6 +2983,7 @@ module.exports = {
   listStaff,
   inviteStaff,
   revokeInvite,
+  updateStaffRole,
   removeStaff,
   effectiveStaffLimit,
   getAiUsage,

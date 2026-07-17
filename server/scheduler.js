@@ -26,10 +26,35 @@ async function runAutoReminderScan() {
   }
 }
 
-function startScheduler() {
-  if (process.env.DISABLE_SCHEDULER === "true") return; // kill switch for local dev / incident rollback
-  runAutoReminderScan().catch((err) => console.error("[scheduler] initial run failed:", err.message));
-  setInterval(() => runAutoReminderScan().catch((err) => console.error("[scheduler] scan failed:", err.message)), SCAN_INTERVAL_MS);
+// Recurring retention campaigns (weekly/monthly "still here" style
+// broadcasts) - same interval, same error-isolation shape as the
+// auto-reminder scan above. Sends via the existing sendCampaign(), which
+// already handles quota checks, {name} personalization, and message
+// logging - this job just decides *when* a stored campaign is due and
+// stamps last_sent_at once it's gone out.
+async function runRecurringCampaignScan() {
+  if (!whatsapp.isConfigured()) return;
+  const due = await db.listDueRecurringCampaigns();
+  for (const c of due) {
+    try {
+      const result = await db.sendCampaign(c.businessId, { audience: { type: c.audienceType, segment: c.segment }, message: c.message }, whatsapp);
+      await db.markRecurringCampaignSent(c.id);
+      console.log(`[scheduler] recurring campaign ${c.id}: sent ${result.sent}/${result.total}`);
+    } catch (err) {
+      console.error(`[scheduler] recurring campaign ${c.id} failed:`, err.message);
+    }
+  }
 }
 
-module.exports = { startScheduler, runAutoReminderScan };
+async function runScheduledJobs() {
+  await runAutoReminderScan();
+  await runRecurringCampaignScan();
+}
+
+function startScheduler() {
+  if (process.env.DISABLE_SCHEDULER === "true") return; // kill switch for local dev / incident rollback
+  runScheduledJobs().catch((err) => console.error("[scheduler] initial run failed:", err.message));
+  setInterval(() => runScheduledJobs().catch((err) => console.error("[scheduler] scan failed:", err.message)), SCAN_INTERVAL_MS);
+}
+
+module.exports = { startScheduler, runAutoReminderScan, runRecurringCampaignScan };

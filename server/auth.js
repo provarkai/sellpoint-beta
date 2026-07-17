@@ -1,5 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
 const db = require("./db");
+const { hasPermission } = require("./roles");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -50,6 +51,18 @@ function requireAuth(req, res, next) {
     .catch(next);
 }
 
+// Mount after requireAuth (needs req.role already set). Owner always
+// passes; other roles need `key` in their ROLE_PERMISSIONS set (see
+// server/roles.js) - this is the single enforcement point that replaces
+// the old scattered `if (req.role !== "owner") return res.status(403)...`
+// checks previously inline in each route.
+function requirePermission(key) {
+  return (req, res, next) => {
+    if (!hasPermission(req.role, key)) return res.status(403).json({ error: "You don't have permission to do that" });
+    next();
+  };
+}
+
 function requirePlatformAdmin(req, res, next) {
   getBearerUser(req)
     .then((user) => {
@@ -63,4 +76,4 @@ function requirePlatformAdmin(req, res, next) {
     .catch(next);
 }
 
-module.exports = { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin };
+module.exports = { requireAuthOnly, requireAuth, requirePermission, requirePlatformAdmin, supabaseAdmin };

@@ -74,10 +74,21 @@ alter table business_members add column if not exists email text not null defaul
 update business_members m set email = u.email
   from auth.users u where u.id = m.user_id and m.email = '';
 
+-- Widened from binary owner/staff to named roles with real permission
+-- boundaries (see server/roles.js) - existing 'staff' rows become 'manager'
+-- (closest match to their prior "everything except owner-only admin"
+-- access) so nobody's access silently shrinks on deploy. drop+add is safe
+-- to re-run since a matching constraint is just replaced each time.
+alter table business_members drop constraint if exists business_members_role_check;
+alter table business_members add constraint business_members_role_check
+  check (role in ('owner', 'manager', 'sales_staff', 'accountant'));
+update business_members set role = 'manager' where role = 'staff';
+
 -- Pending staff invites, keyed by email since the invitee may not have a
 -- Supabase account yet. Consumed (and deleted) when someone signs in with a
 -- matching email and has no existing business membership - see
--- db.js#createBusiness.
+-- db.js#createBusiness. role is the one the inviter picked, applied when
+-- the invite is consumed.
 create table if not exists business_invites (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references businesses(id) on delete cascade,
@@ -86,6 +97,8 @@ create table if not exists business_invites (
   unique(business_id, email)
 );
 create index if not exists business_invites_email_idx on business_invites(lower(email));
+alter table business_invites add column if not exists role text not null default 'manager'
+  check (role in ('manager', 'sales_staff', 'accountant'));
 
 -- One named location per business. Deliberately lightweight today: a
 -- label + address only, not yet a scoping key on products/orders/inventory -
@@ -585,6 +598,27 @@ create table if not exists cash_reconciliations (
 );
 create index if not exists cash_reconciliations_business_id_idx on cash_reconciliations(business_id);
 alter table cash_reconciliations enable row level security;
+
+-- Persisted, schedulable version of the one-off "Send Campaign" tool -
+-- server/scheduler.js sends a due campaign's message to its audience on
+-- the given cadence and stamps last_sent_at, rather than a human clicking
+-- send each time. segment is only meaningful when audience_type='segment'
+-- (one of the five names in db.js#resolveCampaignAudience); 'all' targets
+-- every customer with a phone, no filter.
+create table if not exists recurring_campaigns (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  message text not null,
+  audience_type text not null default 'all' check (audience_type in ('all', 'segment')),
+  segment text,
+  frequency text not null check (frequency in ('weekly', 'monthly')),
+  enabled boolean not null default true,
+  last_sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists recurring_campaigns_business_id_idx on recurring_campaigns(business_id);
+alter table recurring_campaigns enable row level security;
 
 -- Free-text feedback/feature requests a business sends to the SellersPoint
 -- team, submitted from the "Feedback" sidebar tab. rating is optional (1-5)

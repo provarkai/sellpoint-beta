@@ -3,6 +3,8 @@ let pricing={};
 let authToken=null;
 let userEmail=null;
 let myRole=null;
+let myPermissions=[];
+const can=key=>myRole==="owner"||myPermissions.includes(key);
 let customerSegments={};
 let customerSegmentFilter=null;
 let viewingCustomerId=null;
@@ -12,14 +14,30 @@ const clean=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":
 const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)};
 async function api(method,url,body){const res=await fetch(url,{method,headers:{...(body?{"Content-Type":"application/json"}:{}),Authorization:`Bearer ${authToken}`},body:body?JSON.stringify(body):undefined});if(!res.ok){const err=await res.json().catch(()=>({error:"Request failed"}));throw new Error(err.error||"Request failed")}return res.status===204?null:res.json()}
 function applyState(s){Object.assign(state,s.business,{products:s.products,customers:s.customers,orders:s.orders,events:s.events})}
-async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo)]);applyState(s);pricing=p;myRole=me.role;logisticsInfo=log;updateDeliveryMethodOptions()}
+async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo)]);applyState(s);pricing=p;myRole=me.role;myPermissions=me.permissions||[];logisticsInfo=log;updateDeliveryMethodOptions();applyRoleVisibility()}
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
+// Hides sidebar tabs a role has no permission to use at all - Feedback,
+// Dashboard, and AI Assistant stay visible to every role (no write
+// permission gates those). Reports has its own plan-tier visibility rule
+// elsewhere (render()) which also checks can("reports.read") now, so it's
+// deliberately left out of this map to avoid the two fighting each other.
+const TAB_PERMISSIONS={products:"products.write",customers:"customers.write",orders:"orders.write",invoice:"invoices.use",pos:"pos.use",expenses:"expenses.write",suppliers:"suppliers.write",settings:"settings.write"};
+function applyRoleVisibility(){
+  document.querySelectorAll(".tab[data-tab]").forEach(btn=>{
+    const perm=TAB_PERMISSIONS[btn.dataset.tab];
+    if(perm)btn.style.display=can(perm)?"":"none";
+  });
+  if($("openCampaignModal"))$("openCampaignModal").style.display=can("campaigns.send")?"":"none";
+  if($("recurringCampaignForm"))$("recurringCampaignForm").style.display=can("campaigns.send")?"":"none";
+  const rcArticle=$("rcList")?.closest("article");
+  if(rcArticle)rcArticle.style.display=can("campaigns.send")?"":"none";
+}
 const product=id=>state.products.find(x=>x.id===id), customer=id=>state.customers.find(x=>x.id===id), total=o=>Number(o.subtotal||0);
 const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName} x ${i.qty}`).join(", "):`${o.productName} x ${o.qty}`);
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -37,7 +55,7 @@ function render(){
   if($("orderLimit")){const lim=orderLimit();$("orderLimit").textContent=lim===Infinity?"unlimited":lim}
   const priceLabel=t=>t.monthly===0?"Free":t.monthly==null?"Custom Pricing":money(t.monthly)+"/month";
   if($("pricingPlans"))$("pricingPlans").innerHTML=Object.entries(pricing).map(([key,t])=>`<div class="${key===state.plan?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
-  if($("downgradeBtn"))$("downgradeBtn").style.display=state.plan!=="starter"&&myRole==="owner"?"block":"none";
+  if($("downgradeBtn"))$("downgradeBtn").style.display=state.plan!=="starter"&&can("plan.manage")?"block":"none";
   if($("paywallPlans"))$("paywallPlans").innerHTML=Object.entries(pricing).filter(([key,t])=>key!=="starter"&&t.monthly!=null).map(([key,t],i)=>`<div class="${i===0?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
   const rev=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>s+total(o),0), low=state.products.filter(p=>p.stock<5), pending=state.orders.filter(o=>o.status==="Pending payment").length;
   $("rev").textContent=money(rev);$("ordMetric").textContent=state.orders.length;$("custMetric").textContent=state.customers.length;$("lowMetric").textContent=low.length;
@@ -299,7 +317,9 @@ function updateCampaignAudienceCount(){
   if(!$("cmpAudienceCount"))return;
   const type=$("cmpAudienceType").value;
   let count;
-  if(type==="segment"){
+  if(type==="all"){
+    count=state.customers.filter(c=>c.phone).length;
+  }else if(type==="segment"){
     const seg=$("cmpSegment").value;
     count=state.customers.filter(c=>c.phone&&customerSegments[c.id]?.segment===seg).length;
   }else{
@@ -313,7 +333,8 @@ if($("closeCampaignModal"))$("closeCampaignModal").onclick=()=>$("campaignModal"
 if($("cmpAudienceType"))$("cmpAudienceType").onchange=()=>{$("cmpSegmentWrap").style.display=$("cmpAudienceType").value==="segment"?"":"none";updateCampaignAudienceCount()};
 if($("cmpSegment"))$("cmpSegment").onchange=updateCampaignAudienceCount;
 if($("cmpSend"))$("cmpSend").onclick=async()=>{
-  const audience=$("cmpAudienceType").value==="segment"?{type:"segment",segment:$("cmpSegment").value}:{type:"overdue"};
+  const t=$("cmpAudienceType").value;
+  const audience=t==="segment"?{type:"segment",segment:$("cmpSegment").value}:t==="all"?{type:"all"}:{type:"overdue"};
   const message=$("cmpMessage").value.trim();
   if(!message)return toast("Write a message first");
   try{
@@ -321,6 +342,30 @@ if($("cmpSend"))$("cmpSend").onclick=async()=>{
     toast(r.sent===r.total?`Sent to ${r.sent} customer${r.sent===1?"":"s"}`:`Sent to ${r.sent}/${r.total} - stopped early (likely a rate limit or quota), try again shortly for the rest`);
     $("campaignModal").close();
     $("cmpMessage").value="";
+  }catch(err){toast(err.message)}
+};
+// Persisted, schedulable version of the campaign above - server/scheduler.js
+// sends these on their own cadence, this just manages the definitions.
+async function loadRecurringCampaigns(){
+  if(!$("rcList"))return;
+  try{
+    const {campaigns}=await api("GET","/api/recurring-campaigns");
+    $("rcCount").textContent=`(${campaigns.length})`;
+    $("rcList").innerHTML=campaigns.map(c=>`<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span class="meta">${c.frequency}</span></div><div class="meta">${c.audienceType==="all"?"All customers":"Segment: "+clean(c.segment)} - last sent ${c.lastSentAt?date(c.lastSentAt):"never"}</div><div class="item-actions"><button onclick="toggleRecurringCampaign('${c.id}',${!c.enabled})">${c.enabled?"Disable":"Enable"}</button><button onclick="deleteRecurringCampaign('${c.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No recurring messages set up yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+async function toggleRecurringCampaign(id,enabled){try{await api("PATCH",`/api/recurring-campaigns/${id}`,{enabled});loadRecurringCampaigns()}catch(err){toast(err.message)}}
+async function deleteRecurringCampaign(id){try{await api("DELETE",`/api/recurring-campaigns/${id}`);loadRecurringCampaigns();toast("Recurring message deleted")}catch(err){toast(err.message)}}
+if($("rcAudienceType"))$("rcAudienceType").onchange=()=>{$("rcSegmentWrap").style.display=$("rcAudienceType").value==="segment"?"":"none"};
+if($("recurringCampaignForm"))$("recurringCampaignForm").onsubmit=async e=>{
+  e.preventDefault();
+  const audienceType=$("rcAudienceType").value;
+  try{
+    await api("POST","/api/recurring-campaigns",{name:$("rcName").value.trim(),message:$("rcMessage").value.trim(),audienceType,segment:audienceType==="segment"?$("rcSegment").value:undefined,frequency:$("rcFrequency").value});
+    e.target.reset();
+    $("rcSegmentWrap").style.display="none";
+    loadRecurringCampaigns();
+    toast("Recurring message saved");
   }catch(err){toast(err.message)}
 };
 if($("autoReminderForm"))$("autoReminderForm").onsubmit=async e=>{
@@ -503,8 +548,8 @@ function renderStorefrontSection(){
   }
   if(!$("storefrontSection"))return;
   const eligible=!!state.storefrontEligible;
-  $("storefrontLocked").style.display=eligible?"none":(myRole==="owner"?"block":"none");
-  $("storefrontSection").style.display=eligible&&myRole==="owner"?"block":"none";
+  $("storefrontLocked").style.display=eligible?"none":(can("settings.write")?"block":"none");
+  $("storefrontSection").style.display=eligible&&can("settings.write")?"block":"none";
   if(!eligible)return;
   const url=`${location.origin}/store/${state.slug||""}`;
   $("storeUrlDisplay").textContent=url;
@@ -531,7 +576,7 @@ async function loadBanksOnce(){
 }
 function renderOnlinePaymentSection(){
   if(!$("onlinePaymentSection"))return;
-  const eligible=!!state.storefrontEligible&&myRole==="owner";
+  const eligible=!!state.storefrontEligible&&can("payments.manage");
   $("onlinePaymentSection").style.display=eligible?"block":"none";
   if(!eligible)return;
   loadBanksOnce();
@@ -601,7 +646,7 @@ async function renderReferralSection(){
 let auditLogLoaded=false;
 async function renderAuditLogSection(){
   if(!$("auditLogSection"))return;
-  const eligible=myRole==="owner";
+  const eligible=can("audit.read");
   $("auditLogSection").style.display=eligible?"block":"none";
   if(!eligible||auditLogLoaded)return;
   auditLogLoaded=true;
@@ -612,7 +657,7 @@ async function renderAuditLogSection(){
 }
 function renderCouponsSection(){
   if(!$("couponsSection"))return;
-  const eligible=!!state.storefrontEligible&&myRole==="owner";
+  const eligible=!!state.storefrontEligible&&can("coupons.manage");
   $("couponsSection").style.display=eligible?"block":"none";
   if(!eligible)return;
   loadCoupons();
@@ -659,13 +704,13 @@ if($("logisticsForm"))$("logisticsForm").onsubmit=async e=>{e.preventDefault();t
 function renderProfile(){
   if($("profileName"))$("profileName").textContent=state.businessName||"Your Business";
   if($("profilePhone"))$("profilePhone").textContent=state.businessPhone||"No phone set";
-  if($("profileRole"))$("profileRole").textContent=myRole==="owner"?"Owner":myRole==="staff"?"Staff":"";
+  if($("profileRole"))$("profileRole").textContent=myRole==="owner"?"Owner":ROLE_LABELS[myRole]||"";
   if($("profilePlan"))$("profilePlan").textContent=(pricing[state.plan]?.name||state.plan)+" plan";
   if($("profileLogo")&&$("profileLogoFallback")){
     if(state.businessLogo){$("profileLogo").src=state.businessLogo;$("profileLogo").style.display="block";$("profileLogoFallback").style.display="none"}
     else{$("profileLogo").style.display="none";$("profileLogoFallback").style.display="flex"}
   }
-  if($("reportsTab"))$("reportsTab").style.display=(pricing[state.plan]?.reportsTier||"none")!=="none"?"block":"none";
+  if($("reportsTab"))$("reportsTab").style.display=(pricing[state.plan]?.reportsTier||"none")!=="none"&&can("reports.read")?"block":"none";
 }
 
 let lastReport=null;
@@ -790,9 +835,11 @@ if($("poForm"))$("poForm").onsubmit=async e=>{e.preventDefault();try{const items
 
 function renderTeamVisibility(){
   if(!$("teamSection"))return;
-  $("teamSection").style.display=myRole==="owner"?"block":"none";
-  if(myRole==="owner")loadTeam();
+  $("teamSection").style.display=can("staff.manage")?"block":"none";
+  if(can("staff.manage"))loadTeam();
 }
+const ROLE_LABELS={manager:"Manager",sales_staff:"Sales Staff",accountant:"Accountant"};
+const ROLE_OPTIONS=Object.entries(ROLE_LABELS).map(([v,label])=>`<option value="${v}">${label}</option>`).join("");
 async function loadTeam(){
   try{
     const roster=await api("GET","/api/staff");
@@ -801,18 +848,19 @@ async function loadTeam(){
     $("teamCount").textContent=`${roster.staff.length}/${limit} staff`;
     $("teamLimitNote").innerHTML=rawLimit===0?`Your plan doesn't include staff seats. <a href="upgrade.html#addonCards">Buy a staff seat for ₦2,000</a> without upgrading your whole plan, or move to Pro for 3 included.`:`You can invite up to ${limit} staff member(s).`;
     $("inviteForm").style.display=rawLimit===0?"none":"grid";
-    const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><span class="meta">Staff</span><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
+    const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><select onchange="changeStaffRole('${s.userId}',this.value)">${ROLE_OPTIONS.replace(`value="${s.role}"`,`value="${s.role}" selected`)}</select><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending - ${ROLE_LABELS[i.role]||i.role}</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
     $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;
   }catch(err){toast(err.message)}
 }
 async function removeStaffMember(userId){await api("DELETE",`/api/staff/${userId}`);loadTeam()}
 async function revokeStaffInvite(email){await api("DELETE",`/api/staff/invites/${encodeURIComponent(email)}`);loadTeam()}
-if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim()});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
+async function changeStaffRole(userId,role){try{await api("PATCH",`/api/staff/${userId}/role`,{role});loadTeam();toast("Role updated")}catch(err){toast(err.message)}}
+if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim(),role:$("inviteRole").value});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
 
 function renderBranchesVisibility(){
   if(!$("branchesSection"))return;
-  $("branchesSection").style.display=myRole==="owner"?"block":"none";
-  if(myRole==="owner")loadBranches();
+  $("branchesSection").style.display=can("settings.write")?"block":"none";
+  if(can("settings.write"))loadBranches();
 }
 async function loadBranches(){
   try{

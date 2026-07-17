@@ -6,7 +6,8 @@ const Sentry = require("@sentry/node");
 const rateLimit = require("express-rate-limit");
 const db = require("./db");
 const { CURRENCIES } = require("./currencies");
-const { requireAuthOnly, requireAuth, requirePlatformAdmin, supabaseAdmin } = require("./auth");
+const { requireAuthOnly, requireAuth, requirePermission, requirePlatformAdmin, supabaseAdmin } = require("./auth");
+const { permissionsFor, ROLE_LABELS, INVITABLE_ROLES } = require("./roles");
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
@@ -312,9 +313,9 @@ app.get(
   requireAuthOnly,
   handle(async (req, res) => {
     const membership = await db.getMembership(req.user.id);
-    if (!membership) return res.json({ user: { id: req.user.id, email: req.user.email }, business: null, role: null });
+    if (!membership) return res.json({ user: { id: req.user.id, email: req.user.email }, business: null, role: null, permissions: [] });
     const business = await db.getBusiness(membership.businessId);
-    res.json({ user: { id: req.user.id, email: req.user.email }, business, role: membership.role });
+    res.json({ user: { id: req.user.id, email: req.user.email }, business, role: membership.role, permissions: permissionsFor(membership.role) });
   })
 );
 
@@ -335,8 +336,8 @@ app.put(
 app.post(
   "/api/business/downgrade",
   requireAuth,
+  requirePermission("plan.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change the plan" });
     res.json(await db.downgradeToStarter(req.businessId));
   })
 );
@@ -355,8 +356,8 @@ app.get(
 app.get(
   "/api/audit-log",
   requireAuth,
+  requirePermission("audit.read"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can view the activity log" });
     res.json(await db.listAuditLog(req.businessId));
   })
 );
@@ -366,8 +367,8 @@ app.get(
 app.put(
   "/api/business/storefront",
   requireAuth,
+  requirePermission("settings.write"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change storefront settings" });
     res.json(await db.updateStorefrontSettings(req.businessId, req.body || {}));
   })
 );
@@ -397,8 +398,8 @@ app.get(
 app.post(
   "/api/paystack/resolve-account",
   requireAuth,
+  requirePermission("payments.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set up online payments" });
     if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
     const { accountNumber, bankCode } = req.body || {};
     if (!accountNumber || !bankCode) return res.status(400).json({ error: "Account number and bank are required" });
@@ -409,8 +410,8 @@ app.post(
 app.post(
   "/api/business/paystack-subaccount",
   requireAuth,
+  requirePermission("payments.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set up online payments" });
     if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
     const { bankCode, bankName, accountNumber } = req.body || {};
     if (!bankCode || !bankName || !accountNumber) return res.status(400).json({ error: "Bank, account number, and bank name are required" });
@@ -432,8 +433,8 @@ app.post(
 app.post(
   "/api/business/shipbubble-pickup-address",
   requireAuth,
+  requirePermission("logistics.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can set this up" });
     if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
     const { contactName, address } = req.body || {};
     if (!contactName || !String(contactName).trim()) return res.status(400).json({ error: "Pickup contact name is required" });
@@ -468,6 +469,7 @@ app.post(
 app.post(
   "/api/orders/:id/shipbubble-book",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
     res.json(await db.bookShipbubbleShipment(req.businessId, req.params.id, shipbubble));
@@ -477,6 +479,7 @@ app.post(
 app.post(
   "/api/orders/:id/shipbubble-refresh-tracking",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     if (!shipbubble.isConfigured()) return res.status(400).json({ error: "Shipping isn't configured yet" });
     res.json(await db.refreshShipbubbleTracking(req.businessId, req.params.id, shipbubble));
@@ -486,8 +489,8 @@ app.post(
 app.put(
   "/api/business/payment-settings",
   requireAuth,
+  requirePermission("payments.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change payment settings" });
     res.json(await db.updatePaymentSettings(req.businessId, req.body || {}));
   })
 );
@@ -548,6 +551,7 @@ app.post(
 app.post(
   "/api/orders/:id/payment-link",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
     const info = await db.getOrderForPaymentLink(req.businessId, req.params.id);
@@ -576,6 +580,7 @@ app.post(
 app.post(
   "/api/orders/:id/send-reminder-whatsapp",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
     res.json(await db.sendPaymentReminder(req.businessId, req.params.id, whatsapp));
@@ -587,22 +592,54 @@ app.post(
 app.post(
   "/api/orders/remind-all-whatsapp",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
     res.json(await db.sendAllReminders(req.businessId, whatsapp));
   })
 );
-// AI Automation (Slice Three item 3): segment-targeted campaign send. Owner-only
-// - composing and blasting a message to a whole segment is a higher-stakes
-// action than a single reminder, same trust boundary as coupons/staff invites.
+// AI Automation (Slice Three item 3): segment-targeted campaign send.
+// campaigns.send - composing and blasting a message to a whole segment is a
+// higher-stakes action than a single reminder, granted to Manager but not
+// Sales Staff/Accountant.
 app.post(
   "/api/campaigns/send",
   requireAuth,
+  requirePermission("campaigns.send"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can send campaigns" });
     if (!whatsapp.isConfigured()) return res.status(400).json({ error: "Direct WhatsApp sending is not configured yet" });
     const { audience, message } = req.body || {};
     res.json(await db.sendCampaign(req.businessId, { audience, message }, whatsapp));
+  })
+);
+// Persisted, schedulable version of the campaign send above - see
+// server/scheduler.js#runRecurringCampaignScan for what actually sends
+// these on their configured cadence.
+app.get(
+  "/api/recurring-campaigns",
+  requireAuth,
+  requirePermission("campaigns.send"),
+  handle(async (req, res) => res.json({ campaigns: await db.listRecurringCampaigns(req.businessId) }))
+);
+app.post(
+  "/api/recurring-campaigns",
+  requireAuth,
+  requirePermission("campaigns.send"),
+  handle(async (req, res) => res.status(201).json(await db.createRecurringCampaign(req.businessId, req.body || {})))
+);
+app.patch(
+  "/api/recurring-campaigns/:id",
+  requireAuth,
+  requirePermission("campaigns.send"),
+  handle(async (req, res) => res.json(await db.updateRecurringCampaign(req.businessId, req.params.id, req.body || {})))
+);
+app.delete(
+  "/api/recurring-campaigns/:id",
+  requireAuth,
+  requirePermission("campaigns.send"),
+  handle(async (req, res) => {
+    await db.deleteRecurringCampaign(req.businessId, req.params.id);
+    res.status(204).end();
   })
 );
 // AI Automation: opt-in toggle for proactive payment reminders, picked up by
@@ -610,8 +647,8 @@ app.post(
 app.put(
   "/api/business/auto-reminder-settings",
   requireAuth,
+  requirePermission("settings.write"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can change this setting" });
     const { enabled, daysAfter } = req.body || {};
     res.json(await db.updateBusiness(req.businessId, { autoReminderEnabled: enabled, autoReminderDaysAfter: daysAfter }));
   })
@@ -642,24 +679,24 @@ app.get(
 app.post(
   "/api/coupons",
   requireAuth,
+  requirePermission("coupons.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
     res.status(201).json(await db.createCoupon(req.businessId, req.body || {}));
   })
 );
 app.patch(
   "/api/coupons/:id",
   requireAuth,
+  requirePermission("coupons.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
     res.json(await db.setCouponActive(req.businessId, req.params.id, (req.body || {}).active));
   })
 );
 app.delete(
   "/api/coupons/:id",
   requireAuth,
+  requirePermission("coupons.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage coupons" });
     await db.deleteCoupon(req.businessId, req.params.id);
     res.status(204).end();
   })
@@ -675,16 +712,16 @@ app.get(
 app.post(
   "/api/logistics",
   requireAuth,
+  requirePermission("logistics.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage logistics providers" });
     res.status(201).json(await db.createLogisticsProvider(req.businessId, req.body || {}));
   })
 );
 app.delete(
   "/api/logistics/:id",
   requireAuth,
+  requirePermission("logistics.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage logistics providers" });
     await db.deleteLogisticsProvider(req.businessId, req.params.id);
     res.status(204).end();
   })
@@ -703,16 +740,19 @@ app.put(
 app.post(
   "/api/products",
   requireAuth,
+  requirePermission("products.write"),
   handle(async (req, res) => res.status(201).json(await db.createProduct(req.businessId, req.body || {})))
 );
 app.put(
   "/api/products/:id",
   requireAuth,
+  requirePermission("products.write"),
   handle(async (req, res) => res.json(await db.updateProduct(req.businessId, req.params.id, req.body || {})))
 );
 app.delete(
   "/api/products/:id",
   requireAuth,
+  requirePermission("products.write"),
   handle(async (req, res) => {
     await db.deleteProduct(req.businessId, req.params.id);
     res.status(204).end();
@@ -734,11 +774,13 @@ app.get(
 app.post(
   "/api/batches",
   requireAuth,
+  requirePermission("products.write"),
   handle(async (req, res) => res.status(201).json(await db.createBatch(req.businessId, req.body || {})))
 );
 app.delete(
   "/api/batches/:id",
   requireAuth,
+  requirePermission("products.write"),
   handle(async (req, res) => {
     await db.deleteBatch(req.businessId, req.params.id);
     res.status(204).end();
@@ -747,6 +789,7 @@ app.delete(
 app.post(
   "/api/pos/checkout",
   requireAuth,
+  requirePermission("pos.use"),
   handle(async (req, res) => {
     const orders = await db.posCheckout(req.businessId, req.body || {});
     const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -758,11 +801,13 @@ app.post(
 app.post(
   "/api/customers",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => res.status(201).json(await db.createCustomer(req.businessId, req.body || {})))
 );
 app.delete(
   "/api/customers/:id",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => {
     await db.deleteCustomer(req.businessId, req.params.id);
     res.status(204).end();
@@ -784,11 +829,13 @@ app.get(
 app.post(
   "/api/customers/:id/notes",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => res.status(201).json(await db.addCustomerNote(req.businessId, req.params.id, (req.body || {}).note)))
 );
 app.delete(
   "/api/customers/:customerId/notes/:noteId",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => {
     await db.deleteCustomerNote(req.businessId, req.params.noteId);
     res.status(204).end();
@@ -797,6 +844,7 @@ app.delete(
 app.post(
   "/api/customers/:id/redeem-points",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => {
     await db.redeemLoyaltyPoints(req.businessId, req.params.id, (req.body || {}).points, (req.body || {}).reason);
     res.json(await db.getCustomerTimeline(req.businessId, req.params.id));
@@ -805,6 +853,7 @@ app.post(
 app.post(
   "/api/customers/:id/wallet-adjust",
   requireAuth,
+  requirePermission("customers.write"),
   handle(async (req, res) => {
     await db.adjustWallet(req.businessId, req.params.id, (req.body || {}).amount, (req.body || {}).reason);
     res.json(await db.getCustomerTimeline(req.businessId, req.params.id));
@@ -821,11 +870,13 @@ app.get(
 app.post(
   "/api/suppliers",
   requireAuth,
+  requirePermission("suppliers.write"),
   handle(async (req, res) => res.status(201).json(await db.createSupplier(req.businessId, req.body || {})))
 );
 app.delete(
   "/api/suppliers/:id",
   requireAuth,
+  requirePermission("suppliers.write"),
   handle(async (req, res) => {
     await db.deleteSupplier(req.businessId, req.params.id);
     res.status(204).end();
@@ -839,6 +890,7 @@ app.get(
 app.post(
   "/api/purchase-orders",
   requireAuth,
+  requirePermission("suppliers.write"),
   handle(async (req, res) => res.status(201).json(await db.createPurchaseOrder(req.businessId, req.body || {})))
 );
 app.get(
@@ -849,11 +901,13 @@ app.get(
 app.patch(
   "/api/purchase-orders/:id",
   requireAuth,
+  requirePermission("suppliers.write"),
   handle(async (req, res) => res.json(await db.updatePurchaseOrderStatus(req.businessId, req.params.id, (req.body || {}).status)))
 );
 app.delete(
   "/api/purchase-orders/:id",
   requireAuth,
+  requirePermission("suppliers.write"),
   handle(async (req, res) => {
     await db.deletePurchaseOrder(req.businessId, req.params.id);
     res.status(204).end();
@@ -863,6 +917,7 @@ app.delete(
 app.post(
   "/api/orders",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     const order = await db.createOrder(req.businessId, req.body || {});
     db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
@@ -872,6 +927,7 @@ app.post(
 app.patch(
   "/api/orders/:id",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     const order = await db.updateOrder(req.businessId, req.params.id, req.body || {});
     db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
@@ -881,11 +937,13 @@ app.patch(
 app.post(
   "/api/orders/:id/convert",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => res.json(await db.convertQuoteToOrder(req.businessId, req.params.id)))
 );
 app.delete(
   "/api/orders/:id",
   requireAuth,
+  requirePermission("orders.write"),
   handle(async (req, res) => {
     await db.deleteOrder(req.businessId, req.params.id);
     res.status(204).end();
@@ -933,25 +991,32 @@ app.get(
 app.post(
   "/api/staff/invite",
   requireAuth,
+  requirePermission("staff.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can invite staff" });
-    const roster = await db.inviteStaff(req.businessId, (req.body || {}).email);
+    const { email, role } = req.body || {};
+    const roster = await db.inviteStaff(req.businessId, email, role);
     res.status(201).json(roster);
   })
 );
 app.delete(
   "/api/staff/invites/:email",
   requireAuth,
+  requirePermission("staff.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can manage staff" });
     res.json(await db.revokeInvite(req.businessId, req.params.email));
   })
+);
+app.patch(
+  "/api/staff/:userId/role",
+  requireAuth,
+  requirePermission("staff.manage"),
+  handle(async (req, res) => res.json(await db.updateStaffRole(req.businessId, req.params.userId, (req.body || {}).role)))
 );
 app.delete(
   "/api/staff/:userId",
   requireAuth,
+  requirePermission("staff.manage"),
   handle(async (req, res) => {
-    if (req.role !== "owner") return res.status(403).json({ error: "Only the business owner can remove staff" });
     res.json(await db.removeStaff(req.businessId, req.params.userId));
   })
 );
@@ -1222,6 +1287,7 @@ app.post(
 app.get(
   "/api/reports",
   requireAuth,
+  requirePermission("reports.read"),
   handle(async (req, res) => {
     const business = await db.getBusiness(req.businessId);
     const tier = pricing.reportsTierFor(business.plan);
@@ -1262,11 +1328,13 @@ app.get(
 app.post(
   "/api/expenses",
   requireAuth,
+  requirePermission("expenses.write"),
   handle(async (req, res) => res.status(201).json(await db.createExpense(req.businessId, req.body || {})))
 );
 app.delete(
   "/api/expenses/:id",
   requireAuth,
+  requirePermission("expenses.write"),
   handle(async (req, res) => {
     await db.deleteExpense(req.businessId, req.params.id);
     res.status(204).end();
@@ -1287,21 +1355,25 @@ app.post(
 app.get(
   "/api/cashbook",
   requireAuth,
+  requirePermission("reports.read"),
   handle(async (req, res) => res.json(await db.getCashbook(req.businessId, { from: req.query.from, to: req.query.to })))
 );
 app.get(
   "/api/profit-loss",
   requireAuth,
+  requirePermission("reports.read"),
   handle(async (req, res) => res.json(await db.getProfitAndLoss(req.businessId, { from: req.query.from, to: req.query.to })))
 );
 app.get(
   "/api/reconciliations",
   requireAuth,
+  requirePermission("reports.read"),
   handle(async (req, res) => res.json(await db.listReconciliations(req.businessId)))
 );
 app.post(
   "/api/reconciliations",
   requireAuth,
+  requirePermission("expenses.write"),
   handle(async (req, res) => res.json(await db.upsertReconciliation(req.businessId, req.body || {})))
 );
 
