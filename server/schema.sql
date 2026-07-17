@@ -24,12 +24,14 @@ alter table businesses add column if not exists address text not null default ''
 -- any shipment can be booked for this business's orders.
 alter table businesses add column if not exists shipbubble_sender_address_code text;
 
--- Public storefront (Growth plan and above - see pricing.js#storefrontEnabledFor).
--- slug is the shareable URL segment (/store/<slug>); storefront_enabled is a
--- seller-controlled switch so a business isn't publicly visible before
--- they've built out their catalog, even once they're on an eligible plan.
+-- Public storefront (every plan, including Starter - see
+-- pricing.js#storefrontEnabledFor). slug is the shareable URL segment
+-- (/store/<slug>); storefront_enabled is on by default for every
+-- business, but stays a real column (not hardcoded) so a seller can still
+-- turn it off in Settings if they don't want to be publicly visible yet.
 alter table businesses add column if not exists slug text;
-alter table businesses add column if not exists storefront_enabled boolean not null default false;
+alter table businesses add column if not exists storefront_enabled boolean not null default true;
+update businesses set storefront_enabled = true where storefront_enabled = false;
 update businesses set slug = 'shop-' || substr(id::text, 1, 8) where slug is null;
 alter table businesses alter column slug set not null;
 create unique index if not exists businesses_slug_idx on businesses(lower(slug));
