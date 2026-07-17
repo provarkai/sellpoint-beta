@@ -448,6 +448,26 @@ async function deleteExpense(businessId, id) {
   if (!rows[0]) throw new OrderError("Expense not found");
 }
 
+function toFeedbackJson(f) {
+  return { id: f.id, message: f.message, rating: f.rating, createdAt: f.created_at };
+}
+
+async function createFeedback(businessId, data) {
+  const message = requireString(data.message, "Feedback message");
+  const rating = data.rating !== undefined && data.rating !== null && data.rating !== "" ? requireNumber(data.rating, "Rating", { min: 1, max: 5, integer: true }) : null;
+  const { rows } = await query(
+    `INSERT INTO feedback (business_id, message, rating) VALUES ($1, $2, $3) RETURNING *`,
+    [businessId, message, rating]
+  );
+  await logEvent(businessId, "feedback_submitted", message.slice(0, 80));
+  return toFeedbackJson(rows[0]);
+}
+
+async function listFeedback(businessId) {
+  const { rows } = await query("SELECT * FROM feedback WHERE business_id = $1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toFeedbackJson);
+}
+
 // Combined cash-in (paid/delivered orders) + cash-out (expenses) ledger,
 // sorted oldest-first with a running balance - a simple cashbook view, not a
 // full double-entry ledger. Defaults to the last 30 days if no range given,
@@ -2743,6 +2763,8 @@ module.exports = {
   createExpense,
   listExpenses,
   deleteExpense,
+  createFeedback,
+  listFeedback,
   getCashbook,
   getProfitAndLoss,
   upsertReconciliation,

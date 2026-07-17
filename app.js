@@ -19,7 +19,7 @@ const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers")loadCustomerSegments();if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -744,6 +744,15 @@ async function loadExpensesTab(){
 async function delExpense(id){try{await api("DELETE",`/api/expenses/${id}`);loadExpensesTab();toast("Expense deleted")}catch(err){toast(err.message)}}
 if($("expenseForm"))$("expenseForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/expenses",{description:$("eDescription").value.trim(),amount:+$("eAmount").value,category:$("eCategory").value,date:$("eDate").value});e.target.reset();$("eDate").value=new Date().toISOString().slice(0,10);loadExpensesTab();toast("Expense logged")}catch(err){toast(err.message)}};
 if($("reconcileForm"))$("reconcileForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/reconciliations",{date:$("rDate").value,countedCash:+$("rCounted").value,notes:$("rNotes").value.trim()});$("rNotes").value="";loadExpensesTab();toast("Reconciliation saved")}catch(err){toast(err.message)}};
+async function loadFeedbackTab(){
+  if(!$("fbList"))return;
+  try{
+    const {feedback}=await api("GET","/api/feedback");
+    $("fbCount").textContent=`(${feedback.length})`;
+    $("fbList").innerHTML=feedback.map(f=>`<div class="item"><div class="item-top"><strong>${f.rating?"⭐".repeat(f.rating):"No rating"}</strong><span class="meta">${dateTime(f.createdAt)}</span></div><div>${clean(f.message)}</div></div>`).join("")||`<div class="item"><span class="meta">No feedback sent yet</span></div>`;
+  }catch(err){toast(err.message)}
+}
+if($("feedbackForm"))$("feedbackForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/feedback",{message:$("fbMessage").value.trim(),rating:$("fbRating").value||null});e.target.reset();loadFeedbackTab();toast("Feedback sent - thank you!")}catch(err){toast(err.message)}};
 
 let poItemRowId=0;
 function poAddItemRow(){

@@ -20,6 +20,7 @@
       <button class="tab" data-tab="reports" id="reportsTab" style="display:none">📈 Reports</button>
       <button class="tab" data-tab="expenses">💰 Expenses</button>
       <button class="tab" data-tab="suppliers">📥 Suppliers</button>
+      <button class="tab" data-tab="feedback">💬 Feedback</button>
       <button class="tab" data-tab="settings">⚙️ Settings</button>
       <button id="upgrade" class="tab-upgrade">🚀 Upgrade</button>
     </div>
@@ -63,6 +64,10 @@
       <article><h2>Suppliers <small id="spCount"></small></h2><div id="spList" class="list"></div></article>
       <form id="poForm"><h2>New purchase order</h2><label>Supplier<select id="poSupplier"><option value="">No supplier</option></select></label><div id="poItemRows"></div><p class="actions"><button type="button" id="poAddItem">Add Item</button></p><label>Notes<textarea id="poNotes" rows="2" placeholder="Optional"></textarea></label><button>Create Purchase Order</button></form>
       <article><h2>Purchase Orders <small id="poCount"></small></h2><div id="poList" class="list"></div></article>
+    </div></section>
+    <section id="feedback" class="page"><div class="grid">
+      <form id="feedbackForm"><h2>Send feedback</h2><p class="meta">Bugs, feature requests, or anything else - goes straight to the SellersPoint team.</p><label>Message<textarea id="fbMessage" rows="5" required placeholder="What's on your mind?"></textarea></label><label>Rating <span class="meta">(optional)</span><select id="fbRating"><option value="">No rating</option><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Okay</option><option value="2">2 - Poor</option><option value="1">1 - Very poor</option></select></label><button>Send Feedback</button></form>
+      <article><h2>Your feedback <small id="fbCount"></small></h2><div id="fbList" class="list"></div></article>
     </div></section>
     <section id="settings" class="page"><div class="grid"><form id="settingsForm"><h2>Business Profile</h2><label>Business logo<input id="sLogo" type="file" accept="image/*"></label><label>Business name<input id="sBusiness" required></label><label>Phone<input id="sPhone" placeholder="2348012345678"></label><label>Address<input id="sAddress" placeholder="123 Market Street, Lagos"></label><label>Payment details <span class="meta">(sent to customers with pending-payment orders)</span><textarea id="sPayment" rows="4" placeholder="Bank: Example Bank
 Account: 1234567890

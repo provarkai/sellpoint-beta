@@ -1272,6 +1272,18 @@ app.delete(
     res.status(204).end();
   })
 );
+
+// --- Feedback (business -> SellersPoint team) --------------------------------
+app.get(
+  "/api/feedback",
+  requireAuth,
+  handle(async (req, res) => res.json({ feedback: await db.listFeedback(req.businessId) }))
+);
+app.post(
+  "/api/feedback",
+  requireAuth,
+  handle(async (req, res) => res.status(201).json(await db.createFeedback(req.businessId, req.body || {})))
+);
 app.get(
   "/api/cashbook",
   requireAuth,

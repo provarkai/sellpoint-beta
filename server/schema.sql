@@ -586,6 +586,20 @@ create table if not exists cash_reconciliations (
 create index if not exists cash_reconciliations_business_id_idx on cash_reconciliations(business_id);
 alter table cash_reconciliations enable row level security;
 
+-- Free-text feedback/feature requests a business sends to the SellersPoint
+-- team, submitted from the "Feedback" sidebar tab. rating is optional (1-5)
+-- since a business may just want to leave a comment/bug report with no
+-- score attached.
+create table if not exists feedback (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  message text not null,
+  rating smallint,
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_business_id_idx on feedback(business_id);
+alter table feedback enable row level security;
+
 -- Top-of-funnel analytics (landing views, signup conversion, storefront
 -- traffic) - deliberately separate from the per-business `events` table,
 -- which requires a business_id and can't capture anonymous/pre-account
