@@ -144,6 +144,40 @@ main{padding:32px 36px;overflow:auto}
 .vt-tax{background:#eef1ef;color:var(--muted)}
 .vt-template{background:#fff4e8;color:var(--accent)}
 
+/* Escrow / congratulatory / bundle */
+.escrow-note{width:100%;font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;display:flex;align-items:center;gap:5px}
+.released-note{width:100%;font-size:12px;font-weight:700;color:var(--primary);margin-top:2px;display:flex;align-items:center;gap:5px}
+.congrats-banner{background:linear-gradient(135deg,rgba(20,125,100,.1),rgba(211,107,44,.08));border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px}
+.congrats-banner.hide{display:none}
+.congrats-banner p{font-size:14px;font-weight:700}
+.congrats-banner .dismiss{background:transparent;color:var(--muted);font-size:18px;font-weight:800;padding:0 6px;height:28px}
+.bundle-card{background:linear-gradient(135deg,rgba(20,125,100,.08),rgba(211,107,44,.08));border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.bundle-card .info b{display:block;font-size:15px;font-weight:800}
+.bundle-card .info small{color:var(--muted);font-size:12.5px;display:block;margin-top:2px}
+
+/* Verification */
+.verify-item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line);gap:14px;flex-wrap:wrap}
+.verify-item:last-child{border-bottom:0}
+.verify-item .info b{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.verify-item .info .note{display:block;color:var(--accent);font-size:12px;font-weight:700;margin-top:4px;max-width:420px}
+.verify-item .price{color:var(--muted);font-weight:700;font-size:13px;min-width:70px;text-align:right}
+.verify-item.active{background:#f0faf6;margin:0 -14px;padding:13px 14px;border-radius:10px}
+.verify-panel{display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:16px}
+.verify-panel.show{display:block}
+.verify-panel input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:10px 14px;font:inherit;background:#fbfcfb;margin:8px 0 12px}
+.verify-result{display:none;margin-top:14px;background:#f0faf6;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;font-weight:700;color:var(--primary)}
+.verify-result.show{display:block}
+.lookup-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.lookup-row:last-child{border-bottom:0}
+.lookup-row small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+
+/* WhatsApp */
+.wa-link{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);color:#eaf6f0;padding:11px 14px;border-radius:8px;font-weight:800;font-size:13px;margin:6px 0}
+.wa-link:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* Vault verification type */
+.vt-verification{background:#fff4e8;color:var(--accent)}
+
 /* Toast */
 #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.2s ease;z-index:100}
 #toast.show{opacity:1;transform:translate(-50%,0)}
@@ -177,11 +211,13 @@ main{padding:32px 36px;overflow:auto}
   <nav>
     <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
     <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Registrations</button>
+    <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
     <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
     <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
     <button class="nav-item" data-view="templates"><span class="ic">🧾</span> Templates</button>
     <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault</button>
   </nav>
+  <a class="wa-link" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order via WhatsApp</a>
   <a class="back-link" href="#">← Back to main app</a>
 </aside>
 
@@ -190,28 +226,45 @@ main{padding:32px 36px;overflow:auto}
   <!-- ===== OVERVIEW ===== -->
   <section class="view active" id="view-overview">
     <div class="view-header"><h1>Overview</h1><p>Everything about your business setup, in one place.</p></div>
+
+    <div class="congrats-banner" id="congratsBanner">
+      <p>🎉 Congratulations! Your SCUML registration was approved. You've earned the Verified Business badge.</p>
+      <button class="dismiss" onclick="$('congratsBanner').classList.add('hide')">×</button>
+    </div>
+
     <div class="grid grid-2">
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Your Business Setup</h3>
-        <div class="progress-track"><div class="progress-fill" style="width:50%"></div></div>
+        <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
         <div class="step-labels">
-          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span>SCUML (in review)</span><span>LLC —</span>
+          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span class="done">SCUML ✓</span><span>LLC (action needed)</span><span>Trademark —</span>
         </div>
       </div>
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Quick actions</h3>
         <div class="quick-actions" style="margin-top:14px">
-          <button class="btn btn-primary" onclick="goto('tax')">Estimate my tax</button>
+          <button class="btn btn-primary" onclick="goto('verification')">Verify a TIN/BVN/NIN</button>
+          <button class="btn btn-ghost" onclick="goto('tax')">Estimate my tax</button>
           <button class="btn btn-ghost" onclick="goto('templates')">New proposal</button>
           <button class="btn btn-ghost" onclick="goto('templates')">New contract</button>
+          <a class="btn btn-ghost" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order on WhatsApp</a>
         </div>
       </div>
     </div>
+
+    <div class="card bundle-card" style="margin-top:16px">
+      <div class="info">
+        <b>💡 Save with the New Business Bundle</b>
+        <small>Business Name + TIN + 1 contract template + Tax Calculator access — bundled below individual pricing.</small>
+      </div>
+      <button class="btn btn-accent btn-sm" onclick="toast('Bundle pricing would open here')">View bundle</button>
+    </div>
+
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Needs your attention</h3>
         <div class="alert-row">
-          <div class="txt"><b>Action needed</b>SCUML partner requested your business activity classification</div>
+          <div class="txt"><b>Action needed</b>LLC partner requested a certified copy of your means of ID</div>
           <button class="btn btn-accent btn-sm" onclick="goto('registrations')">Upload</button>
         </div>
         <div class="alert-row">
@@ -226,9 +279,9 @@ main{padding:32px 36px;overflow:auto}
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Recently in your Vault</h3>
         <div class="vault-mini" style="margin-top:12px">
-          <div class="vault-mini-row"><span>📄 Business Name Certificate</span><span class="tag">Registration · Jun 12</span></div>
+          <div class="vault-mini-row"><span>📄 SCUML Certificate</span><span class="tag">Registration · Jul 16</span></div>
+          <div class="vault-mini-row"><span>🔍 BVN Verification Result</span><span class="tag">Verification · Jul 16</span></div>
           <div class="vault-mini-row"><span>🧾 Tenancy Agreement</span><span class="tag">Template · Jul 2</span></div>
-          <div class="vault-mini-row"><span>💰 VAT Estimate — June</span><span class="tag">Tax Tool · Jul 15</span></div>
         </div>
       </div>
     </div>
@@ -236,24 +289,36 @@ main{padding:32px 36px;overflow:auto}
 
   <!-- ===== REGISTRATIONS ===== -->
   <section class="view" id="view-registrations">
-    <div class="view-header"><h1>Registrations</h1><p>Filed and tracked by our licensed partners. Status updates automatically.</p></div>
+    <div class="view-header"><h1>Registrations</h1><p>Filed and tracked by our licensed partners. Payment is held until delivery — never released upfront.</p></div>
+
+    <div class="card bundle-card" style="margin-bottom:18px">
+      <div class="info"><b>💡 Buying more than one?</b><small>Bundle pricing beats paying for each service separately.</small></div>
+      <button class="btn btn-ghost btn-sm" onclick="toast('Bundle pricing would open here')">See bundle pricing</button>
+    </div>
 
     <div class="cat-title">Corporate & Legal · Partner A</div>
     <div class="card reg-card">
       <div class="info"><b>Business Name Registration</b><small>Certificate ready</small></div>
       <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-success">● Approved</span><button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button></div>
+      <div class="released-note">✓ Payment released</div>
     </div>
     <div class="card reg-card">
-      <div class="info"><b>LLC Incorporation</b><small>Submitted 3 days ago</small></div>
-      <span class="pill pill-progress">◐ Under Review</span>
+      <div class="info"><b>LLC Incorporation</b><small>Partner requested a certified copy of your means of ID</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button></div>
+      <div class="escrow-note">💳 Payment held — releases when certificate arrives</div>
     </div>
     <div class="card reg-card">
       <div class="info"><b>Trademark Registration</b><small>Not started</small></div>
       <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Trademark application…')">Start</button></div>
     </div>
     <div class="card reg-card">
-      <div class="info"><b>SCUML Registration</b><small>Business activity classification requested</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Confirm flow would open here')">Confirm</button></div>
+      <div class="info"><b>SCUML Registration</b><small>Certificate ready</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-success">● Approved 🎉</span><button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button></div>
+      <div class="released-note">✓ Payment released</div>
+    </div>
+    <div class="card reg-card">
+      <div class="info"><b>CAC Annual Returns (2026)</b><small>Not started</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Annual Returns filing…')">Start</button></div>
     </div>
 
     <div class="cat-title">Tax & Regulatory · Partner B</div>
@@ -264,6 +329,24 @@ main{padding:32px 36px;overflow:auto}
     <div class="card reg-card">
       <div class="info"><b>Tax Clearance Certificate</b><small>Not started</small></div>
       <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Tax Clearance application…')">Start</button></div>
+    </div>
+  </section>
+
+  <!-- ===== VERIFICATION ===== -->
+  <section class="view" id="view-verification">
+    <div class="view-header"><h1>Verification</h1><p>Quick checks — most results in under a minute. No partner, no waiting.</p></div>
+    <div class="card">
+      <div id="verifyList"></div>
+      <div class="verify-panel" id="verifyPanel">
+        <label style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em" id="verifyLabel">Enter the number to check</label>
+        <input id="verifyInput" placeholder="e.g. 12345678901">
+        <button class="btn btn-primary" onclick="runCheck()">Run check</button>
+        <div class="verify-result" id="verifyResult"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Recent lookups</h3>
+      <div id="lookupHistory" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -285,7 +368,7 @@ main{padding:32px 36px;overflow:auto}
       <div id="filingHistory" style="margin-top:10px">
         <div class="filing-row"><span>VAT — June 2026<small>via Partner B</small></span><span class="pill pill-success">● Filed</span></div>
         <div class="filing-row"><span>VAT — May 2026<small>via Partner B</small></span><span class="pill pill-success">● Filed</span></div>
-        <div class="filing-row"><span>CIT — 2025 Annual<small>via Partner B</small></span><span class="pill pill-progress">◐ Under Review</span></div>
+        <div class="filing-row"><span>Tax Clearance — 2025<small>via Partner B</small></span><span class="pill pill-neutral">○ Not Started</span></div>
       </div>
     </div>
   </section>
@@ -357,6 +440,7 @@ main{padding:32px 36px;overflow:auto}
         <button class="filter-btn active" data-filter="all">All</button>
         <button class="filter-btn" data-filter="Registration">Registration</button>
         <button class="filter-btn" data-filter="Tax">Tax</button>
+        <button class="filter-btn" data-filter="Verification">Verification</button>
         <button class="filter-btn" data-filter="Template">Template</button>
       </div>
       <div id="vaultList"></div>
@@ -392,6 +476,68 @@ function fileWithPartner(){
   $("filingHistory").prepend(row);
   toast("Sent to Partner B for filing");
 }
+
+/* ---------- Verification & Lookup ---------- */
+const CHECKS = [
+  { id:"tin", label:"TIN Verification", price:"₦1,000", placeholder:"e.g. 12345678-0001", automated:true },
+  { id:"bvn", label:"BVN Verification", price:"₦800", placeholder:"11-digit BVN", automated:true },
+  { id:"nin", label:"NIN Verification", price:"₦800", placeholder:"11-digit NIN", automated:true },
+  { id:"cacname", label:"CAC Business Name Availability", price:"₦500", placeholder:"e.g. Amina Fashion Hub", automated:true },
+  { id:"cacstatus", label:"CAC Business Status Check", price:"₦500", placeholder:"CAC/RC number", automated:true },
+  { id:"authenticity", label:"Document Authenticity Check", price:"₦1,500", placeholder:"Certificate/reference number", automated:false,
+    note:"High-value documents may route to Partner A for a manual cross-check" },
+];
+let activeCheck = null;
+let lookups = [
+  { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
+  { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
+];
+let verifications = lookups.map(l => ({ name: `${l.label} Result`, type:"Verification", date:`Checked ${l.when.split(",")[0]}` }));
+
+function renderVerifyList(){
+  $("verifyList").innerHTML = CHECKS.map(c => `
+    <div class="verify-item ${activeCheck===c.id?'active':''}" data-id="${c.id}">
+      <div class="info">
+        <b>🔍 ${c.label}</b>
+        ${c.note ? `<span class="note">ⓘ ${c.note}</span>` : ""}
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="price">${c.price}</span>
+        <button class="btn btn-primary btn-sm" onclick="selectCheck('${c.id}')">Verify →</button>
+      </div>
+    </div>`).join("");
+}
+function selectCheck(id){
+  activeCheck = id;
+  renderVerifyList();
+  const c = CHECKS.find(x=>x.id===id);
+  $("verifyLabel").textContent = `Enter the ${c.label.replace(" Verification","").replace(" Check","").replace(" Availability","")} to check`;
+  $("verifyInput").placeholder = c.placeholder;
+  $("verifyInput").value = "";
+  $("verifyResult").classList.remove("show");
+  $("verifyPanel").classList.add("show");
+  $("verifyPanel").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+function runCheck(){
+  const c = CHECKS.find(x=>x.id===activeCheck);
+  if(!c) return;
+  const val = $("verifyInput").value.trim();
+  if(!val){ toast("Enter a number first"); return; }
+  const resultText = c.automated ? "✓ Match found — verified via vendor API" : "✓ Automated check passed — flagged for Partner A cross-check";
+  $("verifyResult").textContent = resultText;
+  $("verifyResult").classList.add("show");
+  const when = "Just now, " + (c.automated ? "instant" : "pending Partner A");
+  lookups.unshift({ label:c.label, result:resultText, when });
+  verifications.unshift({ name:`${c.label} Result`, type:"Verification", date:"Checked just now" });
+  renderLookups();
+  toast(c.automated ? "Checked — saved to your Vault" : "Checked — routed to Partner A for confirmation");
+}
+function renderLookups(){
+  $("lookupHistory").innerHTML = lookups.map(l => `
+    <div class="lookup-row"><span>${l.label} — ${l.result}</span><small>${l.when}</small></div>`).join("");
+}
+renderVerifyList();
+renderLookups();
 
 /* ---------- Trackers ---------- */
 let trackers = [
@@ -492,10 +638,11 @@ renderDocs();
 function vaultItems(){
   const base = [
     { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12 · Renews Jun 2027" },
+    { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · Renews Jul 2027" },
     { name:"VAT Filing — June 2026", type:"Tax", date:"Filed Jul 15" },
   ];
   const fromDocs = docs.map(d=>({ name:d.name, type:"Template", date:`Created ${d.date}` }));
-  return base.concat(fromDocs);
+  return base.concat(verifications).concat(fromDocs);
 }
 let activeFilter = "all";
 document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",()=>{
@@ -506,11 +653,12 @@ document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",(
 }));
 function renderVault(){
   const q = ($("vaultSearch").value||"").toLowerCase();
-  const typeClass = { Registration:"vt-registration", Tax:"vt-tax", Template:"vt-template" };
+  const typeClass = { Registration:"vt-registration", Tax:"vt-tax", Verification:"vt-verification", Template:"vt-template" };
+  const typeIcon = { Registration:"📄", Tax:"💰", Verification:"🔍", Template:"🧾" };
   const items = vaultItems().filter(i => (activeFilter==="all"||i.type===activeFilter) && i.name.toLowerCase().includes(q));
   $("vaultList").innerHTML = items.length ? items.map(i=>`
     <div class="vault-row">
-      <div class="info"><b>${i.type==='Registration'?'📄':i.type==='Tax'?'💰':'🧾'} ${i.name}</b><small>${i.date}</small></div>
+      <div class="info"><b>${typeIcon[i.type]||"📄"} ${i.name}</b><small>${i.date}</small></div>
       <div style="display:flex;gap:10px;align-items:center">
         <span class="vault-type ${typeClass[i.type]}">${i.type}</span>
         <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${i.name}')">Download</button>
