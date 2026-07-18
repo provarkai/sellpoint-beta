@@ -195,7 +195,7 @@ main{padding:32px 36px;overflow:auto}
         <h3 style="font-size:15px;font-weight:800">Your Business Setup</h3>
         <div class="progress-track"><div class="progress-fill" style="width:50%"></div></div>
         <div class="step-labels">
-          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span>NAFDAC (in review)</span><span>LLC —</span>
+          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span>SCUML (in review)</span><span>LLC —</span>
         </div>
       </div>
       <div class="card">
@@ -211,7 +211,7 @@ main{padding:32px 36px;overflow:auto}
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Needs your attention</h3>
         <div class="alert-row">
-          <div class="txt"><b>Action needed</b>NAFDAC partner requested a clearer product label photo</div>
+          <div class="txt"><b>Action needed</b>SCUML partner requested your business activity classification</div>
           <button class="btn btn-accent btn-sm" onclick="goto('registrations')">Upload</button>
         </div>
         <div class="alert-row">
@@ -251,19 +251,19 @@ main{padding:32px 36px;overflow:auto}
       <div class="info"><b>Trademark Registration</b><small>Not started</small></div>
       <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Trademark application…')">Start</button></div>
     </div>
+    <div class="card reg-card">
+      <div class="info"><b>SCUML Registration</b><small>Business activity classification requested</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Confirm flow would open here')">Confirm</button></div>
+    </div>
 
     <div class="cat-title">Tax & Regulatory · Partner B</div>
     <div class="card reg-card">
-      <div class="info"><b>NAFDAC Registration</b><small>Clearer product label photo requested</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button></div>
-    </div>
-    <div class="card reg-card">
-      <div class="info"><b>TIN Verification</b><small>Verified and active</small></div>
+      <div class="info"><b>TIN Verification</b><small>Verified and active — via automated API</small></div>
       <span class="pill pill-success">● Approved</span>
     </div>
     <div class="card reg-card">
-      <div class="info"><b>SCUML Registration</b><small>Not started</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting SCUML application…')">Start</button></div>
+      <div class="info"><b>Tax Clearance Certificate</b><small>Not started</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Tax Clearance application…')">Start</button></div>
     </div>
   </section>
 
