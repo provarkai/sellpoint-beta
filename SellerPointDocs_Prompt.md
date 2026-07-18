@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v5)
+# SellersPoint Docs — Product & Automation Brief (v6)
 
 ## 1. Product Overview
 
@@ -8,10 +8,11 @@
 
 | Category | Services | Fulfillment |
 |---|---|---|
-| **Corporate & Legal** | CAC Business Name registration, full LLC incorporation, Trademark registration | Partner A |
-| **Tax & Regulatory** | TIN generation/verification, NAFDAC, SCUML, state-specific permits (LASAA, local govt), **Tax Filing** (VAT, CIT, PIT returns) | Partner B |
+| **Corporate & Legal** | CAC Business Name registration, full LLC incorporation, Trademark registration, **CAC Annual Returns filing** (recurring) | Partner A |
+| **Tax & Regulatory** | TIN generation/verification, NAFDAC, SCUML, state-specific permits (LASAA, local govt), **Tax Filing** (VAT, CIT, PIT returns), **Tax Clearance Certificate (TCC)** | Partner B |
+| **Verification & Lookup** *(new)* | Personal TIN Verification Slip, CAC Business Name availability check, CAC business status/verification lookup, Document authenticity verification (check any certificate against the register), NIN verification | Partner A/B by document type, or automated where a public verification API exists |
 | **Self-Serve Documents & Tools** | Contract/Agreement Templates (AI-assisted field selection from a pre-vetted clause library), Proposal/Quote Generator, Tax Calculator | SellersPoint, no partner |
-| **Trackers** *(new)* | Seller-defined lifecycle reminders for anything outside the built-in catalog — rent, insurance, payroll, supplier payments, any other renewal — with monthly/custom-cadence reminders | SellersPoint, seller-managed |
+| **Trackers** | Seller-defined lifecycle reminders for anything outside the built-in catalog — rent, insurance, payroll, supplier payments, any other renewal — with monthly/custom-cadence reminders | SellersPoint, seller-managed |
 
 ## 3. Delivery Model — two partners, two self-serve product lines
 
@@ -19,8 +20,10 @@ Government filings require a licensed party of record, so two specialist partner
 
 | Partner slot | Owns | Likely partner type |
 |---|---|---|
-| **Partner A — Corporate & Legal** | Business Name, LLC incorporation, Trademark | Law firm or CAC-accredited agent |
-| **Partner B — Tax & Regulatory** | TIN, NAFDAC, SCUML, state permits, Tax Filing | Chartered accountant (ICAN) or licensed tax/regulatory-filing agent |
+| **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, Trademark — plus **CAC Annual Returns filing** | Law firm or CAC-accredited agent |
+| **Partner B — Tax & Regulatory** | Everything about tax — TIN, Tax Filing, and **Tax Clearance Certificate** — plus the adjacent regulatory filings (NAFDAC, SCUML, state permits) | Chartered accountant (ICAN) or licensed tax/regulatory-filing agent |
+
+**Verification & Lookup splits by document type**: CAC-related lookups (Business Name availability, business status, and checking whether *any* certificate is genuine) route to Partner A; TIN-related lookups (Personal TIN Verification Slip) route to Partner B. NIN verification is automated directly against a public verification API where available, rather than routed to either partner — it's identity data, not a CAC/tax filing. This tier is priced and turned around completely differently from the rest of the catalog (hours, not days — the ₦1,500 / 12-hour Personal TIN Verification Slip is the reference point), and doubles as a low-friction entry point: cheap enough to be a first purchase that builds trust in SellersPoint Docs before a seller commits to a full registration.
 
 **Trackers has zero partner or filing involvement** — it's a pure reminder utility, not a document-generation or fulfillment feature. It exists because a seller's real compliance/renewal calendar extends well past what SellersPoint's catalog covers on day one (a shop lease, an insurance policy, a supplier payment term), and forcing them into a separate app for that defeats the point of a unified Docs product.
 
@@ -77,9 +80,23 @@ Every document from all three fulfillment lines lands here, organized by type an
 
 Registration/filing completion rate per category, partner SLA adherence, submission rejection/rework rate, renewal → re-filing completion rate, Tax Calculator usage → Tax Filing conversion rate, Contract/Proposal templates generated per type, template-to-Partner-A upsell conversion rate, Document Vault engagement, revenue per category/partner, **Trackers created per seller, reminder-to-action rate (marked Renewed/Paid vs. ignored), Tracker-category frequency as a roadmap signal for catalog expansion**, and **clause-library validation rejection rate** (AI suggestions that failed the ID-whitelist check — should trend near zero; a rising number signals the classification model is drifting toward requests the library doesn't yet cover, which is a prompt to expand the library deliberately, not to loosen the boundary).
 
+**New for v6:** Verification & Lookup volume and Lookup-to-full-registration conversion rate (validates the entry-point-product thesis), escrow milestone completion rate (payments released vs. disputed/refunded), WhatsApp-initiated order share vs. dashboard-initiated, and bundle attach rate (sellers buying a package vs. individual services).
+
 ## 10. Ready-to-paste prompt block
 
-> Design the product and automation architecture for **SellersPoint Docs**: (1) CAC Business Name, LLC incorporation, and Trademark registration via a Corporate & Legal partner; (2) TIN, NAFDAC, SCUML, state permits, and periodic Tax Filing via a Tax & Regulatory partner; (3) self-serve Contract/Agreement Templates, a Proposal/Quote Generator, and a Tax Calculator that funnels into Partner B's filing; (4) seller-managed **Trackers** — custom lifecycle reminders (rent, insurance, payroll, supplier payments, or anything else) with monthly/custom-cadence notifications, requiring no document generation or partner involvement. For Templates, AI's role is strictly to classify a seller's plain-language description against a finite, versioned, pre-vetted clause library and assemble the matching clauses with the seller's field values — **AI must never draft novel legal clauses**; enforce this server-side by rejecting any AI output that doesn't resolve to an existing library clause ID, and expand the library only through a deliberate human legal-review process, never at runtime. Every document produced or uploaded across categories 1–3 lands in one unified, NDPR-compliant Document Vault; Trackers optionally attach proof-of-completion to the same Vault. SellersPoint is never the licensed party of record for any filing, and never the author of novel legal language.
+> Design the product and automation architecture for **SellersPoint Docs**: (1) everything about company formation — CAC Business Name, LLC incorporation, Trademark registration, and recurring CAC Annual Returns filing — via a Corporate & Legal partner; (2) everything about tax — TIN, periodic Tax Filing, and Tax Clearance Certificates — plus adjacent regulatory filings (NAFDAC, SCUML, state permits) via a Tax & Regulatory partner; (3) fast, cheap **Verification & Lookup** services (Personal TIN Verification Slip, CAC Business Name availability/status checks, document authenticity checks, NIN verification) that route to whichever partner owns that document type, or run fully automated where a public verification API exists — priced and turned around in hours, not days, as a low-friction entry point into the product; (4) self-serve Contract/Agreement Templates, a Proposal/Quote Generator, and a Tax Calculator that funnels into Partner B's filing; (5) seller-managed **Trackers** — custom lifecycle reminders (rent, insurance, payroll, supplier payments, or anything else) with monthly/custom-cadence notifications, requiring no document generation or partner involvement. For Templates, AI's role is strictly to classify a seller's plain-language description against a finite, versioned, pre-vetted clause library and assemble the matching clauses with the seller's field values — **AI must never draft novel legal clauses**; enforce this server-side by rejecting any AI output that doesn't resolve to an existing library clause ID, and expand the library only through a deliberate human legal-review process, never at runtime. Every document produced or uploaded across categories 1–4 lands in one unified, NDPR-compliant Document Vault; Trackers optionally attach proof-of-completion to the same Vault. Payment for partner-fulfilled work is held in escrow-style and released on delivery milestones, not upfront. SellersPoint is never the licensed party of record for any filing, and never the author of novel legal language.
+
+## 11. Additional Product Features (v6)
+
+**Verification & Lookup** — covered in the catalog above (Section 2) and the delivery-model split (Section 3). Worth restating why it matters: this is the tier most likely to be copied directly from how partners already sell (a ₦1,500, 12-hour Personal TIN Verification Slip is a real, current market reference point), and its low price/fast turnaround make it a natural first purchase before a seller trusts SellersPoint with a ₦70,000+ registration. **Document authenticity verification** — checking whether *any* certificate is genuine, not just ones SellersPoint issued — lives in this tier too, and doubles as a trust-building feature independent of whether the seller ever files anything through SellersPoint (a landlord checking a tenant's registration, a buyer checking a supplier's).
+
+**Escrow-style payment** — the standard failure mode with informal WhatsApp-based agents (the exact channel most of this market already transacts through) is paying upfront and getting ghosted. Holding payment until a real milestone — certificate delivered, not just "submitted to partner" — is a structural trust differentiator, not just a UI nicety. This should extend the existing guardrail set in Section 8: no fabricated turnaround promises pairs naturally with no payment released before actual delivery.
+
+**Bundle packages** — partners already sell this way (a single flat price covering Business Certificate, Status Report, Congratulatory Letter, TIN Certificate, and MEMART as one company-registration bundle). SellersPoint should mirror that instinct with its own packages spanning categories — e.g. a "New Business Bundle" combining Business Name/LLC registration, TIN, one free contract template, and Tax Calculator access — priced below buying each piece separately.
+
+**WhatsApp-native ordering, not just status updates** — Section on Status tracking already delivers updates over WhatsApp; the gap is *initiating* a service request from a WhatsApp chat in the first place, not only opening the dashboard. Given SellersPoint's core brand pillar is WhatsApp-fluency and the reference partner pricing itself arrived as a WhatsApp broadcast, letting a seller start a Registration, order a Verification & Lookup service, or generate a Template directly from a WhatsApp conversation closes the gap between how this market already transacts and how the product works.
+
+**A small congratulatory moment on approval** — worth borrowing directly from the reference partner's bundle, which includes a literal Congratulatory Letter. Cheap to build as an automated milestone notification/badge the moment a registration comes back approved, and it ties naturally into the Founding Member "Founder Badge" concept already established in the brand.
 
 ---
 
@@ -89,17 +106,17 @@ Registration/filing completion rate per category, partner SLA adherence, submiss
 
 | Stage | What happens | Owner | Key inputs | Key outputs |
 |---|---|---|---|---|
-| **0. Entry** | Seller lands via core app upsell, sellerspoint.ng/docs, or WhatsApp share | SellersPoint (automated) | — | Session started |
+| **0. Entry** | Seller lands via core app upsell, sellerspoint.ng/docs, WhatsApp share, or starts an order directly from a WhatsApp chat | SellersPoint (automated) | — | Session started |
 | **1. Guided intake** | Business activity, category, location, registration status, filing history | SellersPoint (automated) | Seller answers | Structured business profile |
-| **2. Eligibility & requirement mapping** | Maps profile → required one-time registrations *and* recurring tax obligations (VAT cadence, CIT annual, PIT if sole proprietor) | SellersPoint (automated) | Business profile | Personalized checklist, one-time + recurring |
+| **2. Eligibility & requirement mapping** | Maps profile → required one-time registrations *and* recurring obligations (VAT cadence, CIT annual, PIT if sole proprietor, **CAC Annual Returns**) | SellersPoint (automated) | Business profile | Personalized checklist, one-time + recurring |
 | **3. Document collection** | ID, proof of address, product/label info, revenue data (auto-pulled from core app where possible) | SellersPoint (automated) | Seller uploads + core app data | Complete document/data set |
 | **4. Draft generation** | AI pre-fills applications and tax returns in each partner's expected format | SellersPoint (AI-assisted) | Business profile + documents | Draft package(s), tagged by destination partner |
 | **5. Pre-partner check** | SellersPoint completeness/sanity check before handoff | SellersPoint (human) | Draft package | Cleared-for-handoff package, or sent back |
 | **6. Partner routing** | Routed to Partner A and/or B, tracked independently | SellersPoint (automated) | Cleared package | Delivered to partner |
-| **7. Partner review & filing** | Final legal/professional review and filing with CAC/FIRS/NAFDAC/SCUML/LASAA | **Partner (required)** | Routed package | Filing reference |
+| **7. Partner review & filing** | Final legal/professional review and filing with CAC/FIRS/NAFDAC/SCUML/LASAA. Payment held escrow-style up to this point, not released upfront. | **Partner (required)** | Routed package | Filing reference |
 | **8. Status tracking** | Per-service WhatsApp/email updates | SellersPoint (automated) | Filing references | Status updates |
-| **9. Delivery & storage** | Certificates/filed returns delivered digitally into the **Document Vault** | SellersPoint (automated) | Government-issued documents | Stored, retrievable per service |
-| **10. Ongoing compliance** | One-time registrations get renewal reminders; **Tax Filing loops here on its own recurring cadence**, often kicked off by a fresh Tax Calculator estimate | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
+| **9. Delivery & storage** | Certificates/filed returns delivered digitally into the **Document Vault**; payment releases to the partner; approval triggers a small congratulatory notification/badge moment | SellersPoint (automated) | Government-issued documents | Stored, retrievable per service |
+| **10. Ongoing compliance** | One-time registrations get renewal reminders; **Tax Filing and CAC Annual Returns loop here on their own recurring cadence**, Tax Filing often kicked off by a fresh Tax Calculator estimate | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
 
 ### B. Self-Serve Documents & Tools
 
