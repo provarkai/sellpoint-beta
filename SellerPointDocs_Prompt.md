@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v8)
+# SellersPoint Docs — Product & Automation Brief (v9)
 
 ## 1. Product Overview
 
@@ -14,9 +14,11 @@
 | **Tax & Regulatory** | TIN generation/verification, state-specific permits (LASAA, local govt), **Tax Filing** (VAT, CIT, PIT returns), **Tax Clearance Certificate (TCC)** | Partner B |
 | **Verification & Lookup** | TIN verification, **BVN verification**, NIN verification, CAC Business Name availability check, CAC business status lookup — all automated via a KYC/verification API vendor, no partner involved for the routine checks; document authenticity verification (checking a specific certificate is genuine) gets an automated first pass with a manual cross-check available for high-stakes cases | Automated (vendor API), with Partner A as an internal fallback only for document authenticity on high-stakes documents |
 | **Tax Suite** *(expanded in v8)* | PAYE Calculator, VAT Estimator (free); Mini Payroll, Payslip Generator, Annual Tax Certificate, NRS/FIRS E-Invoicing (paid tier) — see Section 12 | SellersPoint, no partner |
-| **Self-Serve Documents & Tools** | Contract/Agreement Templates (basic document immediately, AI-assisted improvement from a pre-vetted clause library for peculiar situations), Proposal/Quote Generator | SellersPoint, no partner |
-| **Trackers** | Seller-defined lifecycle reminders — rent, insurance, payroll, supplier payments, any other renewal — **plus a "Licences & Documents" category covering CAC Annual Returns and Tax Clearance Certificate**, which can be filed directly from the tracker when due | SellersPoint, seller-managed (Licences & Documents items route to fulfillment when actioned) |
-| **Compliance Calendar** *(new in v8)* | Unifies every deadline from Trackers, the Tax Suite, and Registrations into one sorted view — see Section 13 | SellersPoint, connective (not a fulfillment category) |
+| **Self-Serve Documents & Tools** *(demoted from primary nav in v9 — see note below)* | Contract/Agreement Templates (basic document immediately, AI-assisted improvement from a pre-vetted clause library for peculiar situations), Proposal/Quote Generator | SellersPoint, no partner |
+| **Trackers** | Seller-defined lifecycle reminders — rent, insurance, payroll, supplier payments, any other renewal — plus a **"Licences & Documents" category** for recurring compliance items the built-in Compliance Calendar doesn't already cover (e.g. a state-specific permit), filed directly from the tracker when due | SellersPoint, seller-managed (Licences & Documents items route to fulfillment when actioned) |
+| **Compliance Calendar** *(upgraded in v9)* | Real statutory deadline dates (not estimates) for VAT, PAYE, WHT, CAC Annual Return, CIT, and PIT/Tax Clearance, merged with open Trackers into one sorted view — see Section 13 | SellersPoint, connective (not a fulfillment category) |
+
+**Templates positioning decision (v9):** kept, not removed — free doesn't mean unfocused, and it was one of the three founding pillars of this product (business creation, regulatory compliance, *and documentation*). The "looks unfocused" concern was real but about prominence, not existence: Templates no longer has its own sidebar tab. It's reachable from an Overview quick action ("New document") and from a "Create a document" prompt inside the Document Vault, so it stays available as a trust-building, retention-driving free tool without visually competing with the paid, higher-stakes services in primary navigation.
 
 ## 3. Delivery Model — two partners, several self-serve product lines
 
@@ -126,18 +128,31 @@ Built on the **Nigeria Tax Act 2025** (effective 1 January 2026), which replaced
 
 **Product note:** this expansion turns Tax Tools from a single VAT estimate into a genuine payroll/compliance suite — worth its own pricing and go-to-market pass rather than treating it as "one more feature" of the existing free tier.
 
-## 13. Compliance Calendar
+## 13. Compliance Calendar (upgraded in v9)
 
-**Why it exists:** Trackers, the Tax Suite, and Registrations each know about their own deadlines, but nothing pulled them into one place — meaning a seller had no reason to open the app on a day nothing was urgently overdue. The Compliance Calendar is the retention answer: one sorted view of everything due, regardless of which subsystem owns it.
+**Why it exists:** Trackers, the Tax Suite, and Registrations each know about their own deadlines, but nothing pulled them into one place — meaning a seller had no reason to open the app on a day nothing was urgently overdue. The Compliance Calendar is the retention answer: one view of everything due, regardless of which subsystem owns it.
 
-**What it pulls together:**
-- **From Trackers** — every non-completed tracker, both self-tracked (rent, insurance, payroll, supplier payments) and Licences & Documents items (CAC Annual Returns, Tax Clearance).
-- **From the Tax Suite** — the current VAT filing deadline.
-- **From Registrations** — long-horizon renewal dates (Business Name, SCUML certificate renewals).
+**v9 change: real dates, not estimated day-counts.** The first version of this feature used rough hardcoded day-offsets ("due in 18 days"). v9 replaces that with actual recurrence math against Nigeria's real statutory filing calendar:
 
-**Behavior:** sorted soonest-first, grouped into "Due soon" (≤30 days) and "Later this year." Each row carries a source tag (Tracker / Licence / Tax / Registration) and a contextual action — "File now" for Licences & Documents items, "Estimate now" for tax deadlines, "View" for registrations, "View tracker" for self-tracked items. No new data model — it's a read-through view over Trackers/Tax/Registrations, so it stays in sync automatically as the underlying items change.
+| Obligation | Cadence | Rule |
+|---|---|---|
+| VAT Return | Monthly | 21st of the month following the sales period |
+| PAYE Remittance | Monthly | 10th of the month following the payroll period |
+| Withholding Tax Remittance | Monthly | 21st of the month following the deduction |
+| CAC Annual Return | Annual | Fixed date (30 June shown as the reference point) |
+| Companies Income Tax Return | Annual | ~6 months after financial year end (December FYE shown) |
+| Personal Income Tax Return | Annual | 31 March, individual return + Tax Clearance renewal |
 
-**Ties three systems together, which is exactly the point:** it's the first surface where marking a tracker done, filing a VAT return, or a registration renewal date all show up in one place, making the product feel like one system instead of five tools glued together.
+Each of these now computes its *actual next occurrence* from today's date (rolling to next month/year automatically once the current occurrence passes), rather than living as a static Tracker row. This is also why the two CAC Annual Returns/Tax Clearance rows were removed from the Trackers pre-seeded list (Section 2 note) — they're first-class Calendar entries now, not generic reminders, so showing both would duplicate the same obligation.
+
+**Three visible pieces:**
+1. **Next deadline hero stat** — the single soonest statutory obligation, shown prominently ("12 days · 21 Jul") with a direct action.
+2. **Two-month grid view** — this month *and* next month, both rendered with dot markers on deadline days. This exists specifically because a single-month view hides real near-term deadlines that fall just past the month boundary — e.g. on 18 July, the next PAYE remittance (10th of the month) has already passed for July and doesn't land until 10 August, invisible on a one-month grid but clearly visible on two.
+3. **Merged upcoming list** — statutory deadlines plus open Trackers, sorted soonest-first, each tagged by source (🏛️ statutory / 📌 tracker) with a contextual action ("File now" for filing-type obligations, "Estimate now" for VAT, "View tracker" for self-tracked items).
+
+**What it pulls together:** the full statutory list above (computed, not stored) + every non-completed Tracker (self-tracked and Licences & Documents categories) + the current VAT deadline from the Tax Suite. No new data model beyond the statutory rule table itself — it's a read-through/computed view, so it stays in sync automatically as Trackers change and time passes.
+
+**Ties three systems together, which is exactly the point:** it's the first surface where marking a tracker done, a VAT deadline, and a CAC Annual Return date all show up together, making the product feel like one system instead of several tools glued together.
 
 ## 14. Feedback & Roadmap (not yet built — logged for future prioritization)
 
@@ -206,14 +221,17 @@ Four further suggestions surfaced in review, not built in this pass:
 
 | Stage | What happens | Owner | Key inputs | Key outputs |
 |---|---|---|---|---|
-| **0. Aggregate** | Pull current state from Trackers, Tax Suite, and Registrations | SellersPoint (automated) | Underlying data from A/B/C | Combined item list |
-| **1. Sort & group** | Sort by days-until-due, group into Due Soon / Later | SellersPoint (automated) | Combined list | Rendered calendar |
-| **2. Action** | Seller clicks a contextual action per item — routes into the relevant workflow (A, B, or C) | Seller-initiated | Selected item | Enters the owning workflow |
+| **0. Compute statutory dates** | Recurrence rules (Section 13 table) compute each obligation's real next occurrence from today's date | SellersPoint (automated) | System date | Statutory deadline list |
+| **1. Aggregate** | Merge computed statutory deadlines with open Trackers | SellersPoint (automated) | Statutory list + Tracker data | Combined item list |
+| **2. Render** | Next-deadline hero stat, this-month + next-month grid, sorted upcoming list | SellersPoint (automated) | Combined list | Rendered calendar |
+| **3. Action** | Seller clicks a contextual action per item — routes into the relevant workflow (A or C) | Seller-initiated | Selected item | Enters the owning workflow |
 
-No new data model — this is a read-through view, so it stays in sync automatically as Trackers/Tax/Registrations change.
+No new data model beyond the statutory recurrence rules themselves — this is a computed/read-through view, so it stays in sync automatically as Trackers change and time passes.
 
 ---
 
 # Dashboard Reference
 
 As of v8, the dashboard is no longer sketched in ASCII here — the product has grown enough (Tax Suite sub-tabs, PAYE calculator fields, payroll tables, payslip previews, e-invoicing forms, the Compliance Calendar) that a static text mockup would drift from the real thing almost immediately. `sellerspoint-docs-dashboard.html` in this repo is the live, clickable, single-source-of-truth reference — open it directly rather than reading a transcription. It implements every workflow above (A–E) end-to-end with mock data, and every seller-facing string in it has been checked against the "no partner names" guardrail in Section 8.
+
+**v9 note:** Templates no longer has a sidebar entry in the live file (see the positioning decision in Section 2) — find it via Overview's "New document" quick action or the Document Vault's "Create a document" prompt. The Compliance Calendar tab now uses real statutory recurrence math and a two-month grid instead of estimated day-counts.

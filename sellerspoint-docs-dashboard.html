@@ -247,13 +247,28 @@ main{padding:32px 36px;overflow:auto}
 .vt-verification{background:#fff4e8;color:var(--accent)}
 
 /* Compliance Calendar */
-.cal-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line);gap:14px;flex-wrap:wrap}
-.cal-row:last-child{border-bottom:0}
-.cal-row .info b{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
-.cal-row .info small{color:var(--muted);font-size:12.5px}
-.cal-source{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:#eef1ef;color:var(--muted);white-space:nowrap}
-.cal-group{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 8px}
-.cal-group:first-child{margin-top:0}
+.next-deadline{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.next-deadline .figure{font-size:34px;font-weight:800;color:var(--accent);margin:6px 0 2px}
+.next-deadline .figure small{font-size:14px;font-weight:700;color:var(--muted);margin-left:6px}
+.cal-months{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.cal-months{grid-template-columns:1fr}}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:14px}
+.cal-dow{font-size:10px;font-weight:800;color:var(--muted);text-align:center;text-transform:uppercase;padding-bottom:2px}
+.cal-cell{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink);background:#fbfcfb;border:1px solid var(--line)}
+.cal-cell.empty{background:transparent;border-color:transparent}
+.cal-cell.today{border-color:var(--primary);color:var(--primary);background:#f0faf6}
+.cal-cell .dot{width:5px;height:5px;border-radius:50%;background:var(--danger)}
+.cal-legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted);font-weight:700}
+.cal-legend span{display:flex;align-items:center;gap:5px}
+.cal-legend .sw{width:8px;height:8px;border-radius:50%}
+.deadline-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.deadline-row:last-child{border-bottom:0}
+.deadline-row .info b{font-size:14px;font-weight:800;display:block}
+.deadline-row .info small{color:var(--muted);font-size:12px}
+.deadline-row .days{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.days-soon{background:#fff1f0;color:var(--danger)}
+.days-mid{background:#fff4e8;color:var(--accent)}
+.days-far{background:#eef1ef;color:var(--muted)}
 
 /* Toast */
 #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.2s ease;z-index:100}
@@ -292,7 +307,6 @@ main{padding:32px 36px;overflow:auto}
     <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
     <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
     <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
-    <button class="nav-item" data-view="templates"><span class="ic">🧾</span> Templates</button>
     <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault</button>
   </nav>
   <a class="wa-link" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order via WhatsApp</a>
@@ -375,9 +389,35 @@ main{padding:32px 36px;overflow:auto}
 
   <!-- ===== COMPLIANCE CALENDAR ===== -->
   <section class="view" id="view-calendar">
-    <div class="view-header"><h1>Compliance Calendar</h1><p>Everything due, pulled from Trackers, Tax Tools, and your registrations — one list, sorted by what's coming up next.</p></div>
-    <div class="card">
-      <div id="calendarList"></div>
+    <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view — this month and next.</p></div>
+
+    <div class="card next-deadline">
+      <div>
+        <h3 style="font-size:15px;font-weight:800">Next deadline</h3>
+        <div class="figure" id="nextDeadlineFigure">—</div>
+        <small style="color:var(--muted)" id="nextDeadlineName">Loading…</small>
+      </div>
+      <button class="btn btn-primary" onclick="goto('tax')">Go to Tax Tools →</button>
+    </div>
+
+    <div class="cal-months" style="margin-top:16px">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800" id="calMonthLabel0">This month</h3>
+        <div class="cal-grid" id="calGrid0"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800" id="calMonthLabel1">Next month</h3>
+        <div class="cal-grid" id="calGrid1"></div>
+      </div>
+    </div>
+    <div class="cal-legend" style="margin:12px 2px 0">
+      <span><span class="sw" style="background:var(--danger)"></span> Deadline</span>
+      <span><span class="sw" style="background:var(--primary)"></span> Today</span>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Upcoming</h3>
+      <div id="calUpcoming" style="margin-top:8px"></div>
     </div>
   </section>
 
@@ -414,7 +454,7 @@ main{padding:32px 36px;overflow:auto}
     </div>
 
     <div class="card" style="margin-top:18px;background:#f0faf6;border-style:dashed">
-      <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those renew every year, so we track them as reminders — see <a href="#" onclick="goto('trackers');return false" style="color:var(--primary);font-weight:800">Trackers</a> or the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
+      <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those recur every year with real due dates — see the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
     </div>
   </section>
 
@@ -654,6 +694,10 @@ main{padding:32px 36px;overflow:auto}
   <!-- ===== VAULT ===== -->
   <section class="view" id="view-vault">
     <div class="view-header"><h1>Document Vault</h1><p>Everything from Registrations, Tax, and Templates — searchable in one place.</p></div>
+    <div class="card bundle-card" style="margin-bottom:16px">
+      <div class="info"><b>🧾 Need a contract, tenancy agreement, or proposal?</b><small>Create a basic document instantly, no status tracking.</small></div>
+      <button class="btn btn-ghost btn-sm" onclick="goto('templates')">Create a document</button>
+    </div>
     <div class="card">
       <div class="vault-toolbar">
         <input id="vaultSearch" placeholder="Search documents…" oninput="renderVault()">
@@ -943,9 +987,12 @@ renderVerifyList();
 renderLookups();
 
 /* ---------- Trackers ---------- */
+// Note: CAC Annual Returns and Tax Clearance/PIT no longer live here as
+// pre-seeded rows - they're first-class statutory deadlines with real date
+// math in the Compliance Calendar below. "Licences & Documents" stays as a
+// selectable category for anything the built-in statutory list doesn't
+// cover (e.g. a state-specific permit).
 let trackers = [
-  { name:"CAC Annual Returns (2026)", cat:"Licences & Documents", status:"due-soon", statusLabel:"Due in 40 days", note:"Recurs annually", fileable:true },
-  { name:"Tax Clearance Certificate", cat:"Licences & Documents", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually", fileable:true },
   { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
   { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
   { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
@@ -978,52 +1025,88 @@ function addTracker(){
 }
 renderTrackers();
 
-/* ---------- Compliance Calendar (unifies Trackers, Tax Tools, Registrations) ---------- */
-function calendarItems(){
-  const fromTrackers = trackers.filter(t=>t.status!=='done').map(t=>({
-    name: t.name,
-    source: t.cat==="Licences & Documents" ? "Licence" : "Tracker",
-    days: t.status==="overdue" ? 2 : (t.status==="due-soon" ? 18 : 180),
-    note: t.note,
-    action: t.fileable ? "File now" : "View tracker",
-    onAction: t.fileable ? (()=>toast("Starting "+t.name+"…")) : (()=>goto("trackers")),
-  }));
-  const fromTax = [
-    { name:"VAT — July 2026", source:"Tax", days:12, note:"Estimate, then file", action:"Estimate now", onAction:()=>goto("tax") },
-  ];
-  const fromRegistrations = [
-    { name:"Business Name renewal", source:"Registration", days:330, note:"Certificate renews annually", action:"View", onAction:()=>goto("registrations") },
-    { name:"SCUML renewal", source:"Registration", days:365, note:"Certificate renews annually", action:"View", onAction:()=>goto("registrations") },
-  ];
-  return [...fromTrackers, ...fromTax, ...fromRegistrations].sort((a,b)=>a.days-b.days);
+/* ---------- Compliance Calendar (unifies Trackers, Tax Suite, Registrations) ---------- */
+function nextMonthlyDate(day){
+  const now = new Date();
+  let d = new Date(now.getFullYear(), now.getMonth(), day);
+  if (d < now) d = new Date(now.getFullYear(), now.getMonth()+1, day);
+  return d;
 }
-function dayLabel(days){
-  if (days <= 3) return { text:`Due in ${days} day${days===1?"":"s"}`, cls:"pill-alert" };
-  if (days <= 30) return { text:`Due in ${days} days`, cls:"pill-progress" };
-  return { text:"Upcoming", cls:"pill-neutral" };
+function nextAnnualDate(month, day){ // month is 0-indexed
+  const now = new Date();
+  let d = new Date(now.getFullYear(), month, day);
+  if (d < now) d = new Date(now.getFullYear()+1, month, day);
+  return d;
 }
+function daysUntil(d){ const now = new Date(); now.setHours(0,0,0,0); const t = new Date(d); t.setHours(0,0,0,0); return Math.round((t-now)/86400000); }
+function daysBadgeClass(n){ return n<=7 ? "days-soon" : n<=30 ? "days-mid" : "days-far"; }
+function daysLabel(n){ if(n<0) return "Overdue"; if(n===0) return "Today"; if(n===1) return "1 day"; return n+" days"; }
+
+function buildStatutoryDeadlines(){
+  return [
+    { name:"VAT Return", note:"Filing + payment, previous month's sales", due: nextMonthlyDate(21), action:"Estimate now", onAction:()=>goto("tax") },
+    { name:"PAYE Remittance", note:"Employee tax withheld, previous month", due: nextMonthlyDate(10), action:"Go to Payroll", onAction:()=>goto("tax") },
+    { name:"Withholding Tax Remittance", note:"Previous month's WHT deductions", due: nextMonthlyDate(21), action:"View", onAction:()=>goto("tax") },
+    { name:"CAC Annual Return", note:"Keeps your company active on the register", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>toast("Starting CAC Annual Return filing…") },
+    { name:"Companies Income Tax Return", note:"~6 months after financial year end (Dec FYE shown)", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>toast("Starting Companies Income Tax filing…") },
+    { name:"Personal Income Tax Return", note:"Individual annual return + Tax Clearance renewal", due: nextAnnualDate(2, 31), action:"File now", onAction:()=>toast("Starting Personal Income Tax filing…") },
+  ];
+}
+
 let calActionRefs = [];
+function renderMonthGrid(gridEl, labelEl, monthOffset, statutory){
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth() + monthOffset;
+  const view = new Date(year, month, 1);
+  const viewYear = view.getFullYear(), viewMonth = view.getMonth();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const deadlineDays = new Set(statutory.filter(s=>s.due.getFullYear()===viewYear && s.due.getMonth()===viewMonth).map(s=>s.due.getDate()));
+  labelEl.textContent = view.toLocaleDateString('en-NG',{month:'long',year:'numeric'});
+  const dow = ["S","M","T","W","T","F","S"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  let cells = "";
+  for(let i=0;i<firstDow;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const isToday = monthOffset===0 && d===now.getDate();
+    cells += `<div class="cal-cell ${isToday?'today':''}">${d}${deadlineDays.has(d)?'<span class="dot"></span>':''}</div>`;
+  }
+  gridEl.innerHTML = dow + cells;
+}
 function renderCalendar(){
   calActionRefs = [];
-  const items = calendarItems();
-  const groups = [
-    { label:"Due soon", test:i=>i.days<=30 },
-    { label:"Later this year", test:i=>i.days>30 },
-  ];
-  $("calendarList").innerHTML = groups.map(g=>{
-    const rows = items.filter(g.test);
-    if (!rows.length) return "";
-    return `<div class="cal-group">${g.label}</div>` + rows.map(i=>{
-      const idx = calActionRefs.push(i.onAction) - 1;
-      const d = dayLabel(i.days);
-      return `<div class="cal-row">
-        <div class="info"><b>📅 ${i.name} <span class="cal-source">${i.source}</span></b><small>${i.note}</small></div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <span class="pill ${d.cls}">${d.text}</span>
-          <button class="btn btn-ghost btn-sm" onclick="calActionRefs[${idx}]()">${i.action}</button>
-        </div>
-      </div>`;
-    }).join("");
+  const statutory = buildStatutoryDeadlines();
+
+  // Next deadline hero
+  const soonest = statutory.slice().sort((a,b)=>a.due-b.due)[0];
+  const n = daysUntil(soonest.due);
+  $("nextDeadlineFigure").innerHTML = `${daysLabel(n)} <small>${soonest.due.toLocaleDateString('en-NG',{day:'numeric',month:'short'})}</small>`;
+  $("nextDeadlineName").textContent = soonest.name;
+
+  // This month + next month grids, so next month's items are visible too
+  renderMonthGrid($("calGrid0"), $("calMonthLabel0"), 0, statutory);
+  renderMonthGrid($("calGrid1"), $("calMonthLabel1"), 1, statutory);
+
+  // Merged upcoming list: statutory deadlines + open trackers
+  const trackerDaysGuess = { "due-soon": 18, "overdue": 2, "upcoming": 45 };
+  const trackerItems = trackers
+    .filter(t => t.status !== "done")
+    .map(t => ({
+      name: t.name, note: `Your Tracker · ${t.note}`, days: trackerDaysGuess[t.status] ?? 45, source: "tracker",
+      action: t.fileable ? "File now" : "View tracker",
+      onAction: t.fileable ? (()=>toast("Starting "+t.name+"…")) : (()=>goto("trackers")),
+    }));
+  const statutoryItems = statutory.map(s => ({ name: s.name, note: s.note, days: daysUntil(s.due), source: "statutory", action: s.action, onAction: s.onAction }));
+  const merged = statutoryItems.concat(trackerItems).sort((a,b)=>a.days-b.days);
+
+  $("calUpcoming").innerHTML = merged.map(item => {
+    const idx = calActionRefs.push(item.onAction) - 1;
+    return `<div class="deadline-row">
+      <div class="info"><b>${item.source==='statutory'?'🏛️ ':'📌 '}${item.name}</b><small>${item.note}</small></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="days ${daysBadgeClass(item.days)}">${daysLabel(item.days)}</span>
+        <button class="btn btn-ghost btn-sm" onclick="calActionRefs[${idx}]()">${item.action}</button>
+      </div>
+    </div>`;
   }).join("");
 }
 renderCalendar();
