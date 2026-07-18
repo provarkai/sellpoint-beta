@@ -30,7 +30,7 @@ a{color:inherit;text-decoration:none}
 
 /* ===== Sidebar ===== */
 aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-direction:column;gap:6px}
-.brandmark{display:flex;align-items:center;gap:10px;padding:0 6px;margin-bottom:22px}
+.brandmark{display:flex;align-items:center;gap:10px;padding:0 6px;margin-bottom:16px}
 .brand-icon{width:30px;height:34px;flex:0 0 auto}
 .brand-word{font-size:18px;font-weight:800;letter-spacing:-.01em}
 .brand-word .w-point{color:var(--accent)}
@@ -40,6 +40,25 @@ aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-d
 .nav-item .ic{font-size:15px}
 .back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
 .back-link:hover{color:#fff}
+
+/* Business switcher */
+.biz-switcher{position:relative;margin-bottom:16px}
+.biz-current{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.07);color:#fff;padding:10px 12px;border-radius:8px;text-align:left}
+.biz-current:hover{background:rgba(255,255,255,.12)}
+.biz-current .biz-info{display:grid;gap:1px;overflow:hidden;min-width:0}
+.biz-current b{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.biz-current small{font-size:11px;color:#9fc3b3;font-weight:700}
+.biz-current .chev{font-size:10px;color:#9fc3b3;flex:0 0 auto;transition:transform .15s ease}
+.biz-switcher.open .chev{transform:rotate(180deg)}
+.biz-menu{display:none;position:absolute;top:100%;left:0;right:0;margin-top:6px;background:#fff;border-radius:10px;box-shadow:0 20px 44px rgba(0,0,0,.3);overflow:hidden;z-index:30}
+.biz-switcher.open .biz-menu{display:block}
+.biz-menu-item{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 14px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line)}
+.biz-menu-item:hover{background:#f0faf6}
+.biz-menu-item.active{background:#f0faf6;color:var(--primary)}
+.biz-menu-item b{font-size:13px;font-weight:800}
+.biz-menu-item small{font-size:11px;color:var(--muted);font-weight:700}
+.biz-menu-add{width:100%;text-align:left;padding:11px 14px;background:#fbfcfb;color:var(--primary);font-weight:800;font-size:13px}
+.biz-menu-add:hover{background:#f0faf6}
 
 /* ===== Main ===== */
 main{padding:32px 36px;overflow:auto}
@@ -74,8 +93,8 @@ main{padding:32px 36px;overflow:auto}
 
 /* Overview */
 .progress-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:14px 0}
-.progress-fill{height:100%;background:var(--primary)}
-.step-labels{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--muted)}
+.progress-fill{height:100%;background:var(--primary);transition:width .3s ease}
+.step-labels{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--muted);flex-wrap:wrap;gap:6px}
 .step-labels .done{color:var(--primary)}
 .alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .alert-row:last-child{border-bottom:0}
@@ -135,12 +154,6 @@ main{padding:32px 36px;overflow:auto}
 .breakdown-row .lbl small{display:block;color:var(--muted);font-weight:600;font-size:11px}
 .exempt-banner{background:#e7f7ef;color:var(--primary);border-radius:10px;padding:14px 16px;font-weight:800;font-size:13px;margin-top:16px}
 
-.lock-panel{text-align:center;padding:40px 20px}
-.lock-panel .lock-ic{font-size:30px}
-.lock-panel h3{font-size:16px;font-weight:800;margin-top:10px}
-.lock-panel p{color:var(--muted);font-size:13px;margin-top:6px;max-width:420px;margin-left:auto;margin-right:auto}
-.lock-panel .btn{margin-top:16px}
-
 .emp-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
 .emp-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;padding:0 10px 8px;border-bottom:1.5px solid var(--line)}
 .emp-table td{padding:11px 10px;border-bottom:1px solid var(--line);font-weight:700}
@@ -151,12 +164,6 @@ main{padding:32px 36px;overflow:auto}
 .payslip-preview .ps-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--primary);padding-bottom:14px;margin-bottom:14px}
 .payslip-preview .ps-head b{font-size:17px;font-weight:800;display:block}
 .payslip-preview .ps-head small{color:var(--muted);font-size:12px}
-
-.tier-compare{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
-.tier-compare th,.tier-compare td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}
-.tier-compare th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.03em}
-.tier-compare td.yes{color:var(--primary);font-weight:800}
-.tier-compare td.no{color:var(--muted)}
 
 .invoice-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
 .invoice-row:last-child{border-bottom:0}
@@ -211,6 +218,7 @@ main{padding:32px 36px;overflow:auto}
 .vt-registration{background:#e7f7ef;color:var(--primary)}
 .vt-tax{background:#eef1ef;color:var(--muted)}
 .vt-template{background:#fff4e8;color:var(--accent)}
+.vt-verification{background:#fff4e8;color:var(--accent)}
 
 /* Escrow / congratulatory / bundle */
 .escrow-note{width:100%;font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;display:flex;align-items:center;gap:5px}
@@ -242,9 +250,6 @@ main{padding:32px 36px;overflow:auto}
 /* WhatsApp */
 .wa-link{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);color:#eaf6f0;padding:11px 14px;border-radius:8px;font-weight:800;font-size:13px;margin:6px 0}
 .wa-link:hover{background:rgba(255,255,255,.12);color:#fff}
-
-/* Vault verification type */
-.vt-verification{background:#fff4e8;color:var(--accent)}
 
 /* Compliance Calendar */
 .next-deadline{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -278,6 +283,7 @@ main{padding:32px 36px;overflow:auto}
   body{grid-template-columns:1fr}
   aside{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:12px;gap:8px;align-items:center}
   .brandmark{margin-bottom:0}
+  .biz-switcher{margin-bottom:0;min-width:180px}
   .nav-item{white-space:nowrap}
   .back-link{display:none}
   main{padding:20px}
@@ -300,6 +306,15 @@ main{padding:32px 36px;overflow:auto}
     <svg class="brand-icon" viewBox="0 0 64 72"><use href="#spIcon"/></svg>
     <span class="brand-word">Sellers<span class="w-point">Point</span> <span style="font-weight:600;opacity:.7">Docs</span></span>
   </div>
+
+  <div class="biz-switcher" id="bizSwitcher">
+    <button class="biz-current" onclick="toggleBizMenu()">
+      <span class="biz-info"><b id="bizCurrentName">—</b><small id="bizCurrentType">—</small></span>
+      <span class="chev">▾</span>
+    </button>
+    <div class="biz-menu" id="bizMenu"></div>
+  </div>
+
   <nav>
     <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
     <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar</button>
@@ -319,18 +334,16 @@ main{padding:32px 36px;overflow:auto}
   <section class="view active" id="view-overview">
     <div class="view-header"><h1>Overview</h1><p>Everything about your business setup, in one place.</p></div>
 
-    <div class="congrats-banner" id="congratsBanner">
-      <p>🎉 Congratulations! Your SCUML registration was approved. You've earned the Verified Business badge.</p>
+    <div class="congrats-banner hide" id="congratsBanner">
+      <p id="congratsText"></p>
       <button class="dismiss" onclick="$('congratsBanner').classList.add('hide')">×</button>
     </div>
 
     <div class="grid grid-2">
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Your Business Setup</h3>
-        <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
-        <div class="step-labels">
-          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span class="done">SCUML ✓</span><span>LLC (action needed)</span><span>Trademark —</span>
-        </div>
+        <div class="progress-track"><div class="progress-fill" id="setupProgressFill" style="width:0%"></div></div>
+        <div class="step-labels" id="setupSteps"></div>
       </div>
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Quick actions</h3>
@@ -363,26 +376,11 @@ main{padding:32px 36px;overflow:auto}
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Needs your attention</h3>
-        <div class="alert-row">
-          <div class="txt"><b>Action needed</b>We need a certified copy of your means of ID for your LLC registration</div>
-          <button class="btn btn-accent btn-sm" onclick="goto('registrations')">Upload</button>
-        </div>
-        <div class="alert-row">
-          <div class="txt"><b>Deadline</b>VAT filing due in 12 days</div>
-          <button class="btn btn-ghost btn-sm" onclick="goto('tax')">Estimate</button>
-        </div>
-        <div class="alert-row">
-          <div class="txt"><b>Reminder</b>Staff salary run due in 2 days</div>
-          <button class="btn btn-ghost btn-sm" onclick="goto('trackers')">View</button>
-        </div>
+        <div id="overviewAlerts"></div>
       </div>
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">Recently in your Vault</h3>
-        <div class="vault-mini" style="margin-top:12px">
-          <div class="vault-mini-row"><span>📄 SCUML Certificate</span><span class="tag">Registration · Jul 16</span></div>
-          <div class="vault-mini-row"><span>🔍 BVN Verification Result</span><span class="tag">Verification · Jul 16</span></div>
-          <div class="vault-mini-row"><span>🧾 Tenancy Agreement</span><span class="tag">Template · Jul 2</span></div>
-        </div>
+        <div class="vault-mini" id="overviewVaultMini" style="margin-top:12px"></div>
       </div>
     </div>
   </section>
@@ -430,28 +428,12 @@ main{padding:32px 36px;overflow:auto}
       <button class="btn btn-ghost btn-sm" onclick="toast('Bundle pricing would open here')">See bundle pricing</button>
     </div>
 
-    <div class="cat-title">Company Registration — choose one, upgrade later as your business grows</div>
-    <div class="card reg-card">
-      <div class="info"><b>Business Name Registration</b><small>Certificate ready</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-success">● Approved</span><button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button></div>
-      <div class="released-note">✓ Payment released</div>
-    </div>
-    <div class="card reg-card">
-      <div class="info"><b>Limited Liability Company</b><small>Upgrading from Business Name · we need a certified copy of your means of ID</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button></div>
-      <div class="escrow-note">💳 Payment held — releases when certificate arrives</div>
-    </div>
+    <div class="cat-title">Company Registration — it's either Business Name or Limited Liability Company, never both at once</div>
+    <div id="regPrimary"></div>
 
     <div class="cat-title">Also available</div>
-    <div class="card reg-card">
-      <div class="info"><b>Trademark Registration</b><small>Not started</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Trademark application…')">Start</button></div>
-    </div>
-    <div class="card reg-card">
-      <div class="info"><b>SCUML Registration</b><small>Certificate ready</small></div>
-      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-success">● Approved 🎉</span><button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button></div>
-      <div class="released-note">✓ Payment released</div>
-    </div>
+    <div id="regTrademark"></div>
+    <div id="regScuml"></div>
 
     <div class="card" style="margin-top:18px;background:#f0faf6;border-style:dashed">
       <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those recur every year with real due dates — see the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
@@ -526,12 +508,12 @@ main{padding:32px 36px;overflow:auto}
       </div>
     </div>
 
-    <!-- ===== VAT (existing, kept) ===== -->
+    <!-- ===== VAT ===== -->
     <div class="tax-panel" id="tax-vat">
       <div class="card">
         <h3 style="font-size:15px;font-weight:800">VAT Estimator</h3>
         <p style="color:var(--muted);font-size:13px;margin-top:4px">Pulling from your SellersPoint sales data automatically. Estimate only — not a filed position.</p>
-        <div class="calc-figure" id="vatFigure">₦42,300</div>
+        <div class="calc-figure" id="vatFigure">₦0</div>
         <small style="color:var(--muted)">Estimated VAT this month</small>
         <div style="display:flex;gap:10px;margin-top:16px">
           <button class="btn btn-ghost" onclick="recalc()">Recalculate</button>
@@ -540,10 +522,7 @@ main{padding:32px 36px;overflow:auto}
       </div>
       <div class="card" style="margin-top:16px">
         <h3 style="font-size:15px;font-weight:800">Filing history</h3>
-        <div id="filingHistory" style="margin-top:10px">
-          <div class="filing-row"><span>VAT — June 2026</span><span class="pill pill-success">● Filed</span></div>
-          <div class="filing-row"><span>VAT — May 2026</span><span class="pill pill-success">● Filed</span></div>
-        </div>
+        <div id="filingHistory" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -576,7 +555,7 @@ main{padding:32px 36px;overflow:auto}
         <p style="color:var(--muted);font-size:13px;margin-top:4px">Pick a staff member from Payroll to preview and export their payslip.</p>
         <div class="field-grid" style="margin-top:14px">
           <div class="field">Employee<select id="payslipEmpSelect" onchange="renderPayslip()"></select></div>
-          <div class="field">Company name<input id="payslipCompany" value="Provark Global Services Ltd" oninput="renderPayslip()"></div>
+          <div class="field">Company name<input id="payslipCompany" value="" oninput="renderPayslip()"></div>
         </div>
         <div id="payslipPreviewWrap"></div>
       </div>
@@ -768,7 +747,7 @@ function calcPAYE({ gross, annualRent = 0, pension = 0, nhf = 0, nhis = 0, mortg
 }
 function naira(n){ return "₦" + Math.round(n).toLocaleString(); }
 
-/* ---------- Calculator panel ---------- */
+/* ---------- Calculator panel (business-agnostic free tool) ---------- */
 let calcPeriod = "monthly";
 function setPeriod(p){
   calcPeriod = p;
@@ -812,21 +791,227 @@ function renderBreakdown(r){
     </div>`;
 }
 
-/* ---------- Payroll panel ---------- */
-let employees = [];
+/* ============================================================
+   MULTI-BUSINESS DATA MODEL
+   Every business carries its own full state - registrations, trackers,
+   templates, verification history, payroll, VAT/filing history. The
+   registration choice is a single field (regType), never two parallel
+   fields, so "Business Name OR Limited Liability Company" is enforced
+   by the data model itself, not just the UI.
+   ============================================================ */
+const BUSINESSES = [
+  {
+    id: "biz1", name: "Amina Fashion Hub", regType: "Business Name",
+    regStatus: "approved", regNote: "Certificate ready",
+    trademark: { status: "not-started" },
+    scuml: { status: "approved", celebrate: true },
+    setupSteps: [
+      { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
+      { text:"SCUML ✓", done:true }, { text:"Trademark —", done:false },
+    ],
+    setupProgress: 75,
+    congrats: "🎉 Congratulations! Your SCUML registration was approved. You've earned the Verified Business badge.",
+    alerts: [
+      { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
+      { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
+    ],
+    trackers: [
+      { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
+      { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
+      { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
+      { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
+    ],
+    docs: [
+      { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
+      { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
+      { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
+    ],
+    lookups: [
+      { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
+      { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
+    ],
+    employees: [],
+    invoices: [],
+    vatFigure: 42300,
+    filingHistory: [
+      { label:"VAT — June 2026", status:"filed", date:"Filed Jul 15" },
+      { label:"VAT — May 2026", status:"filed", date:"Filed Jun 15" },
+    ],
+    vaultExtra: [
+      { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12 · Renews Jun 2027" },
+      { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · Renews Jul 2027" },
+    ],
+  },
+  {
+    id: "biz2", name: "TechBuild Nigeria Ltd", regType: "Limited Liability Company",
+    regStatus: "approved", regNote: "Certificate ready",
+    trademark: { status: "review", note:"Submitted 3 days ago" },
+    scuml: { status: "not-started" },
+    setupSteps: [
+      { text:"LLC ✓", done:true }, { text:"TIN ✓", done:true },
+      { text:"Trademark (in review)", done:false }, { text:"SCUML —", done:false },
+    ],
+    setupProgress: 50,
+    congrats: "",
+    alerts: [
+      { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
+    ],
+    trackers: [
+      { name:"Office Lease Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 25 days", note:"Recurs annually" },
+      { name:"Software License Renewals", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually" },
+      { name:"Staff Salary Run", cat:"Payroll", status:"due-soon", statusLabel:"Due in 6 days", note:"Recurs monthly" },
+    ],
+    docs: [
+      { name:"Freelance / Service Contract — UI Designer", type:"Freelance / Service Contract", date:"Jul 8", warn:false },
+    ],
+    lookups: [
+      { label:"NIN Verification", result:"✓ Match found", when:"Jul 14, instant" },
+      { label:"TIN Verification", result:"✓ Match found", when:"Jul 3, instant" },
+    ],
+    employees: [
+      (function(){ const g=4800000, r=1200000; return { name:"Chidi Okafor", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+      (function(){ const g=3600000, r=900000; return { name:"Ngozi Eze", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+    ],
+    invoices: [],
+    vatFigure: 128400,
+    filingHistory: [
+      { label:"VAT — June 2026", status:"filed", date:"Filed Jul 14" },
+      { label:"VAT — May 2026", status:"filed", date:"Filed Jun 13" },
+    ],
+    vaultExtra: [
+      { name:"LLC Incorporation Certificate", type:"Registration", date:"Issued May 2 · Renews annually (Annual Returns)" },
+    ],
+  },
+  {
+    id: "biz3", name: "Coastal Traders", regType: "Business Name",
+    regStatus: "action-needed", regNote: "We need a certified copy of your means of ID",
+    trademark: { status: "not-started" },
+    scuml: { status: "not-started" },
+    setupSteps: [
+      { text:"Business Name (action needed)", done:false }, { text:"TIN —", done:false },
+      { text:"SCUML —", done:false }, { text:"Trademark —", done:false },
+    ],
+    setupProgress: 0,
+    congrats: "",
+    alerts: [
+      { title:"Action needed", text:"We need a certified copy of your means of ID for your Business Name registration", action:"Upload", view:"registrations" },
+    ],
+    trackers: [
+      { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually" },
+    ],
+    docs: [],
+    lookups: [],
+    employees: [],
+    invoices: [],
+    vatFigure: 0,
+    filingHistory: [],
+    vaultExtra: [],
+  },
+];
+let currentBusinessId = "biz1";
+function biz(){ return BUSINESSES.find(b=>b.id===currentBusinessId); }
+
+function renderBizSwitcher(){
+  const b = biz();
+  $("bizCurrentName").textContent = b.name;
+  $("bizCurrentType").textContent = b.regType;
+  $("bizMenu").innerHTML = BUSINESSES.map(x=>`
+    <button class="biz-menu-item ${x.id===currentBusinessId?'active':''}" onclick="switchBusiness('${x.id}')">
+      <b>${x.name}</b><small>${x.regType}</small>
+    </button>`).join("") + `<button class="biz-menu-add" onclick="toast('Add Business flow would open here'); toggleBizMenu()">+ Add business</button>`;
+}
+function toggleBizMenu(){ $("bizSwitcher").classList.toggle("open"); }
+document.addEventListener("click", (e)=>{
+  if (!$("bizSwitcher").contains(e.target)) $("bizSwitcher").classList.remove("open");
+});
+function switchBusiness(id){
+  currentBusinessId = id;
+  $("bizSwitcher").classList.remove("open");
+  // Reset any mid-flow UI state that belongs to the previous business's session, not its data
+  activeCheck = null; $("verifyPanel") && $("verifyPanel").classList.remove("show");
+  selectedTpl = null; $("basicDoc") && ($("basicDoc").style.display = "none");
+  renderAll();
+  toast(`Switched to ${biz().name}`);
+}
+function renderAll(){
+  renderBizSwitcher();
+  renderOverview();
+  renderRegistrations();
+  renderVerifyList(); renderLookups();
+  $("vatFigure").textContent = naira(biz().vatFigure);
+  renderFilingHistory();
+  renderPayroll();
+  renderInvoices();
+  renderTrackers();
+  renderCalendar();
+  renderDocs();
+  renderVault();
+}
+
+/* ---------- Overview (per business) ---------- */
+function renderOverview(){
+  const b = biz();
+  $("setupProgressFill").style.width = b.setupProgress + "%";
+  $("setupSteps").innerHTML = b.setupSteps.map(s=>`<span class="${s.done?'done':''}">${s.text}</span>`).join("");
+  const banner = $("congratsBanner");
+  if (b.congrats){ $("congratsText").textContent = b.congrats; banner.classList.remove("hide"); }
+  else { banner.classList.add("hide"); }
+  $("overviewAlerts").innerHTML = b.alerts.length ? b.alerts.map(a=>`
+    <div class="alert-row">
+      <div class="txt"><b>${a.title}</b>${a.text}</div>
+      <button class="btn ${a.title==='Action needed'?'btn-accent':'btn-ghost'} btn-sm" onclick="goto('${a.view}')">${a.action}</button>
+    </div>`).join("") : `<p style="color:var(--muted);font-size:13px;padding:14px 0">Nothing needs your attention right now.</p>`;
+  const recent = vaultItems().slice(0,3);
+  $("overviewVaultMini").innerHTML = recent.length ? recent.map(i=>{
+    const icon = i.type==='Registration'?'📄':i.type==='Tax'?'💰':i.type==='Verification'?'🔍':'🧾';
+    return `<div class="vault-mini-row"><span>${icon} ${i.name}</span><span class="tag">${i.type} · ${i.date.replace(/^(Issued|Filed|Checked|Created)\s/,'')}</span></div>`;
+  }).join("") : `<p style="color:var(--muted);font-size:13px;padding:8px 0">Nothing here yet.</p>`;
+}
+
+/* ---------- Registrations (per business, single either/or card) ---------- */
+const REG_STATUS_PILL = {
+  approved: { cls:"pill-success", label:"● Approved" },
+  review: { cls:"pill-progress", label:"◐ Under Review" },
+  "action-needed": { cls:"pill-alert", label:"⚠ Action Needed" },
+  "not-started": { cls:"pill-neutral", label:"○ Not Started" },
+};
+function regCardHtml(name, status, note, opts){
+  opts = opts || {};
+  const p = REG_STATUS_PILL[status];
+  const btn = status==="approved" ? `<button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button>`
+    : status==="not-started" ? `<button class="btn btn-primary btn-sm" onclick="toast('Starting ${name} application…')">Start</button>`
+    : status==="action-needed" ? `<button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button>`
+    : ``;
+  const extraNote = status==="approved" ? `<div class="released-note">✓ Payment released</div>`
+    : (status==="review"||status==="action-needed") ? `<div class="escrow-note">💳 Payment held — releases when certificate arrives</div>` : "";
+  return `<div class="card reg-card">
+    <div class="info"><b>${name}${opts.celebrate && status==='approved' ? ' 🎉' : ''}</b><small>${note}</small></div>
+    <div style="display:flex;gap:10px;align-items:center"><span class="pill ${p.cls}">${p.label}</span>${btn}</div>
+    ${extraNote}
+  </div>`;
+}
+function renderRegistrations(){
+  const b = biz();
+  $("regPrimary").innerHTML = regCardHtml(b.regType + " Registration", b.regStatus, b.regNote);
+  $("regTrademark").innerHTML = regCardHtml("Trademark Registration", b.trademark.status, b.trademark.status==="not-started" ? "Not started" : (b.trademark.note || "In progress"));
+  $("regScuml").innerHTML = regCardHtml("SCUML Registration", b.scuml.status, b.scuml.status==="approved" ? "Certificate ready" : b.scuml.status==="not-started" ? "Not started" : (b.scuml.note || "In progress"), { celebrate: b.scuml.celebrate });
+}
+
+/* ---------- Payroll panel (business-scoped) ---------- */
 function addEmployee(){
   const name = $("empName").value.trim();
   const gross = Number($("empGross").value) || 0;
   const rent = Number($("empRent").value) || 0;
   if (!name || !gross) { toast("Enter a name and gross salary first"); return; }
   const r = calcPAYE({ gross, annualRent: rent });
-  employees.push({ name, gross, rent, ...r });
+  biz().employees.push({ name, gross, rent, ...r });
   $("empName").value = ""; $("empGross").value = ""; $("empRent").value = "";
   renderPayroll();
   toast(`${name} added to payroll`);
 }
-function removeEmployee(i){ employees.splice(i,1); renderPayroll(); }
+function removeEmployee(i){ biz().employees.splice(i,1); renderPayroll(); }
 function renderPayroll(){
+  const employees = biz().employees;
   $("empTableBody").innerHTML = employees.map((e,i)=>`
     <tr><td>${e.name}</td><td>${naira(e.gross)}</td><td>${e.exempt?"Exempt":naira(e.tax)}</td><td>${naira(e.net)}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="removeEmployee(${i})">Remove</button></td></tr>`).join("")
@@ -848,9 +1033,11 @@ function renderPayroll(){
 function renderPayslipSelect(){
   const sel = $("payslipEmpSelect");
   if (!sel) return;
+  const employees = biz().employees;
   sel.innerHTML = employees.length
     ? employees.map((e,i)=>`<option value="${i}">${e.name}</option>`).join("")
     : `<option value="">Add an employee in Payroll first</option>`;
+  if (!$("payslipCompany").value) $("payslipCompany").value = biz().name;
   renderPayslip();
 }
 
@@ -858,9 +1045,10 @@ function renderPayslipSelect(){
 function renderPayslip(){
   const wrap = $("payslipPreviewWrap");
   const idx = $("payslipEmpSelect") ? $("payslipEmpSelect").value : "";
+  const employees = biz().employees;
   if (idx === "" || !employees[idx]) { wrap.innerHTML = ""; return; }
   const e = employees[idx];
-  const company = $("payslipCompany").value || "Your Company";
+  const company = $("payslipCompany").value || biz().name;
   wrap.innerHTML = `
     <div class="payslip-preview">
       <div class="ps-head">
@@ -877,10 +1065,10 @@ function renderPayslip(){
 
 /* ---------- Annual Certificate panel ---------- */
 function generateCertificate(){
+  const employees = biz().employees;
   if (!employees.length) { toast("Add at least one employee in Payroll first"); return; }
   const totGross = employees.reduce((s,e)=>s+e.gross,0);
   const totTax = employees.reduce((s,e)=>s+e.tax,0);
-  const totPension = 0; // populated once pension inputs are wired per-employee
   $("certSummary").innerHTML = `
     <div class="breakdown-row"><span>Total gross income (yr)</span><span>${naira(totGross)}</span></div>
     <div class="breakdown-row"><span>Total tax paid (yr)</span><span>${naira(totTax)}</span></div>
@@ -888,8 +1076,7 @@ function generateCertificate(){
   toast("Annual Tax Certificate PDF generated");
 }
 
-/* ---------- E-Invoicing panel ---------- */
-let invoices = [];
+/* ---------- E-Invoicing panel (business-scoped) ---------- */
 function createInvoice(){
   const buyer = $("invBuyerName").value.trim();
   const amount = Number($("invAmount").value) || 0;
@@ -897,34 +1084,39 @@ function createInvoice(){
   const vat = amount * 0.075;
   const irn = "IRN-" + Math.random().toString(36).slice(2,8).toUpperCase();
   const csid = "CSID-" + Math.random().toString(36).slice(2,10).toUpperCase();
-  invoices.unshift({ buyer, amount, vat, irn, csid, when: new Date().toLocaleDateString('en-NG',{day:'numeric',month:'short'}) });
+  biz().invoices.unshift({ buyer, amount, vat, irn, csid, when: new Date().toLocaleDateString('en-NG',{day:'numeric',month:'short'}) });
   $("invBuyerName").value = ""; $("invAmount").value = ""; $("invDesc").value = "";
   renderInvoices();
   toast("Invoice validated — IRN and QR code issued");
 }
 function renderInvoices(){
-  $("invoiceHistory").innerHTML = invoices.map(inv => `
+  $("invoiceHistory").innerHTML = biz().invoices.map(inv => `
     <div class="invoice-row">
       <div class="info"><b>${inv.buyer} — ${naira(inv.amount + inv.vat)} (incl. VAT)</b><small>${inv.irn} · ${inv.csid} · ${inv.when}</small></div>
       <span class="pill pill-success">● Validated by NRS</span>
     </div>`).join("");
 }
 
-/* ---------- Tax Tools (legacy VAT) ---------- */
+/* ---------- Tax Tools: VAT (business-scoped) ---------- */
 function recalc(){
   const n = Math.round((30000 + Math.random()*40000)/100)*100;
-  $("vatFigure").textContent = "₦" + n.toLocaleString();
+  biz().vatFigure = n;
+  $("vatFigure").textContent = naira(n);
   toast("Estimate updated from your latest sales data");
 }
 function fileNow(){
-  const row = document.createElement("div");
-  row.className = "filing-row";
-  row.innerHTML = `<span>VAT — July 2026</span><span class="pill pill-progress">◐ Submitted</span>`;
-  $("filingHistory").prepend(row);
+  biz().filingHistory.unshift({ label:"VAT — July 2026", status:"submitted", date:"Submitted just now" });
+  renderFilingHistory();
   toast("Sent for filing");
 }
+function renderFilingHistory(){
+  const rows = biz().filingHistory;
+  $("filingHistory").innerHTML = rows.length ? rows.map(f=>`
+    <div class="filing-row"><span>${f.label}</span><span class="pill ${f.status==='filed'?'pill-success':'pill-progress'}">${f.status==='filed'?'● Filed':'◐ Submitted'}</span></div>`).join("")
+    : `<p style="color:var(--muted);font-size:13px;padding:10px 0">No filings yet for this business.</p>`;
+}
 
-/* ---------- Verification & Lookup ---------- */
+/* ---------- Verification & Lookup (business-scoped history) ---------- */
 const CHECKS = [
   { id:"tin", label:"TIN Verification", price:"₦1,000", placeholder:"e.g. 12345678-0001", automated:true },
   { id:"bvn", label:"BVN Verification", price:"₦1,000", placeholder:"11-digit BVN", automated:true },
@@ -935,12 +1127,6 @@ const CHECKS = [
     note:"High-value documents may require a manual review" },
 ];
 let activeCheck = null;
-let lookups = [
-  { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
-  { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
-];
-let verifications = lookups.map(l => ({ name: `${l.label} Result`, type:"Verification", date:`Checked ${l.when.split(",")[0]}` }));
-
 function renderVerifyList(){
   $("verifyList").innerHTML = CHECKS.map(c => `
     <div class="verify-item ${activeCheck===c.id?'active':''}" data-id="${c.id}">
@@ -974,34 +1160,22 @@ function runCheck(){
   $("verifyResult").textContent = resultText;
   $("verifyResult").classList.add("show");
   const when = "Just now, " + (c.automated ? "instant" : "pending review");
-  lookups.unshift({ label:c.label, result:resultText, when });
-  verifications.unshift({ name:`${c.label} Result`, type:"Verification", date:"Checked just now" });
+  biz().lookups.unshift({ label:c.label, result:resultText, when });
   renderLookups();
+  renderVault();
   toast(c.automated ? "Checked — saved to your Vault" : "Checked — sent for manual review");
 }
 function renderLookups(){
-  $("lookupHistory").innerHTML = lookups.map(l => `
+  $("lookupHistory").innerHTML = biz().lookups.map(l => `
     <div class="lookup-row"><span>${l.label} — ${l.result}</span><small>${l.when}</small></div>`).join("");
 }
-renderVerifyList();
-renderLookups();
 
-/* ---------- Trackers ---------- */
-// Note: CAC Annual Returns and Tax Clearance/PIT no longer live here as
-// pre-seeded rows - they're first-class statutory deadlines with real date
-// math in the Compliance Calendar below. "Licences & Documents" stays as a
-// selectable category for anything the built-in statutory list doesn't
-// cover (e.g. a state-specific permit).
-let trackers = [
-  { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
-  { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
-  { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
-  { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
-];
+/* ---------- Trackers (business-scoped) ---------- */
 const pillFor = { "due-soon":"pill-progress", "upcoming":"pill-neutral", "overdue":"pill-alert", "done":"pill-success" };
 const iconFor = { "Licences & Documents":"📜","Rent/Lease":"🏠","Insurance":"🛡️","Payroll":"👥","Supplier/Vendor":"📦","Loan Repayment":"💳","Other":"📌" };
 function renderTrackers(){
-  $("trackerList").innerHTML = trackers.map((t,i)=>`
+  const trackers = biz().trackers;
+  $("trackerList").innerHTML = trackers.length ? trackers.map((t,i)=>`
     <div class="card tracker-card">
       <div class="info"><b>${iconFor[t.cat]||"📌"} ${t.name}</b><small>${t.cat} · ${t.note}</small></div>
       <div style="display:flex;gap:10px;align-items:center">
@@ -1009,23 +1183,22 @@ function renderTrackers(){
         ${t.status!=='done' && t.fileable ? `<button class="btn btn-primary btn-sm" onclick="toast('Starting '+${JSON.stringify(t.name)}+'…')">File now</button>` : ""}
         ${t.status!=='done' && !t.fileable ? `<button class="btn btn-ghost btn-sm" onclick="markDone(${i})">Mark done</button>` : ""}
       </div>
-    </div>`).join("");
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No trackers yet for this business.</p>`;
 }
-function markDone(i){ trackers[i].status="done"; renderTrackers(); renderCalendar(); toast("Marked done — saved to your Vault"); }
+function markDone(i){ biz().trackers[i].status="done"; renderTrackers(); renderCalendar(); toast("Marked done — saved to your Vault"); }
 function toggleAddTracker(){ $("addTrackerForm").classList.toggle("show"); }
 function addTracker(){
   const name = $("trkName").value.trim();
   if(!name){ toast("Give it a name first"); return; }
-  trackers.unshift({ name, cat:$("trkCategory").value, status:"upcoming", statusLabel:"Upcoming", note:`Recurs ${$("trkRecur").value.toLowerCase()}`, fileable:$("trkCategory").value==="Licences & Documents" });
+  biz().trackers.unshift({ name, cat:$("trkCategory").value, status:"upcoming", statusLabel:"Upcoming", note:`Recurs ${$("trkRecur").value.toLowerCase()}`, fileable:$("trkCategory").value==="Licences & Documents" });
   $("trkName").value="";
   toggleAddTracker();
   renderTrackers();
   renderCalendar();
   toast("Tracker added — reminders scheduled");
 }
-renderTrackers();
 
-/* ---------- Compliance Calendar (unifies Trackers, Tax Suite, Registrations) ---------- */
+/* ---------- Compliance Calendar (statutory dates are business-agnostic; the Upcoming list's tracker rows are business-scoped) ---------- */
 function nextMonthlyDate(day){
   const now = new Date();
   let d = new Date(now.getFullYear(), now.getMonth(), day);
@@ -1076,19 +1249,16 @@ function renderCalendar(){
   calActionRefs = [];
   const statutory = buildStatutoryDeadlines();
 
-  // Next deadline hero
   const soonest = statutory.slice().sort((a,b)=>a.due-b.due)[0];
   const n = daysUntil(soonest.due);
   $("nextDeadlineFigure").innerHTML = `${daysLabel(n)} <small>${soonest.due.toLocaleDateString('en-NG',{day:'numeric',month:'short'})}</small>`;
   $("nextDeadlineName").textContent = soonest.name;
 
-  // This month + next month grids, so next month's items are visible too
   renderMonthGrid($("calGrid0"), $("calMonthLabel0"), 0, statutory);
   renderMonthGrid($("calGrid1"), $("calMonthLabel1"), 1, statutory);
 
-  // Merged upcoming list: statutory deadlines + open trackers
   const trackerDaysGuess = { "due-soon": 18, "overdue": 2, "upcoming": 45 };
-  const trackerItems = trackers
+  const trackerItems = biz().trackers
     .filter(t => t.status !== "done")
     .map(t => ({
       name: t.name, note: `Your Tracker · ${t.note}`, days: trackerDaysGuess[t.status] ?? 45, source: "tracker",
@@ -1109,9 +1279,8 @@ function renderCalendar(){
     </div>`;
   }).join("");
 }
-renderCalendar();
 
-/* ---------- Templates ---------- */
+/* ---------- Templates (business-scoped documents) ---------- */
 const TPL_LABELS = { business:"Business Agreement", tenancy:"Tenancy Agreement", freelance:"Freelance / Service Contract", loan:"Loan Agreement", sales:"Sales / Supplier Agreement", proposal:"Proposal / Quote" };
 const BASIC_FIELDS = {
   loan: ["Borrower & Lender names","Loan amount & currency","Repayment schedule","Signatures & date"],
@@ -1130,11 +1299,6 @@ const TPL_SUGGESTIONS = {
   proposal: ["Timeline","Optional add-ons"],
 };
 let selectedTpl = null;
-let docs = [
-  { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
-  { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
-  { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
-];
 
 document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll(".tpl-btn").forEach(x=>x.classList.remove("active"));
@@ -1149,7 +1313,7 @@ document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>
 
 function downloadBasic(){
   const label = TPL_LABELS[selectedTpl];
-  docs.unshift({ name: `${label} — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: selectedTpl === "loan" });
+  biz().docs.unshift({ name: `${label} — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: selectedTpl === "loan" });
   renderDocs();
   renderVault();
   toast("Standard document downloaded — saved to your Vault");
@@ -1169,21 +1333,22 @@ function suggestFields(){
 function generateImproved(){
   const label = TPL_LABELS[selectedTpl];
   const isHighValue = selectedTpl === "loan";
-  docs.unshift({ name: `${label} (Improved) — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: isHighValue });
+  biz().docs.unshift({ name: `${label} (Improved) — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: isHighValue });
   renderDocs();
   renderVault();
   toast("Improved document generated — saved to your Vault");
   downloadText(`${label.replace(/\s+/g,'-').toLowerCase()}-improved.txt`, `SellersPoint Docs — ${label} (Improved)\n\nStandard document, adjusted for what you told us.\nThis is a template for common situations, not a substitute for personalized legal advice.`);
 }
 function renderDocs(){
-  $("docList").innerHTML = docs.map(d=>`
+  const docs = biz().docs;
+  $("docList").innerHTML = docs.length ? docs.map(d=>`
     <div class="doc-row">
       <div class="info"><b>🧾 ${d.name}</b><small>${d.date}</small>${d.warn?'<span class="warn">ⓘ High-value — consider a professionally reviewed version</span>':''}</div>
       <div class="doc-actions">
         <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${d.name}')">Download</button>
         ${d.warn ? `<button class="btn btn-accent btn-sm" onclick="toast('Requesting expert review…')">Request expert review</button>` : `<button class="btn btn-ghost btn-sm" onclick="toast('Reopening the wizard with your prior answers')">Edit & regenerate</button>`}
       </div>
-    </div>`).join("");
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No documents yet for this business.</p>`;
 }
 function downloadText(filename, text){
   const blob = new Blob([text], { type: "text/plain" });
@@ -1192,17 +1357,15 @@ function downloadText(filename, text){
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
-renderDocs();
 
-/* ---------- Vault ---------- */
+/* ---------- Vault (business-scoped) ---------- */
 function vaultItems(){
-  const base = [
-    { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12 · Renews Jun 2027" },
-    { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · Renews Jul 2027" },
-    { name:"VAT Filing — June 2026", type:"Tax", date:"Filed Jul 15" },
-  ];
-  const fromDocs = docs.map(d=>({ name:d.name, type:"Template", date:`Created ${d.date}` }));
-  return base.concat(verifications).concat(fromDocs);
+  const b = biz();
+  const base = b.vaultExtra.slice();
+  const fromFilings = b.filingHistory.map(f=>({ name:f.label, type:"Tax", date:f.date }));
+  const fromVerify = b.lookups.map(l=>({ name:`${l.label} Result`, type:"Verification", date:`Checked ${l.when.split(",")[0]}` }));
+  const fromDocs = b.docs.map(d=>({ name:d.name, type:"Template", date:`Created ${d.date}` }));
+  return base.concat(fromFilings).concat(fromVerify).concat(fromDocs);
 }
 let activeFilter = "all";
 document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",()=>{
@@ -1225,8 +1388,9 @@ function renderVault(){
       </div>
     </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No documents match.</p>`;
 }
-renderVault();
-renderPayroll();
+
+/* ---------- Boot ---------- */
+renderAll();
 </script>
 </body>
 </html>

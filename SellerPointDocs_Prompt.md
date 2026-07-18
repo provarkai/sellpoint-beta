@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v9)
+# SellersPoint Docs — Product & Automation Brief (v10)
 
 ## 1. Product Overview
 
@@ -59,7 +59,7 @@ Every document from every fulfillment line lands here, organized by type and ren
 - **Existing SellersPoint core users** — cross-sell target for the Tax Suite (pulls their existing revenue data) and Proposal/Quote Generator.
 - **Graduating sellers** — Business Name → LLC upgrade, Trademark, SCUML, and recurring compliance as the anchor once registered.
 - **Any seller, registered or not** — Trackers isn't gated behind registration; rent/insurance/payroll renewals apply regardless.
-- **Consultants/accountants managing multiple SMEs** — not yet served (see Section 14, multi-business support).
+- **Consultants/accountants managing multiple SMEs, and sellers who simply run more than one business** — now served as of v10 via multi-business support (see Section 13a).
 
 ## 7. Automation Tiers
 
@@ -154,14 +154,29 @@ Each of these now computes its *actual next occurrence* from today's date (rolli
 
 **Ties three systems together, which is exactly the point:** it's the first surface where marking a tracker done, a VAT deadline, and a CAC Annual Return date all show up together, making the product feel like one system instead of several tools glued together.
 
+## 13a. Multi-Business Support (built in v10)
+
+**Why now, not later:** the core SellersPoint app itself started single-tenant and had to be substantially reworked to support multiple businesses per login — a retrofit, not a design choice. Docs is built multi-business from this point forward specifically to avoid repeating that migration pain, even though most sellers today only have one business.
+
+**Hard constraint carried through the whole data model:** a business's company registration is **one field, not two** — `regType` is either `"Business Name"` or `"Limited Liability Company"`, never both at once, and never rendered as two parallel registration cards. Registrations always renders exactly one Company Registration card per business, whose label follows that business's actual `regType`.
+
+**Architecture:**
+- Each business is a fully independent state bundle — registration status, Trademark status, SCUML status, setup progress/steps, alerts, Trackers, Templates/documents, Verification & Lookup history, Payroll employees, Invoices, current VAT figure, filing history, and Vault contents all live *inside* that business's record, not in a shared global store filtered by an "active business" flag. This was a deliberate choice over a shared-store-plus-filter model: it's what the core app's own migration proved is worth avoiding.
+- A sidebar business switcher lets the seller (or consultant) move between businesses at any time; switching re-renders every view against the newly active business and resets any mid-flow UI state (an in-progress Verification check, a Template selection) so nothing bleeds across businesses.
+- **What stays shared across all businesses, deliberately:** the Compliance Calendar's statutory deadline dates (VAT/PAYE/WHT/CAC/CIT/PIT recurrence rules) are Nigerian tax law, not business-specific data — they compute the same way regardless of which business is active. Only the *merged* Tracker rows inside the Calendar's upcoming list are per-business.
+- Adding a business is a first-class action from the switcher, not a settings-page afterthought — this is what makes the feature usable for a consultant onboarding a new client mid-session, not just for a seller who happens to run two shops.
+
+**What this unlocks:** the consultant/accountant-managing-multiple-SMEs persona (Section 6) moves from "not yet served" to served. It also quietly serves the more common case of a single seller who, e.g., runs a registered LLC for one line of business and a separate Business Name for a side venture — two different `regType` values under one login.
+
 ## 14. Feedback & Roadmap (not yet built — logged for future prioritization)
 
-Four further suggestions surfaced in review, not built in this pass:
+Three further suggestions surfaced in review, not built in this pass:
 
-- **TIN auto-fill across tools** — once a TIN is verified in the Verification tab, pre-fill it into the Tax Suite and Templates instead of asking the seller to re-enter it. Small implementation, but it's the difference between feeling like one dashboard vs. five separate tools.
-- **Business Health Score on Overview** — a composite signal ("Registrations 100%, Tax filings up to date, 2 documents expiring soon") giving a reason to check in even with nothing urgent pending, and a natural upsell trigger ("unlock auto-renewal reminders"). Overlaps conceptually with the Compliance Calendar — worth designing together rather than as two competing "why open the app" surfaces.
+- **TIN auto-fill across tools** — once a TIN is verified in the Verification tab, pre-fill it into the Tax Suite and Templates instead of asking the seller to re-enter it. Small implementation, but it's the difference between feeling like one dashboard vs. five separate tools. Now scoped per-business as of v10 (each business's verified TIN would pre-fill only within that business's context).
+- **Business Health Score on Overview** — a composite signal ("Registrations 100%, Tax filings up to date, 2 documents expiring soon") giving a reason to check in even with nothing urgent pending, and a natural upsell trigger ("unlock auto-renewal reminders"). Overlaps conceptually with the Compliance Calendar — worth designing together rather than as two competing "why open the app" surfaces. Would be computed per-business, with a switcher badge surfacing which businesses need attention.
 - **CAC Annual Return reminder + guided filing** — already partially addressed by the Licences & Documents tracker category and the Compliance Calendar's "File now" action; a fuller guided-filing wizard specifically for this flow is still open, and worth prioritizing since missed CAC annual returns is one of the most common ways small Nigerian businesses accidentally lapse into non-compliance.
-- **Multi-business/multi-entity support** — letting one login switch between multiple client businesses. Not needed for the primary seller persona, but significant for consultants/accountants managing several SMEs — a distinct user type worth a dedicated design pass rather than bolting onto the single-business dashboard.
+
+**Multi-business/multi-entity support — built in v10, see Section 13a.**
 
 ---
 
@@ -235,3 +250,5 @@ No new data model beyond the statutory recurrence rules themselves — this is a
 As of v8, the dashboard is no longer sketched in ASCII here — the product has grown enough (Tax Suite sub-tabs, PAYE calculator fields, payroll tables, payslip previews, e-invoicing forms, the Compliance Calendar) that a static text mockup would drift from the real thing almost immediately. `sellerspoint-docs-dashboard.html` in this repo is the live, clickable, single-source-of-truth reference — open it directly rather than reading a transcription. It implements every workflow above (A–E) end-to-end with mock data, and every seller-facing string in it has been checked against the "no partner names" guardrail in Section 8.
 
 **v9 note:** Templates no longer has a sidebar entry in the live file (see the positioning decision in Section 2) — find it via Overview's "New document" quick action or the Document Vault's "Create a document" prompt. The Compliance Calendar tab now uses real statutory recurrence math and a two-month grid instead of estimated day-counts.
+
+**v10 note:** the sidebar now opens with a business switcher above the nav. Every view (Overview, Registrations, Verification, Tax Suite, Trackers, Templates, Vault) renders against whichever business is currently active, and Registrations always shows a single Company Registration card matching that business's actual registration type — see Section 13a for the full data-model rationale.
