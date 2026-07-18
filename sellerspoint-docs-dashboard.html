@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellersPoint Docs — Dashboard Mockup</title>
+<meta name="description" content="Clickable dashboard mockup for SellersPoint Docs: Registrations, Tax Tools, Trackers, Templates, and the Document Vault.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#147D64;
+  --accent:#D36B2C;
+  --dark:#062E26;
+  --ink:#0e1f19;
+  --muted:#5b6a63;
+  --bg:#f6f8f6;
+  --surface:#ffffff;
+  --line:#e1e9e3;
+  --danger:#b42318;
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg);display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:8px}
+h1,h2,h3,p{margin:0}
+a{color:inherit;text-decoration:none}
+
+/* ===== Sidebar ===== */
+aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-direction:column;gap:6px}
+.brandmark{display:flex;align-items:center;gap:10px;padding:0 6px;margin-bottom:22px}
+.brand-icon{width:30px;height:34px;flex:0 0 auto}
+.brand-word{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.brand-word .w-point{color:var(--accent)}
+.nav-item{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#dfece4;padding:11px 14px;border-radius:8px;font-weight:700;font-size:14px}
+.nav-item:hover{background:#12281f}
+.nav-item.active{background:var(--primary);color:#fff}
+.nav-item .ic{font-size:15px}
+.back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
+.back-link:hover{color:#fff}
+
+/* ===== Main ===== */
+main{padding:32px 36px;overflow:auto}
+.view{display:none}
+.view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.view-header{margin-bottom:26px}
+.view-header h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
+.view-header p{color:var(--muted);margin-top:4px;font-size:14px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 6px 18px rgba(6,46,38,.04)}
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;height:40px;border-radius:8px;font-weight:800;font-size:13px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#116a54}
+.btn-ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-sm{height:32px;padding:0 12px;font-size:12px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pill-success{background:#e7f7ef;color:var(--primary)}
+.pill-progress{background:#fff4e8;color:var(--accent)}
+.pill-alert{background:#fff1f0;color:var(--danger)}
+.pill-neutral{background:#eef1ef;color:var(--muted)}
+
+/* Overview */
+.progress-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:14px 0}
+.progress-fill{height:100%;background:var(--primary)}
+.step-labels{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--muted)}
+.step-labels .done{color:var(--primary)}
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.alert-row:last-child{border-bottom:0}
+.alert-row .txt{font-size:14px;font-weight:600}
+.alert-row .txt b{display:block;font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px}
+.quick-actions{display:flex;gap:10px;flex-wrap:wrap}
+.vault-mini{display:grid;gap:10px}
+.vault-mini-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vault-mini-row:last-child{border-bottom:0}
+.vault-mini-row .tag{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase}
+
+/* Registration cards */
+.cat-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:22px 0 10px}
+.cat-title:first-child{margin-top:0}
+.reg-card{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.reg-card .info b{display:block;font-size:15px;font-weight:800}
+.reg-card .info small{color:var(--muted);font-size:12.5px}
+.reg-card + .reg-card{margin-top:10px}
+
+/* Tax tools */
+.calc-figure{font-size:34px;font-weight:800;color:var(--primary);margin:8px 0 4px}
+.filing-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.filing-row:last-child{border-bottom:0}
+.filing-row small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+
+/* Trackers */
+.tracker-card{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.tracker-card + .tracker-card{margin-top:10px}
+.tracker-card .info b{font-size:15px;font-weight:800;display:block}
+.tracker-card .info small{color:var(--muted);font-size:12.5px}
+.add-tracker-form{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+.add-tracker-form.show{display:grid}
+.add-tracker-form label{display:grid;gap:5px;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.add-tracker-form input,.add-tracker-form select{border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;font:inherit;background:#fbfcfb}
+.add-tracker-form .span2{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end}
+
+/* Templates */
+.tpl-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:760px){.tpl-picker{grid-template-columns:1fr 1fr}}
+.tpl-btn{padding:16px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-weight:800;font-size:13px;text-align:left}
+.tpl-btn:hover,.tpl-btn.active{border-color:var(--primary);color:var(--primary);background:#f0faf6}
+.ai-box textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;font:inherit;min-height:64px;resize:vertical;background:#fbfcfb}
+.suggest-list{display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:16px}
+.suggest-list.show{display:block}
+.suggest-item{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;font-weight:600}
+.suggest-item input{width:18px;height:18px;accent-color:var(--primary)}
+.ai-note{font-size:12px;color:var(--muted);margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.doc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.doc-row:last-child{border-bottom:0}
+.doc-row .info b{font-size:14px;font-weight:800;display:block}
+.doc-row .info small{color:var(--muted);font-size:12.5px}
+.doc-row .warn{display:block;color:var(--accent);font-size:12px;font-weight:700;margin-top:4px}
+.doc-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Vault */
+.vault-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+.vault-toolbar input{flex:1;min-width:200px;border:1.5px solid var(--line);border-radius:8px;padding:10px 14px;font:inherit;background:#fbfcfb}
+.filter-btn{padding:0 14px;height:38px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font-weight:800;font-size:12.5px}
+.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.vault-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);gap:14px;flex-wrap:wrap}
+.vault-row:last-child{border-bottom:0}
+.vault-row .info b{font-size:14px;font-weight:800;display:block}
+.vault-row .info small{color:var(--muted);font-size:12.5px}
+.vault-type{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px}
+.vt-registration{background:#e7f7ef;color:var(--primary)}
+.vt-tax{background:#eef1ef;color:var(--muted)}
+.vt-template{background:#fff4e8;color:var(--accent)}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.2s ease;z-index:100}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:820px){
+  body{grid-template-columns:1fr}
+  aside{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:12px;gap:8px;align-items:center}
+  .brandmark{margin-bottom:0}
+  .nav-item{white-space:nowrap}
+  .back-link{display:none}
+  main{padding:20px}
+}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" aria-hidden="true">
+  <symbol id="spIcon" viewBox="0 0 64 72">
+    <path d="M32 2C48.5 2 62 15 62 31c0 12-8 20-18 28.5L34 70c-1 1.3-3 1.3-4 0l-10-10.5C10 51 2 43 2 31 2 15 15.5 2 32 2Z" fill="#0c3b2d"/>
+    <path d="M62 31c0 12-8 20-18 28.5L34 70c-.6.8-1.5 1.1-2.4 1V2.1C48.2 2.6 62 15.5 62 31Z" fill="#1c9c7e" opacity=".55"/>
+    <path d="M18 54 32 70 22 58Z" fill="#D36B2C"/>
+    <text x="31" y="41" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-weight="800" font-size="30" fill="#ffffff">S</text>
+  </symbol>
+</svg>
+
+<aside>
+  <div class="brandmark">
+    <svg class="brand-icon" viewBox="0 0 64 72"><use href="#spIcon"/></svg>
+    <span class="brand-word">Sellers<span class="w-point">Point</span> <span style="font-weight:600;opacity:.7">Docs</span></span>
+  </div>
+  <nav>
+    <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
+    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Registrations</button>
+    <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
+    <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
+    <button class="nav-item" data-view="templates"><span class="ic">🧾</span> Templates</button>
+    <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault</button>
+  </nav>
+  <a class="back-link" href="#">← Back to main app</a>
+</aside>
+
+<main>
+
+  <!-- ===== OVERVIEW ===== -->
+  <section class="view active" id="view-overview">
+    <div class="view-header"><h1>Overview</h1><p>Everything about your business setup, in one place.</p></div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Your Business Setup</h3>
+        <div class="progress-track"><div class="progress-fill" style="width:50%"></div></div>
+        <div class="step-labels">
+          <span class="done">Business Name ✓</span><span class="done">TIN ✓</span><span>NAFDAC (in review)</span><span>LLC —</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Quick actions</h3>
+        <div class="quick-actions" style="margin-top:14px">
+          <button class="btn btn-primary" onclick="goto('tax')">Estimate my tax</button>
+          <button class="btn btn-ghost" onclick="goto('templates')">New proposal</button>
+          <button class="btn btn-ghost" onclick="goto('templates')">New contract</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Needs your attention</h3>
+        <div class="alert-row">
+          <div class="txt"><b>Action needed</b>NAFDAC partner requested a clearer product label photo</div>
+          <button class="btn btn-accent btn-sm" onclick="goto('registrations')">Upload</button>
+        </div>
+        <div class="alert-row">
+          <div class="txt"><b>Deadline</b>VAT filing due in 12 days</div>
+          <button class="btn btn-ghost btn-sm" onclick="goto('tax')">Estimate</button>
+        </div>
+        <div class="alert-row">
+          <div class="txt"><b>Reminder</b>Staff salary run due in 2 days</div>
+          <button class="btn btn-ghost btn-sm" onclick="goto('trackers')">View</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Recently in your Vault</h3>
+        <div class="vault-mini" style="margin-top:12px">
+          <div class="vault-mini-row"><span>📄 Business Name Certificate</span><span class="tag">Registration · Jun 12</span></div>
+          <div class="vault-mini-row"><span>🧾 Tenancy Agreement</span><span class="tag">Template · Jul 2</span></div>
+          <div class="vault-mini-row"><span>💰 VAT Estimate — June</span><span class="tag">Tax Tool · Jul 15</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REGISTRATIONS ===== -->
+  <section class="view" id="view-registrations">
+    <div class="view-header"><h1>Registrations</h1><p>Filed and tracked by our licensed partners. Status updates automatically.</p></div>
+
+    <div class="cat-title">Corporate & Legal · Partner A</div>
+    <div class="card reg-card">
+      <div class="info"><b>Business Name Registration</b><small>Certificate ready</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-success">● Approved</span><button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button></div>
+    </div>
+    <div class="card reg-card">
+      <div class="info"><b>LLC Incorporation</b><small>Submitted 3 days ago</small></div>
+      <span class="pill pill-progress">◐ Under Review</span>
+    </div>
+    <div class="card reg-card">
+      <div class="info"><b>Trademark Registration</b><small>Not started</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting Trademark application…')">Start</button></div>
+    </div>
+
+    <div class="cat-title">Tax & Regulatory · Partner B</div>
+    <div class="card reg-card">
+      <div class="info"><b>NAFDAC Registration</b><small>Clearer product label photo requested</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-alert">⚠ Action Needed</span><button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button></div>
+    </div>
+    <div class="card reg-card">
+      <div class="info"><b>TIN Verification</b><small>Verified and active</small></div>
+      <span class="pill pill-success">● Approved</span>
+    </div>
+    <div class="card reg-card">
+      <div class="info"><b>SCUML Registration</b><small>Not started</small></div>
+      <div style="display:flex;gap:10px;align-items:center"><span class="pill pill-neutral">○ Not Started</span><button class="btn btn-primary btn-sm" onclick="toast('Starting SCUML application…')">Start</button></div>
+    </div>
+  </section>
+
+  <!-- ===== TAX TOOLS ===== -->
+  <section class="view" id="view-tax">
+    <div class="view-header"><h1>Tax Tools</h1><p>Estimate what you owe, then hand it to Partner B to actually file.</p></div>
+    <div class="card">
+      <h3 style="font-size:15px;font-weight:800">Tax Calculator</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:4px">Pulling from your SellersPoint sales data automatically. Estimate only — not a filed position.</p>
+      <div class="calc-figure" id="vatFigure">₦42,300</div>
+      <small style="color:var(--muted)">Estimated VAT this month</small>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="recalc()">Recalculate</button>
+        <button class="btn btn-primary" onclick="fileWithPartner()">File this with our partner →</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Filing history</h3>
+      <div id="filingHistory" style="margin-top:10px">
+        <div class="filing-row"><span>VAT — June 2026<small>via Partner B</small></span><span class="pill pill-success">● Filed</span></div>
+        <div class="filing-row"><span>VAT — May 2026<small>via Partner B</small></span><span class="pill pill-success">● Filed</span></div>
+        <div class="filing-row"><span>CIT — 2025 Annual<small>via Partner B</small></span><span class="pill pill-progress">◐ Under Review</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TRACKERS ===== -->
+  <section class="view" id="view-trackers">
+    <div class="view-header"><h1>Trackers</h1><p>Anything with a due or renewal date — we'll remind you. No partner, no filing, just a nudge.</p></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-size:15px;font-weight:800">Your trackers</h3>
+        <button class="btn btn-primary btn-sm" onclick="toggleAddTracker()">+ Add a tracker</button>
+      </div>
+      <div class="add-tracker-form" id="addTrackerForm">
+        <label>Name<input id="trkName" placeholder="e.g. Shop Insurance"></label>
+        <label>Category
+          <select id="trkCategory"><option>Rent/Lease</option><option>Insurance</option><option>Payroll</option><option>Supplier/Vendor</option><option>Loan Repayment</option><option>Other</option></select>
+        </label>
+        <label>Due date<input id="trkDate" type="date"></label>
+        <label>Recurrence
+          <select id="trkRecur"><option>One-time</option><option>Monthly</option><option>Quarterly</option><option selected>Annually</option><option>Custom</option></select>
+        </label>
+        <div class="span2">
+          <button class="btn btn-ghost btn-sm" onclick="toggleAddTracker()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="addTracker()">Save tracker</button>
+        </div>
+      </div>
+    </div>
+    <div id="trackerList" style="margin-top:16px"></div>
+  </section>
+
+  <!-- ===== TEMPLATES ===== -->
+  <section class="view" id="view-templates">
+    <div class="view-header"><h1>Templates</h1><p>Fill it, download it, print it. No status tracking — these are yours the moment they're generated.</p></div>
+
+    <div class="card">
+      <h3 style="font-size:15px;font-weight:800">Create a document</h3>
+      <div class="tpl-picker" style="margin-top:14px" id="tplPicker">
+        <button class="tpl-btn" data-tpl="business">Business Agreement</button>
+        <button class="tpl-btn" data-tpl="tenancy">Tenancy Agreement</button>
+        <button class="tpl-btn" data-tpl="freelance">Freelance / Service</button>
+        <button class="tpl-btn" data-tpl="loan">Loan Agreement</button>
+        <button class="tpl-btn" data-tpl="sales">Sales / Supplier</button>
+        <button class="tpl-btn" data-tpl="proposal">Proposal / Quote</button>
+      </div>
+
+      <div class="ai-box" style="margin-top:18px;display:none" id="aiBox">
+        <label style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em">Describe the situation — AI will suggest what to include</label>
+        <textarea id="aiInput" placeholder="e.g. ₦500,000 to a supplier, repaid over 6 months, no collateral, monthly installments" style="margin-top:8px"></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <button class="btn btn-primary" onclick="suggestFields()">Suggest fields</button>
+        </div>
+        <div class="suggest-list" id="suggestList"></div>
+        <p class="ai-note">AI only selects from SellersPoint's pre-vetted clause library and assembles the fields you keep checked — it never drafts new legal language. (Demo preview — this mockup shows canned suggestions per template type.)</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Your documents</h3>
+      <div id="docList" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ===== VAULT ===== -->
+  <section class="view" id="view-vault">
+    <div class="view-header"><h1>Document Vault</h1><p>Everything from Registrations, Tax, and Templates — searchable in one place.</p></div>
+    <div class="card">
+      <div class="vault-toolbar">
+        <input id="vaultSearch" placeholder="Search documents…" oninput="renderVault()">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="Registration">Registration</button>
+        <button class="filter-btn" data-filter="Tax">Tax</button>
+        <button class="filter-btn" data-filter="Template">Template</button>
+      </div>
+      <div id="vaultList"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2400); }
+
+/* ---------- nav ---------- */
+function goto(view){
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.view===view));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id==="view-"+view));
+}
+document.querySelectorAll(".nav-item").forEach(n=>n.addEventListener("click",()=>goto(n.dataset.view)));
+
+/* ---------- Tax Tools ---------- */
+function recalc(){
+  const n = Math.round((30000 + Math.random()*40000)/100)*100;
+  $("vatFigure").textContent = "₦" + n.toLocaleString();
+  toast("Estimate updated from your latest sales data");
+}
+function fileWithPartner(){
+  const row = document.createElement("div");
+  row.className = "filing-row";
+  row.innerHTML = `<span>VAT — July 2026<small>via Partner B</small></span><span class="pill pill-progress">◐ Submitted</span>`;
+  $("filingHistory").prepend(row);
+  toast("Sent to Partner B for filing");
+}
+
+/* ---------- Trackers ---------- */
+let trackers = [
+  { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
+  { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
+  { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
+  { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
+];
+const pillFor = { "due-soon":"pill-progress", "upcoming":"pill-neutral", "overdue":"pill-alert", "done":"pill-success" };
+const iconFor = { "Rent/Lease":"🏠","Insurance":"🛡️","Payroll":"👥","Supplier/Vendor":"📦","Loan Repayment":"💳","Other":"📌" };
+function renderTrackers(){
+  $("trackerList").innerHTML = trackers.map((t,i)=>`
+    <div class="card tracker-card">
+      <div class="info"><b>${iconFor[t.cat]||"📌"} ${t.name}</b><small>${t.note}</small></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="pill ${pillFor[t.status]}">${t.status==='done'?'✓ Marked Done':t.statusLabel}</span>
+        ${t.status!=='done' ? `<button class="btn btn-ghost btn-sm" onclick="markDone(${i})">Mark done</button>` : ""}
+      </div>
+    </div>`).join("");
+}
+function markDone(i){ trackers[i].status="done"; renderTrackers(); toast("Marked done — saved to your Vault"); }
+function toggleAddTracker(){ $("addTrackerForm").classList.toggle("show"); }
+function addTracker(){
+  const name = $("trkName").value.trim();
+  if(!name){ toast("Give it a name first"); return; }
+  trackers.unshift({ name, cat:$("trkCategory").value, status:"upcoming", statusLabel:"Upcoming", note:`Recurs ${$("trkRecur").value.toLowerCase()}` });
+  $("trkName").value="";
+  toggleAddTracker();
+  renderTrackers();
+  toast("Tracker added — reminders scheduled");
+}
+renderTrackers();
+
+/* ---------- Templates ---------- */
+const TPL_LABELS = { business:"Business Agreement", tenancy:"Tenancy Agreement", freelance:"Freelance / Service Contract", loan:"Loan Agreement", sales:"Sales / Supplier Agreement", proposal:"Proposal / Quote" };
+const TPL_SUGGESTIONS = {
+  loan: ["Loan amount & currency","Repayment schedule (monthly installments)","Interest rate (optional — leave blank if none)","Collateral / security clause","Late payment penalty clause","Guarantor / co-signer details","Governing state / jurisdiction"],
+  tenancy: ["Property address & description","Rent amount & payment schedule","Lease duration & renewal terms","Security deposit","Maintenance responsibilities","Termination conditions"],
+  freelance: ["Scope of work","Payment terms & schedule","Deliverable deadlines","Revision policy","Confidentiality clause","Termination conditions"],
+  business: ["Parties & business purpose","Capital contribution","Profit/loss sharing","Roles & responsibilities","Decision-making process","Exit/dissolution terms"],
+  sales: ["Goods/services description","Price & payment terms","Delivery timeline","Warranty/returns policy","Late delivery penalty"],
+  proposal: ["Client & project summary","Scope of work","Pricing breakdown","Timeline","Validity period of this quote"],
+};
+let selectedTpl = null, tplComplete = { loan:true, tenancy:false, business:false, sales:false };
+let docs = [
+  { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
+  { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
+  { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
+];
+
+document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tpl-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  selectedTpl = b.dataset.tpl;
+  $("aiBox").style.display = "block";
+  $("suggestList").classList.remove("show");
+  $("aiInput").value = "";
+}));
+
+function suggestFields(){
+  if(!selectedTpl) return;
+  const fields = TPL_SUGGESTIONS[selectedTpl] || TPL_SUGGESTIONS.business;
+  $("suggestList").innerHTML = fields.map((f,i)=>`
+    <label class="suggest-item"><input type="checkbox" checked> ${f}</label>`).join("") +
+    `<div style="margin-top:14px"><button class="btn btn-primary" onclick="generateDoc()">Generate document →</button></div>`;
+  $("suggestList").classList.add("show");
+  toast("AI matched this to clauses from the vetted template library");
+}
+function generateDoc(){
+  const label = TPL_LABELS[selectedTpl];
+  const isHighValue = selectedTpl === "loan";
+  docs.unshift({ name: `${label} — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: isHighValue });
+  renderDocs();
+  renderVault();
+  toast("Document generated — saved to your Vault");
+  downloadText(`${label.replace(/\s+/g,'-').toLowerCase()}.txt`, `SellersPoint Docs — ${label}\n\nGenerated from your description and selected fields.\nThis is a template for common situations, not a substitute for personalized legal advice.`);
+}
+function renderDocs(){
+  $("docList").innerHTML = docs.map(d=>`
+    <div class="doc-row">
+      <div class="info"><b>🧾 ${d.name}</b><small>${d.date}</small>${d.warn?'<span class="warn">ⓘ High-value — consider a lawyer-reviewed version</span>':''}</div>
+      <div class="doc-actions">
+        <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${d.name}')">Download</button>
+        ${d.warn ? `<button class="btn btn-accent btn-sm" onclick="toast('Connecting you to Partner A…')">Talk to Partner A</button>` : `<button class="btn btn-ghost btn-sm" onclick="toast('Reopening the wizard with your prior answers')">Edit & regenerate</button>`}
+      </div>
+    </div>`).join("");
+}
+function downloadText(filename, text){
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+renderDocs();
+
+/* ---------- Vault ---------- */
+function vaultItems(){
+  const base = [
+    { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12 · Renews Jun 2027" },
+    { name:"VAT Filing — June 2026", type:"Tax", date:"Filed Jul 15" },
+  ];
+  const fromDocs = docs.map(d=>({ name:d.name, type:"Template", date:`Created ${d.date}` }));
+  return base.concat(fromDocs);
+}
+let activeFilter = "all";
+document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".filter-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  activeFilter = b.dataset.filter;
+  renderVault();
+}));
+function renderVault(){
+  const q = ($("vaultSearch").value||"").toLowerCase();
+  const typeClass = { Registration:"vt-registration", Tax:"vt-tax", Template:"vt-template" };
+  const items = vaultItems().filter(i => (activeFilter==="all"||i.type===activeFilter) && i.name.toLowerCase().includes(q));
+  $("vaultList").innerHTML = items.length ? items.map(i=>`
+    <div class="vault-row">
+      <div class="info"><b>${i.type==='Registration'?'📄':i.type==='Tax'?'💰':'🧾'} ${i.name}</b><small>${i.date}</small></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="vault-type ${typeClass[i.type]}">${i.type}</span>
+        <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${i.name}')">Download</button>
+      </div>
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No documents match.</p>`;
+}
+renderVault();
+</script>
+</body>
+</html>
