@@ -2341,6 +2341,47 @@ async function listAllPayments() {
   return rows.map(toPaymentJson);
 }
 
+// Full cross-tenant detail for one business - powers backend.html's "View
+// Details" panel. Reuses listStaff (same function the business's own
+// Settings > Team tab uses) rather than re-querying business_members here.
+async function getBusinessDetailForAdmin(businessId) {
+  const month = currentMonth();
+  const { rows } = await query(
+    `SELECT b.*,
+      (SELECT COUNT(*) FROM orders o WHERE o.business_id = b.id) AS order_count,
+      (SELECT COUNT(*) FROM customers c WHERE c.business_id = b.id) AS customer_count,
+      (SELECT COUNT(*) FROM products p WHERE p.business_id = b.id) AS product_count,
+      COALESCE((SELECT count FROM ai_usage a WHERE a.business_id = b.id AND a.month = $2), 0) AS ai_used,
+      COALESCE((SELECT COUNT(*)::int FROM addon_purchases ap WHERE ap.business_id = b.id AND ap.type = 'ai_credits' AND ap.month = $2), 0) AS ai_addon_count
+    FROM businesses b WHERE b.id = $1`,
+    [businessId, month]
+  );
+  const b = rows[0];
+  if (!b) throw new OrderError("Business not found");
+  const baseLimit = aiLimitFor(effectivePlan(b));
+  const aiLimit = baseLimit === Infinity ? null : baseLimit + Number(b.ai_addon_count) * ADDON_AI_CREDITS;
+
+  const [staff, paymentRows, activityRows] = await Promise.all([
+    listStaff(businessId),
+    query("SELECT * FROM payments WHERE business_id = $1 ORDER BY created_at DESC LIMIT 20", [businessId]),
+    query("SELECT * FROM audit_log WHERE business_id = $1 ORDER BY created_at DESC LIMIT 20", [businessId]),
+  ]);
+
+  return {
+    business: {
+      ...toBusinessJson(b),
+      orderCount: Number(b.order_count),
+      customerCount: Number(b.customer_count),
+      productCount: Number(b.product_count),
+      aiUsed: Number(b.ai_used),
+      aiLimit,
+    },
+    staff,
+    payments: paymentRows.rows.map(toPaymentJson),
+    activity: activityRows.rows.map((r) => ({ method: r.method, path: r.path, statusCode: r.status_code, createdAt: r.created_at })),
+  };
+}
+
 // --- Platform admins (who can access backend.html) --------------------------
 
 async function isPlatformAdmin(email) {
@@ -3003,6 +3044,7 @@ module.exports = {
   getPaymentByReference,
   listAllBusinesses,
   listAllPayments,
+  getBusinessDetailForAdmin,
   isPlatformAdmin,
   listPlatformAdmins,
   addPlatformAdmin,

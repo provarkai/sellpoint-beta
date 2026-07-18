@@ -13,6 +13,8 @@ let authToken = null;
 let myEmail = null;
 let confirmDeleteId = null;
 let expandedId = null;
+let businessDetails = {};
+let loadingDetailId = null;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const clean = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
 const date = (d) => { const x = new Date(d); return `${String(x.getDate()).padStart(2, "0")}-${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
@@ -46,14 +48,31 @@ async function loadAll() {
   platformAdmins = platformAdminsRes;
 }
 
-function businessDetailHtml(b) {
+// Comprehensive per-business panel shown under "View Details" - business
+// info, staff/team, payment history, and recent activity, all fetched from
+// GET /api/admin/businesses/:id (see db.js#getBusinessDetailForAdmin)
+// rather than the summary fields listAllBusinesses already has.
+function businessDetailHtml(id) {
+  if (loadingDetailId === id) return '<div class="item-details"><p class="meta">Loading...</p></div>';
+  const d = businessDetails[id];
+  if (!d) return '<div class="item-details"><p class="meta">Couldn\'t load details.</p></div>';
+  const b = d.business;
+  const staffRows = [d.staff.owner, ...d.staff.staff].filter(Boolean);
   return `<div class="item-details">
+    <div class="row"><span>Created</span><b>${dateTime(b.createdAt)}</b></div>
     <div class="row"><span>Phone</span><b>${clean(b.businessPhone || "-")}</b></div>
     <div class="row"><span>Address</span><b>${clean(b.businessAddress || "-")}</b></div>
     <div class="row"><span>Plan</span><b>${clean(b.plan)} (${clean(b.billingCycle || "monthly")})</b></div>
     <div class="row"><span>Plan expires</span><b>${b.planExpiresAt ? date(b.planExpiresAt) : "-"}</b></div>
     <div class="row"><span>Storefront</span><b>${b.storefrontEnabled ? "Enabled" : "Disabled"}${b.slug ? " - /store/" + clean(b.slug) : ""}</b></div>
+    <div class="row"><span>Products / Orders / Customers</span><b>${b.productCount} / ${b.orderCount} / ${b.customerCount}</b></div>
     <div class="row"><span>AI credits</span><b>${b.aiUsed}/${b.aiLimit === null ? "unlimited" : b.aiLimit} used this month</b></div>
+    <h3>Team (${staffRows.length})</h3>
+    ${staffRows.map((m) => `<div class="row"><span>${clean(m.email)} - ${clean(m.role)}</span><b>${dateTime(m.createdAt)}</b></div>`).join("") || '<p class="meta">No staff yet</p>'}
+    <h3>Payment history (${d.payments.length})</h3>
+    ${d.payments.map((p) => `<div class="row"><span>${clean(p.plan)} (${clean(p.billingCycle)}) - ${clean(p.status)}</span><b>${money(p.amount)} - ${dateTime(p.createdAt)}</b></div>`).join("") || '<p class="meta">No payments yet</p>'}
+    <h3>Recent activity (${d.activity.length})</h3>
+    ${d.activity.map((a) => `<div class="row"><span>${clean(a.method)} ${clean(a.path)}</span><b>${a.statusCode} - ${dateTime(a.createdAt)}</b></div>`).join("") || '<p class="meta">No activity yet</p>'}
   </div>`;
 }
 
@@ -65,14 +84,14 @@ function render() {
   $("businessList").innerHTML = businesses.map((b) => {
     const confirming = confirmDeleteId === b.id;
     const expanded = expandedId === b.id;
-    return '<div class="item"><div class="item-top"><strong>' + clean(b.businessName) + '</strong><span>' + clean(b.plan) + '</span></div><div class="meta">' + b.orderCount + ' orders, ' + b.customerCount + ' customers - joined ' + date(b.createdAt) + ' - AI ' + b.aiUsed + '/' + (b.aiLimit === null ? '∞' : b.aiLimit) + '</div>' +
-      (expanded ? businessDetailHtml(b) : '') +
+    return '<div class="item"><div class="item-top"><strong>' + clean(b.businessName) + '</strong><span>' + clean(b.plan) + '</span></div><div class="meta">' + b.orderCount + ' orders, ' + b.customerCount + ' customers - joined ' + dateTime(b.createdAt) + ' - AI ' + b.aiUsed + '/' + (b.aiLimit === null ? '∞' : b.aiLimit) + '</div>' +
+      (expanded ? businessDetailHtml(b.id) : '') +
       (confirming
         ? '<div class="item-actions"><input id="confirmDeleteInput" placeholder="Type \'' + clean(b.businessName) + '\' to confirm"><button class="danger" onclick="confirmDeleteBusiness(\'' + b.id + '\',' + JSON.stringify(b.businessName) + ')">Permanently Delete</button><button onclick="cancelDeleteBusiness()">Cancel</button></div>'
         : '<div class="item-actions"><button onclick="toggleBusinessDetail(\'' + b.id + '\')">' + (expanded ? 'Hide Details' : 'View Details') + '</button><button class="danger" onclick="startDeleteBusiness(\'' + b.id + '\')">Delete</button></div>') +
       '</div>';
   }).join("");
-  $("paymentLog").innerHTML = payments.slice(0, 20).map((p) => '<div class="item"><div class="item-top"><strong>' + clean(p.businessName) + '</strong><span>' + money(p.amount) + '</span></div><div class="meta">' + clean(p.plan) + ' (' + clean(p.billingCycle) + ') - ' + clean(p.status) + ' - ' + clean(p.reference) + ' - ' + date(p.createdAt) + '</div></div>').join("");
+  $("paymentLog").innerHTML = payments.slice(0, 20).map((p) => '<div class="item"><div class="item-top"><strong>' + clean(p.businessName) + '</strong><span>' + money(p.amount) + '</span></div><div class="meta">' + clean(p.plan) + ' (' + clean(p.billingCycle) + ') - ' + clean(p.status) + ' - ' + clean(p.reference) + ' - ' + dateTime(p.createdAt) + '</div></div>').join("");
   const EVENT_LABELS = { landing_view: "Landing page views", signup_completed: "Signups completed", storefront_view: "Storefront views", demo_started: "Demo starts", assessment_completed: "Assessments completed" };
   $("analyticsSummary").innerHTML = Object.keys(EVENT_LABELS).map((type) => {
     const found = (analytics.totals || []).find((t) => t.eventType === type);
@@ -100,7 +119,7 @@ function render() {
   $("platformAdminCount").textContent = `(${platformAdmins.length})`;
   $("platformAdminList").innerHTML = platformAdmins.map((a) => {
     const isMe = myEmail && a.email === myEmail;
-    return '<div class="item"><div class="item-top"><strong>' + clean(a.email) + '</strong>' + (isMe ? '<span class="meta">You</span>' : '') + '</div><div class="meta">Added ' + date(a.createdAt) + (a.addedBy ? ' by ' + clean(a.addedBy) : '') + '</div>' +
+    return '<div class="item"><div class="item-top"><strong>' + clean(a.email) + '</strong>' + (isMe ? '<span class="meta">You</span>' : '') + '</div><div class="meta">Added ' + dateTime(a.createdAt) + (a.addedBy ? ' by ' + clean(a.addedBy) : '') + '</div>' +
       (isMe ? '' : '<div class="item-actions"><button class="danger" onclick="removePlatformAdmin(' + JSON.stringify(a.email) + ')">Remove</button></div>') +
       '</div>';
   }).join("");
@@ -190,7 +209,21 @@ $("paymentExportCsv").onclick = () => downloadCsv(
   "payments.csv"
 );
 
-function toggleBusinessDetail(id) { expandedId = expandedId === id ? null : id; render(); }
+async function toggleBusinessDetail(id) {
+  if (expandedId === id) { expandedId = null; return render(); }
+  expandedId = id;
+  if (!businessDetails[id]) {
+    loadingDetailId = id;
+    render();
+    try {
+      businessDetails[id] = await api("GET", "/api/admin/businesses/" + id);
+    } catch (err) {
+      toast(err.message);
+    }
+    loadingDetailId = null;
+  }
+  render();
+}
 // Deletion is permanent and cascades through every product/customer/order/
 // staff account under the business (plus their login) - typing the exact
 // name is deliberate friction so this can't happen from a stray click,

@@ -1520,6 +1520,15 @@ app.get(
   handle(async (req, res) => res.json(await db.listAllBusinesses()))
 );
 
+// Comprehensive per-business view for backend.html's "View Details" panel -
+// business info, staff/team, payment history, and recent activity, all in
+// one call rather than the summary-only fields listAllBusinesses returns.
+app.get(
+  "/api/admin/businesses/:id",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.getBusinessDetailForAdmin(req.params.id)))
+);
+
 app.get(
   "/api/admin/payments",
   requirePlatformAdmin,
