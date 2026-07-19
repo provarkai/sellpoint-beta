@@ -1,0 +1,1520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellersPoint Docs — Dashboard Mockup</title>
+<meta name="description" content="Clickable dashboard mockup for SellersPoint Docs: Business Registration, Tax Tools, Trackers, Templates, and the Document Vault.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#147D64;
+  --accent:#D36B2C;
+  --dark:#062E26;
+  --ink:#0e1f19;
+  --muted:#5b6a63;
+  --bg:#f6f8f6;
+  --surface:#ffffff;
+  --line:#e1e9e3;
+  --danger:#b42318;
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg);display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:8px}
+h1,h2,h3,p{margin:0}
+a{color:inherit;text-decoration:none}
+
+/* ===== Sidebar ===== */
+aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-direction:column;gap:6px}
+.brandmark{display:flex;align-items:center;gap:10px;padding:0 6px;margin-bottom:16px}
+.brand-icon{width:30px;height:34px;flex:0 0 auto}
+.brand-word{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.brand-word .w-point{color:var(--accent)}
+.nav-item{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#dfece4;padding:11px 14px;border-radius:8px;font-weight:700;font-size:14px}
+.nav-item:hover{background:#12281f}
+.nav-item.active{background:var(--primary);color:#fff}
+.nav-item .ic{font-size:15px}
+.nav-item .lock{display:none;margin-left:auto;font-size:11px;opacity:.75}
+.nav-item.nav-locked{opacity:.55}
+.nav-item.nav-locked .lock{display:inline}
+.nav-item.nav-locked:hover{background:transparent;cursor:not-allowed}
+.nav-group-label{font-size:10.5px;font-weight:800;color:#7fa393;text-transform:uppercase;letter-spacing:.06em;padding:14px 14px 4px}
+.back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
+.back-link:hover{color:#fff}
+
+/* Business info (single business per login — see Section 13a) */
+.biz-static{display:grid;gap:1px;background:rgba(255,255,255,.07);padding:10px 12px;border-radius:8px;margin-bottom:16px}
+.biz-static b{font-size:13px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.biz-static small{font-size:11px;color:#9fc3b3;font-weight:700}
+
+/* ===== Main ===== */
+main{padding:32px 36px;overflow:auto}
+.view{display:none}
+.view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.view-header{margin-bottom:26px}
+.view-header h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
+.view-header p{color:var(--muted);margin-top:4px;font-size:14px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 6px 18px rgba(6,46,38,.04)}
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;height:40px;border-radius:8px;font-weight:800;font-size:13px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#116a54}
+.btn-ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-sm{height:32px;padding:0 12px;font-size:12px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.pill-success{background:#e7f7ef;color:var(--primary)}
+.pill-progress{background:#fff4e8;color:var(--accent)}
+.pill-alert{background:#fff1f0;color:var(--danger)}
+.pill-neutral{background:#eef1ef;color:var(--muted)}
+
+/* Overview */
+.progress-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:14px 0}
+.progress-fill{height:100%;background:var(--primary);transition:width .3s ease}
+.step-labels{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--muted);flex-wrap:wrap;gap:6px}
+.step-labels .done{color:var(--primary)}
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.alert-row:last-child{border-bottom:0}
+.alert-row .txt{font-size:14px;font-weight:600}
+.alert-row .txt b{display:block;font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px}
+.quick-actions{display:flex;gap:10px;flex-wrap:wrap}
+.vault-mini{display:grid;gap:10px}
+.vault-mini-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vault-mini-row:last-child{border-bottom:0}
+.vault-mini-row .tag{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase}
+
+/* Registration cards */
+.cat-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:22px 0 10px}
+.cat-title:first-child{margin-top:0}
+.reg-card{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.reg-card .info b{display:block;font-size:15px;font-weight:800}
+.reg-card .info small{color:var(--muted);font-size:12.5px}
+.reg-card + .reg-card{margin-top:10px}
+
+/* Tax tools */
+.calc-figure{font-size:34px;font-weight:800;color:var(--primary);margin:8px 0 4px}
+.filing-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.filing-row:last-child{border-bottom:0}
+.filing-row small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+
+/* Tax suite (Calculator, Payroll, Payslip, Certificate, E-Invoicing) */
+.tax-subnav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1.5px solid var(--line);padding-bottom:0}
+.tax-tab{display:flex;align-items:center;gap:7px;background:transparent;padding:11px 14px;font-weight:800;font-size:13px;color:var(--muted);border-radius:8px 8px 0 0;border-bottom:2.5px solid transparent;margin-bottom:-1.5px}
+.tax-tab:hover{color:var(--ink)}
+.tax-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tax-tab .pill{font-size:10px;padding:2px 7px}
+.tax-panel{display:none}
+.tax-panel.active{display:block;animation:fade .2s ease}
+
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.field-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:760px){.field-grid,.field-grid.cols-3{grid-template-columns:1fr}}
+.field{display:grid;gap:5px;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.field input,.field select{border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;background:#fbfcfb;text-transform:none;letter-spacing:normal;font-weight:600;color:var(--ink)}
+.field.span2{grid-column:1/-1}
+.field-hint{font-size:11px;color:var(--muted);font-weight:600;text-transform:none;letter-spacing:normal;margin-top:-2px}
+
+.toggle-row{display:flex;gap:8px;margin:14px 0}
+.toggle-btn{flex:1;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;font-weight:800;font-size:13px;background:#fff;color:var(--muted)}
+.toggle-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+.deduct-toggle{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px}
+.deduct-toggle summary{cursor:pointer;font-weight:800;font-size:13px;color:var(--primary);list-style:none}
+.deduct-toggle summary::-webkit-details-marker{display:none}
+.deduct-toggle summary::before{content:"+ ";}
+.deduct-toggle[open] summary::before{content:"− ";}
+
+.breakdown-card{margin-top:18px;background:#f0faf6;border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.breakdown-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:6px 0;border-bottom:1px dashed var(--line)}
+.breakdown-row:last-child{border-bottom:0}
+.breakdown-row.total{font-size:15px;color:var(--primary);border-top:1.5px solid var(--line);border-bottom:0;padding-top:10px;margin-top:4px}
+.breakdown-row .lbl small{display:block;color:var(--muted);font-weight:600;font-size:11px}
+.exempt-banner{background:#e7f7ef;color:var(--primary);border-radius:10px;padding:14px 16px;font-weight:800;font-size:13px;margin-top:16px}
+
+.emp-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+.emp-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;padding:0 10px 8px;border-bottom:1.5px solid var(--line)}
+.emp-table td{padding:11px 10px;border-bottom:1px solid var(--line);font-weight:700}
+.emp-table tr:last-child td{border-bottom:0}
+.emp-table .muted{color:var(--muted);font-weight:600}
+
+.payslip-preview{margin-top:18px;border:1.5px solid var(--line);border-radius:12px;padding:22px;background:#fff}
+.payslip-preview .ps-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--primary);padding-bottom:14px;margin-bottom:14px}
+.payslip-preview .ps-head b{font-size:17px;font-weight:800;display:block}
+.payslip-preview .ps-head small{color:var(--muted);font-size:12px}
+
+.invoice-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+.invoice-row:last-child{border-bottom:0}
+.invoice-row .info b{font-size:14px;font-weight:800;display:block}
+.invoice-row .info small{color:var(--muted);font-size:12px;font-family:monospace}
+
+.roadmap-step{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.roadmap-step:last-child{border-bottom:0}
+.roadmap-step .num{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+.roadmap-step b{font-size:14px;font-weight:800;display:block}
+.roadmap-step p{color:var(--muted);font-size:12.5px;margin-top:3px}
+
+/* Trackers */
+.tracker-card{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.tracker-card + .tracker-card{margin-top:10px}
+.tracker-card .info b{font-size:15px;font-weight:800;display:block}
+.tracker-card .info small{color:var(--muted);font-size:12.5px}
+.add-tracker-form{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+.add-tracker-form.show{display:grid}
+.add-tracker-form label{display:grid;gap:5px;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.add-tracker-form input,.add-tracker-form select{border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;font:inherit;background:#fbfcfb}
+.add-tracker-form .span2{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end}
+
+/* Templates */
+.tpl-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:760px){.tpl-picker{grid-template-columns:1fr 1fr}}
+.tpl-btn{padding:16px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-weight:800;font-size:13px;text-align:left}
+.tpl-btn:hover,.tpl-btn.active{border-color:var(--primary);color:var(--primary);background:#f0faf6}
+.ai-box textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;font:inherit;min-height:64px;resize:vertical;background:#fbfcfb}
+.suggest-list{display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:16px}
+.suggest-list.show{display:block}
+.suggest-item{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;font-weight:600}
+.suggest-item input{width:18px;height:18px;accent-color:var(--primary)}
+.ai-note{font-size:12px;color:var(--muted);margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.doc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.doc-row:last-child{border-bottom:0}
+.doc-row .info b{font-size:14px;font-weight:800;display:block}
+.doc-row .info small{color:var(--muted);font-size:12.5px}
+.doc-row .warn{display:block;color:var(--accent);font-size:12px;font-weight:700;margin-top:4px}
+.doc-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Vault */
+.vault-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+.vault-toolbar input{flex:1;min-width:200px;border:1.5px solid var(--line);border-radius:8px;padding:10px 14px;font:inherit;background:#fbfcfb}
+.filter-btn{padding:0 14px;height:38px;border:1.5px solid var(--line);border-radius:999px;background:#fff;font-weight:800;font-size:12.5px}
+.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.vault-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);gap:14px;flex-wrap:wrap}
+.vault-row:last-child{border-bottom:0}
+.vault-row .info b{font-size:14px;font-weight:800;display:block}
+.vault-row .info small{color:var(--muted);font-size:12.5px}
+.vault-type{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px}
+.vt-registration{background:#e7f7ef;color:var(--primary)}
+.vt-tax{background:#eef1ef;color:var(--muted)}
+.vt-template{background:#fff4e8;color:var(--accent)}
+.vt-verification{background:#fff4e8;color:var(--accent)}
+
+/* Escrow / congratulatory / bundle */
+.escrow-note{width:100%;font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;display:flex;align-items:center;gap:5px}
+.released-note{width:100%;font-size:12px;font-weight:700;color:var(--primary);margin-top:2px;display:flex;align-items:center;gap:5px}
+.congrats-banner{background:linear-gradient(135deg,rgba(20,125,100,.1),rgba(211,107,44,.08));border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px}
+.congrats-banner.hide{display:none}
+.congrats-banner p{font-size:14px;font-weight:700}
+.congrats-banner .dismiss{background:transparent;color:var(--muted);font-size:18px;font-weight:800;padding:0 6px;height:28px}
+.bundle-card{background:linear-gradient(135deg,rgba(20,125,100,.08),rgba(211,107,44,.08));border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.bundle-card .info b{display:block;font-size:15px;font-weight:800}
+.bundle-card .info small{color:var(--muted);font-size:12.5px;display:block;margin-top:2px}
+
+/* Verification */
+.verify-item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line);gap:14px;flex-wrap:wrap}
+.verify-item:last-child{border-bottom:0}
+.verify-item .info b{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.verify-item .info .note{display:block;color:var(--accent);font-size:12px;font-weight:700;margin-top:4px;max-width:420px}
+.verify-item .price{color:var(--muted);font-weight:700;font-size:13px;min-width:70px;text-align:right}
+.verify-item.active{background:#f0faf6;margin:0 -14px;padding:13px 14px;border-radius:10px}
+.verify-panel{display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:16px}
+.verify-panel.show{display:block}
+.verify-panel input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:10px 14px;font:inherit;background:#fbfcfb;margin:8px 0 12px}
+.verify-result{display:none;margin-top:14px;background:#f0faf6;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;font-weight:700;color:var(--primary)}
+.verify-result.show{display:block}
+.lookup-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.lookup-row:last-child{border-bottom:0}
+.lookup-row small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+
+/* WhatsApp */
+.wa-link{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);color:#eaf6f0;padding:11px 14px;border-radius:8px;font-weight:800;font-size:13px;margin:6px 0}
+.wa-link:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* Business Health Score */
+.health-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.health-score{font-size:28px;font-weight:800;color:var(--primary);white-space:nowrap}
+.health-score small{font-size:13px;font-weight:700;color:var(--muted)}
+.health-score.score-mid{color:var(--accent)}
+.health-score.score-low{color:var(--danger)}
+.health-bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:12px 0}
+.health-bar-fill{height:100%;background:var(--primary);transition:width .3s ease}
+.health-bar-fill.fill-mid{background:var(--accent)}
+.health-bar-fill.fill-low{background:var(--danger)}
+.health-checklist{display:grid;gap:9px;margin-top:2px}
+.health-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700}
+.health-item .lbl{display:flex;align-items:center;gap:8px}
+.health-item .ic{width:16px;text-align:center;flex:0 0 auto}
+.health-item.pass .ic{color:var(--primary)}
+.health-item.fail .ic{color:var(--muted)}
+
+/* Guided filing modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(6,46,38,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-box{position:relative;background:#fff;border-radius:14px;max-width:460px;width:100%;padding:26px;box-shadow:0 30px 70px rgba(0,0,0,.35);max-height:88vh;overflow:auto}
+.modal-box h2{font-size:17px;font-weight:800;padding-right:24px}
+.modal-x{position:absolute;top:16px;right:16px;background:transparent;color:var(--muted);font-size:20px;line-height:1;width:28px;height:28px;border-radius:6px}
+.modal-x:hover{color:var(--ink);background:var(--bg)}
+.modal-step-dots{display:flex;gap:6px;margin:16px 0}
+.modal-step-dots span{height:5px;flex:1;border-radius:99px;background:var(--line)}
+.modal-step-dots span.done{background:var(--primary)}
+.modal-review-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.modal-review-row:last-child{border-bottom:0}
+.modal-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px}
+.modal-radio{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-top:10px}
+
+/* Compliance Calendar */
+.cal-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-top:16px}
+@media(max-width:980px){.cal-layout{grid-template-columns:1fr}}
+.next-deadline{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.next-deadline .figure{font-size:34px;font-weight:800;color:var(--accent);margin:6px 0 2px}
+.next-deadline .figure small{font-size:14px;font-weight:700;color:var(--muted);margin-left:6px}
+.cal-months{display:flex;flex-direction:column;gap:22px}
+.cal-months .card + .card{position:relative}
+.cal-months .card + .card::before{content:"";position:absolute;top:-11px;left:20px;right:20px;border-top:1px dashed var(--line)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:14px}
+.cal-dow{font-size:10px;font-weight:800;color:var(--muted);text-align:center;text-transform:uppercase;padding-bottom:2px}
+.cal-cell{position:relative;aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink);background:#fbfcfb;border:1px solid var(--line);transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.cal-cell.empty{background:transparent;border-color:transparent}
+.cal-cell.today{border-color:var(--primary);color:var(--primary);background:#f0faf6}
+.cal-cell.has-deadline{cursor:pointer}
+.cal-cell.has-deadline:hover{border-color:var(--danger);background:#fff5f4;box-shadow:0 6px 16px rgba(180,35,24,.18);z-index:6}
+.cal-cell .dot{width:5px;height:5px;border-radius:50%;background:var(--danger)}
+.cal-tip{position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--dark);color:#eef8f1;padding:10px 12px;border-radius:8px;font-size:11.5px;font-weight:600;line-height:1.45;width:200px;text-align:left;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease,transform .15s ease;box-shadow:0 14px 30px rgba(0,0,0,.3);z-index:20}
+.cal-tip .tip-item b{display:block;font-size:11.5px;font-weight:800;color:#fff}
+.cal-tip .tip-item{color:#c7ddd2}
+.cal-tip .tip-item + .tip-item{margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.14)}
+.cal-cell.has-deadline:hover .cal-tip{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+.cal-legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted);font-weight:700}
+.cal-legend span{display:flex;align-items:center;gap:5px}
+.cal-legend .sw{width:8px;height:8px;border-radius:50%}
+.deadline-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.deadline-row:last-child{border-bottom:0}
+.deadline-row .info{min-width:0}
+.deadline-row .info b{font-size:14px;font-weight:800;display:block}
+.deadline-row .info small{color:var(--muted);font-size:12px}
+.deadline-row .action-col{display:flex;align-items:center;gap:10px;justify-self:end}
+.deadline-row .days{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.days-soon{background:#fff1f0;color:var(--danger)}
+.days-mid{background:#fff4e8;color:var(--accent)}
+.days-far{background:#eef1ef;color:var(--muted)}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.2s ease;z-index:100}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:820px){
+  body{grid-template-columns:1fr}
+  aside{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:12px;gap:8px;align-items:center}
+  .brandmark{margin-bottom:0}
+  .biz-static{margin-bottom:0;min-width:180px}
+  .nav-item{white-space:nowrap}
+  .back-link{display:none}
+  main{padding:20px}
+}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" aria-hidden="true">
+  <symbol id="spIcon" viewBox="0 0 64 72">
+    <path d="M32 2C48.5 2 62 15 62 31c0 12-8 20-18 28.5L34 70c-1 1.3-3 1.3-4 0l-10-10.5C10 51 2 43 2 31 2 15 15.5 2 32 2Z" fill="#0c3b2d"/>
+    <path d="M62 31c0 12-8 20-18 28.5L34 70c-.6.8-1.5 1.1-2.4 1V2.1C48.2 2.6 62 15.5 62 31Z" fill="#1c9c7e" opacity=".55"/>
+    <path d="M18 54 32 70 22 58Z" fill="#D36B2C"/>
+    <text x="31" y="41" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-weight="800" font-size="30" fill="#ffffff">S</text>
+  </symbol>
+</svg>
+
+<aside>
+  <div class="brandmark">
+    <svg class="brand-icon" viewBox="0 0 64 72"><use href="#spIcon"/></svg>
+    <span class="brand-word">Sellers<span class="w-point">Point</span> <span style="font-weight:600;opacity:.7">Docs</span></span>
+  </div>
+
+  <div class="biz-static" id="bizStatic">
+    <b id="bizCurrentName">—</b><small id="bizCurrentType">—</small>
+  </div>
+
+  <nav>
+    <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
+    <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
+    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
+    <div class="nav-group-label">Maintenance &amp; Compliance</div>
+    <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar <span class="lock">🔒</span></button>
+    <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools <span class="lock">🔒</span></button>
+    <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers <span class="lock">🔒</span></button>
+    <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault <span class="lock">🔒</span></button>
+  </nav>
+  <a class="wa-link" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order via WhatsApp</a>
+  <a class="back-link" href="#">← Back to main app</a>
+</aside>
+
+<main>
+
+  <!-- ===== OVERVIEW ===== -->
+  <section class="view active" id="view-overview">
+    <div class="view-header"><h1>Overview</h1><p>Everything about your business setup, in one place.</p></div>
+
+    <div class="congrats-banner hide" id="congratsBanner">
+      <p id="congratsText"></p>
+      <button class="dismiss" onclick="$('congratsBanner').classList.add('hide')">×</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Onboarding</h3>
+        <p style="color:var(--muted);font-size:12.5px;margin-top:2px">A one-time process — Business Registration through SCUML. Unlocks Tax Tools, Trackers, and Document Vault when done.</p>
+        <div class="progress-track"><div class="progress-fill" id="setupProgressFill" style="width:0%"></div></div>
+        <div class="step-labels" id="setupSteps"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Quick actions</h3>
+        <div class="quick-actions" style="margin-top:14px">
+          <button class="btn btn-primary" onclick="goto('calendar')">📅 View compliance calendar</button>
+          <button class="btn btn-ghost" onclick="goto('verification')">Verify a TIN/BVN/NIN</button>
+          <button class="btn btn-ghost" onclick="goto('tax')">Estimate my tax</button>
+          <button class="btn btn-ghost" onclick="goto('templates')">New document</button>
+          <a class="btn btn-ghost" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order on WhatsApp</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card health-card" style="margin-top:16px">
+      <div class="health-head">
+        <div>
+          <h3 style="font-size:15px;font-weight:800">Business Health Score</h3>
+          <p style="color:var(--muted);font-size:12.5px;margin-top:2px">How compliant and bank-ready this business is right now.</p>
+        </div>
+        <div class="health-score" id="healthScoreFigure">—</div>
+      </div>
+      <div class="health-bar"><div class="health-bar-fill" id="healthBarFill" style="width:0%"></div></div>
+      <div class="health-checklist" id="healthChecklist"></div>
+    </div>
+
+    <div class="card bundle-card" style="margin-top:16px">
+      <div class="info">
+        <b>📅 Everything due, in one place</b>
+        <small>VAT, Annual Returns, Tax Clearance, and your own reminders — see what's coming up next.</small>
+      </div>
+      <button class="btn btn-accent btn-sm" onclick="goto('calendar')">Open calendar</button>
+    </div>
+
+    <div class="card bundle-card" style="margin-top:16px">
+      <div class="info">
+        <b>💡 Save with the New Business Bundle</b>
+        <small>Business Registration (TIN included) + SCUML + 1 contract template + Tax Calculator access — bundled below individual pricing.</small>
+      </div>
+      <button class="btn btn-accent btn-sm" onclick="toast('Bundle pricing would open here')">View bundle</button>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Needs your attention</h3>
+        <div id="overviewAlerts"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Recently in your Vault</h3>
+        <div class="vault-mini" id="overviewVaultMini" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== COMPLIANCE CALENDAR ===== -->
+  <section class="view" id="view-calendar">
+    <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view — this month and next.</p></div>
+
+    <div class="cal-layout">
+      <div class="cal-col-left">
+        <div class="card next-deadline">
+          <div>
+            <h3 style="font-size:15px;font-weight:800">Next deadline</h3>
+            <div class="figure" id="nextDeadlineFigure">—</div>
+            <small style="color:var(--muted)" id="nextDeadlineName">Loading…</small>
+          </div>
+          <button class="btn btn-primary" onclick="goto('tax')">Go to Tax Tools →</button>
+        </div>
+
+        <div class="cal-months" style="margin-top:16px">
+          <div class="card">
+            <h3 style="font-size:15px;font-weight:800" id="calMonthLabel0">This month</h3>
+            <div class="cal-grid" id="calGrid0"></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size:15px;font-weight:800" id="calMonthLabel1">Next month</h3>
+            <div class="cal-grid" id="calGrid1"></div>
+          </div>
+        </div>
+        <div class="cal-legend" style="margin:12px 2px 0">
+          <span><span class="sw" style="background:var(--danger)"></span> Deadline</span>
+          <span><span class="sw" style="background:var(--primary)"></span> Today</span>
+        </div>
+      </div>
+
+      <div class="cal-col-right">
+        <div class="card">
+          <h3 style="font-size:15px;font-weight:800">Upcoming</h3>
+          <div id="calUpcoming" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REGISTRATIONS ===== -->
+  <section class="view" id="view-registrations">
+    <div class="view-header"><h1>Business Registration</h1><p>Filed and tracked for you. Payment is held until delivery — never released upfront.</p></div>
+
+    <div class="card bundle-card" style="margin-bottom:18px">
+      <div class="info"><b>💡 Buying more than one?</b><small>Bundle pricing beats paying for each service separately.</small></div>
+      <button class="btn btn-ghost btn-sm" onclick="toast('Bundle pricing would open here')">See bundle pricing</button>
+    </div>
+
+    <div class="cat-title">Business Registration — Business Name, Limited Liability Company, or Partnership: exactly one, never more than one at a time</div>
+    <div id="regPrimary"></div>
+
+    <div class="cat-title">Also available</div>
+    <div class="card" style="margin-bottom:10px;background:#f0faf6">
+      <p style="font-size:13px;font-weight:700;color:var(--dark)">🏦 Get this early — most Nigerian banks won't open a business account without your SCUML certificate. It's a one-time certificate issued by the EFCC, no renewal needed once approved — we recommend starting it right after your TIN.</p>
+    </div>
+    <div id="regScuml"></div>
+
+    <div class="card" style="margin-top:18px;background:#f0faf6;border-style:dashed">
+      <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those recur every year with real due dates — filing them keeps your business in good standing, but doesn't renew your registration certificate itself. See the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
+    </div>
+  </section>
+
+  <!-- ===== VERIFICATION ===== -->
+  <section class="view" id="view-verification">
+    <div class="view-header"><h1>Verification</h1><p>Quick checks — most results in under a minute.</p></div>
+    <div class="card">
+      <div id="verifyList"></div>
+      <div class="verify-panel" id="verifyPanel">
+        <label style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em" id="verifyLabel">Enter the number to check</label>
+        <p id="verifyTinNote" style="display:none;font-size:12px;font-weight:700;color:var(--primary);margin:2px 0 8px">✓ Auto-filled from your last verified TIN</p>
+        <input id="verifyInput" placeholder="e.g. 12345678901">
+        <button class="btn btn-primary" onclick="runCheck()">Run check</button>
+        <div class="verify-result" id="verifyResult"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Recent lookups</h3>
+      <div id="lookupHistory" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ===== TAX TOOLS ===== -->
+  <section class="view" id="view-tax">
+    <div class="view-header"><h1>Tax Tools</h1><p>PAYE, payroll, payslips and FIRS/NRS e-invoicing — built on the Nigeria Tax Act, 2025 (effective 1 Jan 2026). Estimates only — not a filed position.</p></div>
+
+    <div class="tax-subnav" id="taxSubnav">
+      <button class="tax-tab active" data-tax="calculator">🧮 Tax Calculator</button>
+      <button class="tax-tab" data-tax="vat">🧾 VAT</button>
+      <button class="tax-tab" data-tax="payroll">👥 Payroll <span class="pill pill-progress">Pro</span></button>
+      <button class="tax-tab" data-tax="payslip">📄 Payslip <span class="pill pill-progress">Pro</span></button>
+      <button class="tax-tab" data-tax="certificate">📜 Annual Certificate <span class="pill pill-progress">Pro</span></button>
+      <button class="tax-tab" data-tax="einvoice">🔗 E-Invoicing <span class="pill pill-progress">Pro</span></button>
+    </div>
+
+    <!-- ===== CALCULATOR (free) ===== -->
+    <div class="tax-panel active" id="tax-calculator">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">PAYE Calculator</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Under the Nigeria Tax Act 2025, the old Consolidated Relief Allowance is gone — this uses the current itemized deductions and Fourth Schedule bands.</p>
+
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="periodMonthly" onclick="setPeriod('monthly')">Monthly salary</button>
+          <button class="toggle-btn" id="periodAnnual" onclick="setPeriod('annual')">Annual salary</button>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">Gross salary (₦)<input id="calcGross" type="number" placeholder="e.g. 450000"></div>
+          <div class="field">Annual rent paid (₦)<input id="calcRent" type="number" placeholder="e.g. 1200000">
+            <span class="field-hint">Drives your rent relief — the main deduction under the new law</span>
+          </div>
+        </div>
+
+        <details class="deduct-toggle">
+          <summary>Add pension, NHF, NHIS, or other deductions</summary>
+          <div class="field-grid cols-3" style="margin-top:12px">
+            <div class="field">Pension contribution (₦/yr)<input id="calcPension" type="number" placeholder="0"></div>
+            <div class="field">NHF contribution (₦/yr)<input id="calcNHF" type="number" placeholder="0"></div>
+            <div class="field">NHIS contribution (₦/yr)<input id="calcNHIS" type="number" placeholder="0"></div>
+            <div class="field">Mortgage interest (₦/yr)<input id="calcMortgage" type="number" placeholder="0"></div>
+            <div class="field">Life insurance premium (₦/yr)<input id="calcLife" type="number" placeholder="0"></div>
+            <div class="field">National Minimum Wage (₦/mo)<input id="calcMinWage" type="number" value="70000">
+              <span class="field-hint">Editable — set by a separate Act, subject to change</span>
+            </div>
+          </div>
+        </details>
+
+        <div style="margin-top:16px"><button class="btn btn-primary" onclick="runCalc()">Calculate →</button></div>
+        <div id="calcResult"></div>
+      </div>
+    </div>
+
+    <!-- ===== VAT ===== -->
+    <div class="tax-panel" id="tax-vat">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">VAT Estimator</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Pulling from your SellersPoint sales data automatically. Estimate only — not a filed position.</p>
+        <div class="calc-figure" id="vatFigure">₦0</div>
+        <small style="color:var(--muted)">Estimated VAT this month</small>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-ghost" onclick="recalc()">Recalculate</button>
+          <button class="btn btn-primary" onclick="fileNow()">File this now →</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3 style="font-size:15px;font-weight:800">Filing history</h3>
+        <div id="filingHistory" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- ===== PAYROLL (paid) ===== -->
+    <div class="tax-panel" id="tax-payroll">
+      <div class="card" id="payrollCard">
+        <h3 style="font-size:15px;font-weight:800">Mini Payroll</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Add your staff once — net pay recalculates automatically under the current PAYE bands.</p>
+        <div class="field-grid cols-3" style="margin-top:14px">
+          <div class="field">Employee name<input id="empName" placeholder="e.g. Amaka Obi"></div>
+          <div class="field">Gross salary (₦/yr)<input id="empGross" type="number" placeholder="e.g. 4800000"></div>
+          <div class="field">Annual rent paid (₦)<input id="empRent" type="number" placeholder="e.g. 1000000"></div>
+        </div>
+        <div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="addEmployee()">+ Add Employee</button></div>
+        <table class="emp-table" id="empTable"><thead>
+          <tr><th>Name</th><th>Gross (yr)</th><th>Tax (yr)</th><th>Net (yr)</th><th></th></tr>
+        </thead><tbody id="empTableBody"></tbody></table>
+        <div class="breakdown-card" id="payrollSummary" style="display:none"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-ghost" onclick="toast('Payroll summary PDF exported')">Export Payroll Summary (PDF)</button>
+          <button class="btn btn-accent" onclick="toast('Payslips queued to send via WhatsApp')">Send Payslips via WhatsApp</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAYSLIP (paid) ===== -->
+    <div class="tax-panel" id="tax-payslip">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Payslip Generator</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Pick a staff member from Payroll to preview and export their payslip.</p>
+        <div class="field-grid" style="margin-top:14px">
+          <div class="field">Employee<select id="payslipEmpSelect" onchange="renderPayslip()"></select></div>
+          <div class="field">Company name<input id="payslipCompany" value="" oninput="renderPayslip()"></div>
+        </div>
+        <div id="payslipPreviewWrap"></div>
+      </div>
+    </div>
+
+    <!-- ===== ANNUAL CERTIFICATE (paid) ===== -->
+    <div class="tax-panel" id="tax-certificate">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">Annual Tax Certificate</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Auto-aggregates your Payroll data into a yearly summary — useful for loan, mortgage, or visa applications.</p>
+        <div id="certSummary" class="breakdown-card" style="margin-top:14px">
+          <p style="color:var(--muted);font-size:13px;font-weight:600">Add at least one employee in Payroll to generate a certificate.</p>
+        </div>
+        <div style="margin-top:16px"><button class="btn btn-primary" onclick="generateCertificate()">Generate Annual Certificate (PDF)</button></div>
+      </div>
+    </div>
+
+    <!-- ===== E-INVOICING (paid) ===== -->
+    <div class="tax-panel" id="tax-einvoice">
+      <div class="card">
+        <h3 style="font-size:15px;font-weight:800">NRS/FIRS E-Invoicing</h3>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">Nigeria's e-invoicing mandate (Merchant-Buyer Solution / Electronic Fiscal System) rolled out for large taxpayers from Nov 2025, with medium and small businesses phased in through 2026–2027. Every compliant invoice gets an FIRS/NRS-issued <b>Invoice Reference Number (IRN)</b>, a <b>Cryptographic Stamp (CSID)</b>, and a <b>QR code</b> before it reaches the buyer — B2B/B2G go through pre-clearance, B2C over ₦50,000 gets reported within 24 hours. Check current NRS guidance for your business's exact compliance deadline.</p>
+
+        <div class="field-grid cols-3" style="margin-top:14px">
+          <div class="field">Your TIN<input id="invSellerTin" placeholder="e.g. 12345678-0001"><small id="invTinNote" style="display:none;color:var(--primary);font-weight:700">✓ Auto-filled from Verification</small></div>
+          <div class="field">Buyer name<input id="invBuyerName" placeholder="e.g. Zenith Bank PLC"></div>
+          <div class="field">Buyer TIN<input id="invBuyerTin" placeholder="e.g. 98765432-0001"></div>
+          <div class="field span2">Description of goods/services<input id="invDesc" placeholder="e.g. Consulting services — July 2026"></div>
+          <div class="field">Amount (₦, excl. VAT)<input id="invAmount" type="number" placeholder="e.g. 500000"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" onclick="createInvoice()">Generate & Submit to NRS →</button></div>
+        <div id="invoiceHistory" style="margin-top:18px"></div>
+      </div>
+    </div>
+
+    <!-- ===== BUILD ROADMAP (dev notes card) ===== -->
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Build Order — Tax Tools Roadmap</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:4px">For internal/dev reference. Ship the free Tax Calculator first — as a web app it can go live the moment it's built, no app-store review to wait on — and it validates demand before the paid tier is built.</p>
+      <div style="margin-top:6px">
+        <div class="roadmap-step"><span class="num">1</span><div><b>PAYE calculation core</b><p>One reusable logic block (Section 30 deductions + Fourth Schedule bands + minimum wage exemption) — every other tool below calls this same function.</p></div></div>
+        <div class="roadmap-step"><span class="num">2</span><div><b>Free Tax Calculator</b><p>Gross + rent + optional deductions → net pay breakdown. Live on the web as soon as it's built, ad-supported.</p></div></div>
+        <div class="roadmap-step"><span class="num">3</span><div><b>Mini Payroll + Payslip</b><p>Multi-employee list reusing the core calc, plus a branded payslip PDF export. First paid tier — replaces manual Excel/accountant work for small business owners.</p></div></div>
+        <div class="roadmap-step"><span class="num">4</span><div><b>Annual Certificate</b><p>Lower-frequency, high-stakes-moment feature (loan/visa/mortgage applications) — a good candidate for a one-time unlock rather than subscription.</p></div></div>
+        <div class="roadmap-step"><span class="num">5</span><div><b>NRS/FIRS E-Invoicing</b><p>Highest build effort — needs UBL/Peppol BIS 3.0 formatting and a live NRS/Access Point Provider integration, not just a local calculation. Build last, once the calculator has real users to convert.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TRACKERS ===== -->
+  <section class="view" id="view-trackers">
+    <div class="view-header"><h1>Trackers</h1><p>Anything with a due or renewal date — we'll remind you. Licences & Documents can be filed straight from here; everything else is just a nudge.</p></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-size:15px;font-weight:800">Your trackers</h3>
+        <button class="btn btn-primary btn-sm" onclick="toggleAddTracker()">+ Add a tracker</button>
+      </div>
+      <div class="add-tracker-form" id="addTrackerForm">
+        <label>Name<input id="trkName" placeholder="e.g. Shop Insurance"></label>
+        <label>Category
+          <select id="trkCategory"><option>Licences & Documents</option><option>Rent/Lease</option><option>Insurance</option><option>Payroll</option><option>Supplier/Vendor</option><option>Loan Repayment</option><option>Other</option></select>
+        </label>
+        <label>Due date<input id="trkDate" type="date"></label>
+        <label>Recurrence
+          <select id="trkRecur"><option>One-time</option><option>Monthly</option><option>Quarterly</option><option selected>Annually</option><option>Custom</option></select>
+        </label>
+        <div class="span2">
+          <button class="btn btn-ghost btn-sm" onclick="toggleAddTracker()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="addTracker()">Save tracker</button>
+        </div>
+      </div>
+    </div>
+    <div id="trackerList" style="margin-top:16px"></div>
+  </section>
+
+  <!-- ===== TEMPLATES ===== -->
+  <section class="view" id="view-templates">
+    <div class="view-header"><h1>Templates</h1><p>Fill it, download it, print it. No status tracking — these are yours the moment they're generated.</p></div>
+
+    <div class="card">
+      <h3 style="font-size:15px;font-weight:800">Create a document</h3>
+      <div class="tpl-picker" style="margin-top:14px" id="tplPicker">
+        <button class="tpl-btn" data-tpl="business">Business Agreement</button>
+        <button class="tpl-btn" data-tpl="tenancy">Tenancy Agreement</button>
+        <button class="tpl-btn" data-tpl="freelance">Freelance / Service</button>
+        <button class="tpl-btn" data-tpl="loan">Loan Agreement</button>
+        <button class="tpl-btn" data-tpl="sales">Sales / Supplier</button>
+        <button class="tpl-btn" data-tpl="proposal">Proposal / Quote</button>
+      </div>
+
+      <div style="display:none;margin-top:18px;border-top:1px dashed var(--line);padding-top:16px" id="basicDoc">
+        <b id="basicDocLabel" style="font-size:15px;font-weight:800"></b>
+        <p style="color:var(--muted);font-size:13px;margin-top:4px">The standard version — fill it in and it's ready to use as-is.</p>
+        <div id="basicDocFields" style="margin-top:10px;display:grid;gap:6px;font-size:13px;font-weight:700"></div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="downloadBasic()">Fill in & download</button>
+
+        <div class="ai-box" style="margin-top:22px;border-top:1px dashed var(--line);padding-top:16px" id="aiBox">
+          <label style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em">Anything specific about your situation?</label>
+          <textarea id="aiInput" placeholder="e.g. There's a guarantor, and repayment is quarterly, not monthly" style="margin-top:8px"></textarea>
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <button class="btn btn-accent" onclick="suggestFields()">Improve it →</button>
+          </div>
+          <div class="suggest-list" id="suggestList"></div>
+          <p class="ai-note">AI adds or adjusts clauses from SellersPoint's pre-vetted clause library based on what you tell it — it never drafts new legal language. (Demo preview — this mockup shows canned suggestions per template type.)</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="font-size:15px;font-weight:800">Your documents</h3>
+      <div id="docList" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ===== VAULT ===== -->
+  <section class="view" id="view-vault">
+    <div class="view-header"><h1>Document Vault</h1><p>Everything from Business Registration, Tax, and Templates — searchable in one place.</p></div>
+    <div class="card bundle-card" style="margin-bottom:16px">
+      <div class="info"><b>🧾 Need a contract, tenancy agreement, or proposal?</b><small>Create a basic document instantly, no status tracking.</small></div>
+      <button class="btn btn-ghost btn-sm" onclick="goto('templates')">Create a document</button>
+    </div>
+    <div class="card">
+      <div class="vault-toolbar">
+        <input id="vaultSearch" placeholder="Search documents…" oninput="renderVault()">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="Registration">Registration</button>
+        <button class="filter-btn" data-filter="Tax">Tax</button>
+        <button class="filter-btn" data-filter="Verification">Verification</button>
+        <button class="filter-btn" data-filter="Template">Template</button>
+      </div>
+      <div id="vaultList"></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-overlay" id="cacWizardOverlay" onclick="if(event.target===this) closeCacWizard()">
+  <div class="modal-box">
+    <button class="modal-x" onclick="closeCacWizard()">×</button>
+    <h2>Guided CAC Annual Return Filing</h2>
+    <div class="modal-step-dots" id="cacStepDots"></div>
+    <div id="cacWizardBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2400); }
+
+/* ---------- nav ----------
+   Business Registration is a one-time process that ends at SCUML — until
+   that's done, the "Maintenance & Compliance" views (Compliance Calendar,
+   Tax Tools, Trackers, Document Vault) don't have anything real to operate
+   on (no TIN to file tax against, no certificates to store), so they stay
+   locked and redirect back to Business Registration instead of opening.
+   Verification is deliberately NOT gated here — it's a standalone service,
+   not an onboarding step: TIN already comes bundled with Business
+   Registration (see Section 2/3), so there's nothing to verify again on
+   the way in. Verification exists for other cases (a third party's TIN, a
+   business that registered elsewhere) and is usable any time. */
+const LOCKED_VIEWS = ["calendar", "tax", "trackers", "vault"];
+function isOnboardingComplete(){
+  const b = biz();
+  return b.regStatus === "approved" && b.scuml.status === "approved";
+}
+function renderNavLocks(){
+  const complete = isOnboardingComplete();
+  LOCKED_VIEWS.forEach(v=>{
+    const btn = document.querySelector('.nav-item[data-view="'+v+'"]');
+    if (btn) btn.classList.toggle("nav-locked", !complete);
+  });
+}
+function goto(view){
+  if (LOCKED_VIEWS.includes(view) && !isOnboardingComplete()){
+    toast("Finish Business Registration through SCUML to unlock this");
+    view = "registrations";
+  }
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.view===view));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id==="view-"+view));
+}
+document.querySelectorAll(".nav-item").forEach(n=>n.addEventListener("click",()=>goto(n.dataset.view)));
+
+/* ---------- Tax sub-nav ---------- */
+document.querySelectorAll(".tax-tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tax-tab").forEach(x=>x.classList.toggle("active", x===t));
+  document.querySelectorAll(".tax-panel").forEach(p=>p.classList.toggle("active", p.id==="tax-"+t.dataset.tax));
+}));
+
+/* ---------- PAYE core logic (Nigeria Tax Act 2025, Section 30 + Fourth Schedule) ---------- */
+const NTA_BANDS = [
+  { width:   800000, rate: 0.00 },
+  { width:  2200000, rate: 0.15 },
+  { width:  9000000, rate: 0.18 },
+  { width: 13000000, rate: 0.21 },
+  { width: 25000000, rate: 0.23 },
+  { width: Infinity, rate: 0.25 },
+];
+
+function calcPAYE({ gross, annualRent = 0, pension = 0, nhf = 0, nhis = 0, mortgage = 0, life = 0, minWageMonthly = 70000 }) {
+  gross = Number(gross) || 0;
+  const minWageAnnual = (Number(minWageMonthly) || 0) * 12;
+  if (gross > 0 && gross <= minWageAnnual) {
+    return { exempt: true, gross, tax: 0, net: gross, rentRelief: 0, totalDeductions: 0, chargeable: 0, breakdown: [] };
+  }
+  const rentRelief = Math.min((Number(annualRent) || 0) * 0.20, 500000);
+  const totalDeductions = rentRelief + (Number(pension)||0) + (Number(nhf)||0) + (Number(nhis)||0) + (Number(mortgage)||0) + (Number(life)||0);
+  const chargeable = Math.max(gross - totalDeductions, 0);
+
+  let remaining = chargeable, tax = 0;
+  const breakdown = [];
+  for (const band of NTA_BANDS) {
+    if (remaining <= 0) break;
+    const amt = Math.min(remaining, band.width);
+    const bandTax = amt * band.rate;
+    tax += bandTax;
+    if (amt > 0) breakdown.push({ amt, rate: band.rate, bandTax });
+    remaining -= amt;
+  }
+  const net = gross - tax - (Number(pension)||0) - (Number(nhf)||0) - (Number(nhis)||0);
+  return { exempt: false, gross, rentRelief, totalDeductions, chargeable, tax, net, breakdown };
+}
+function naira(n){ return "₦" + Math.round(n).toLocaleString(); }
+
+/* ---------- Calculator panel (business-agnostic free tool) ---------- */
+let calcPeriod = "monthly";
+function setPeriod(p){
+  calcPeriod = p;
+  $("periodMonthly").classList.toggle("active", p==="monthly");
+  $("periodAnnual").classList.toggle("active", p==="annual");
+}
+function runCalc(){
+  const rawGross = Number($("calcGross").value) || 0;
+  const gross = calcPeriod === "monthly" ? rawGross * 12 : rawGross;
+  const r = calcPAYE({
+    gross,
+    annualRent: $("calcRent").value,
+    pension: $("calcPension").value,
+    nhf: $("calcNHF").value,
+    nhis: $("calcNHIS").value,
+    mortgage: $("calcMortgage").value,
+    life: $("calcLife").value,
+    minWageMonthly: $("calcMinWage").value,
+  });
+  $("calcResult").innerHTML = renderBreakdown(r);
+}
+function renderBreakdown(r){
+  if (!r.gross) return "";
+  if (r.exempt) {
+    return `<div class="exempt-banner">✓ No tax due — annual income is at or below the National Minimum Wage, fully exempt under Section 58.</div>`;
+  }
+  const bandLabels = ["0% band","15% band","18% band","21% band","23% band","25% band"];
+  const bandRows = r.breakdown.map((b,i)=>`
+    <div class="breakdown-row"><span class="lbl">${bandLabels[i]}<small>${naira(b.amt)} × ${(b.rate*100).toFixed(0)}%</small></span><span>${naira(b.bandTax)}</span></div>`).join("");
+  return `
+    <div class="breakdown-card">
+      <div class="breakdown-row"><span>Gross income (yr)</span><span>${naira(r.gross)}</span></div>
+      <div class="breakdown-row"><span>Rent relief${r.rentRelief>=500000?" (capped)":""}</span><span>− ${naira(r.rentRelief)}</span></div>
+      <div class="breakdown-row"><span>Other eligible deductions</span><span>− ${naira(r.totalDeductions - r.rentRelief)}</span></div>
+      <div class="breakdown-row"><span>Chargeable income</span><span>${naira(r.chargeable)}</span></div>
+      ${bandRows}
+      <div class="breakdown-row total"><span>Annual tax</span><span>${naira(r.tax)}</span></div>
+      <div class="breakdown-row"><span>Monthly tax</span><span>${naira(r.tax/12)}</span></div>
+      <div class="breakdown-row total"><span>Net pay (yr)</span><span>${naira(r.net)}</span></div>
+      <div class="breakdown-row"><span>Net pay (mo)</span><span>${naira(r.net/12)}</span></div>
+    </div>`;
+}
+
+/* ============================================================
+   MULTI-BUSINESS DATA MODEL
+   Every business carries its own full state - registrations, trackers,
+   templates, verification history, payroll, VAT/filing history. The
+   registration choice is a single field (regType), one of "Business
+   Name", "Limited Liability Company", or "Partnership" — never more
+   than one at a time.
+   SCUML is ordered right after TIN in setupSteps since it's usually the
+   blocker for opening a business bank account. CAC Annual Returns is a
+   recurring compliance filing (see Compliance Calendar) - it does not
+   renew the Business Name / LLC / Partnership registration certificate.
+   This dashboard is scoped to one business per login (v13) — managing
+   several businesses under one login is now a Partner Sub-Account
+   capability on the admin backend, see sellerspoint-docs-admin.html.
+   ============================================================ */
+const BUSINESS = {
+  name: "Amina Fashion Hub", regType: "Business Name",
+  regStatus: "approved", regNote: "Certificate ready",
+  tinIssued: true, tin: "20304050-0002",
+  scuml: { status: "approved" },
+  alerts: [
+    { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
+    { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
+  ],
+  trackers: [
+    { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
+    { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
+    { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
+    { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
+  ],
+  docs: [
+    { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
+    { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
+    { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
+  ],
+  lookups: [
+    { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
+    { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
+  ],
+  employees: [
+    (function(){ const g=4800000, r=1200000; return { name:"Chidi Okafor", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+    (function(){ const g=3600000, r=900000; return { name:"Ngozi Eze", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+  ],
+  invoices: [],
+  vatFigure: 42300,
+  filingHistory: [
+    { label:"VAT — June 2026", status:"filed", date:"Filed Jul 15" },
+    { label:"VAT — May 2026", status:"filed", date:"Filed Jun 15" },
+  ],
+  vaultExtra: [
+    { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12" },
+    { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · One-time, EFCC-issued — no renewal" },
+  ],
+};
+function biz(){ return BUSINESS; }
+function renderBizInfo(){
+  $("bizCurrentName").textContent = BUSINESS.name;
+  $("bizCurrentType").textContent = BUSINESS.regType;
+}
+function renderAll(){
+  renderBizInfo();
+  renderNavLocks();
+  renderOverview();
+  renderHealthScore();
+  renderRegistrations();
+  renderVerifyList(); renderLookups();
+  $("vatFigure").textContent = naira(biz().vatFigure);
+  renderFilingHistory();
+  renderPayroll();
+  renderInvoices();
+  applyTinAutofill();
+  renderTrackers();
+  renderCalendar();
+  renderDocs();
+  renderVault();
+}
+function applyTinAutofill(){
+  const tin = biz().tin;
+  if ($("invSellerTin")){
+    $("invSellerTin").value = tin || "";
+    $("invTinNote").style.display = tin ? "block" : "none";
+  }
+}
+
+/* ---------- Overview (per business) ---------- */
+function stepLabel(name, status){
+  const suffix = status==="approved" ? " ✓" : status==="review" ? " (in review)" : status==="action-needed" ? " (action needed)" : " —";
+  return name + suffix;
+}
+function computeOnboardingSteps(b){
+  const steps = [
+    { text: stepLabel(b.regType, b.regStatus), done: b.regStatus==="approved" },
+    { text: stepLabel("TIN", b.tinIssued ? "approved" : "not-started"), done: !!b.tinIssued },
+    { text: stepLabel("SCUML", b.scuml.status), done: b.scuml.status==="approved" },
+  ];
+  const progress = Math.round((steps.filter(s=>s.done).length/steps.length)*100);
+  return { steps, progress };
+}
+function renderOverview(){
+  const b = biz();
+  const { steps, progress } = computeOnboardingSteps(b);
+  $("setupProgressFill").style.width = progress + "%";
+  $("setupSteps").innerHTML = steps.map(s=>`<span class="${s.done?'done':''}">${s.text}</span>`).join("");
+  const banner = $("congratsBanner");
+  const congrats = isOnboardingComplete() ? "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account, your onboarding is complete, and Tax Tools, Trackers, and Document Vault are now unlocked. You've earned the Verified Business badge." : "";
+  if (congrats){ $("congratsText").textContent = congrats; banner.classList.remove("hide"); }
+  else { banner.classList.add("hide"); }
+  $("overviewAlerts").innerHTML = b.alerts.length ? b.alerts.map(a=>`
+    <div class="alert-row">
+      <div class="txt"><b>${a.title}</b>${a.text}</div>
+      <button class="btn ${a.title==='Action needed'?'btn-accent':'btn-ghost'} btn-sm" onclick="goto('${a.view}')">${a.action}</button>
+    </div>`).join("") : `<p style="color:var(--muted);font-size:13px;padding:14px 0">Nothing needs your attention right now.</p>`;
+  const recent = vaultItems().slice(0,3);
+  $("overviewVaultMini").innerHTML = recent.length ? recent.map(i=>{
+    const icon = i.type==='Registration'?'📄':i.type==='Tax'?'💰':i.type==='Verification'?'🔍':'🧾';
+    return `<div class="vault-mini-row"><span>${icon} ${i.name}</span><span class="tag">${i.type} · ${i.date.replace(/^(Issued|Filed|Checked|Created)\s/,'')}</span></div>`;
+  }).join("") : `<p style="color:var(--muted);font-size:13px;padding:8px 0">Nothing here yet.</p>`;
+}
+
+/* ---------- Business Health Score (per business, computed from live state) ---------- */
+function computeHealthChecks(b){
+  return [
+    { label:"Registration approved", pass: b.regStatus==="approved", view:"registrations" },
+    { label:"SCUML certificate (bank-ready)", pass: b.scuml.status==="approved", view:"registrations" },
+    { label:"TIN verified", pass: !!b.tin, view:"verification" },
+    { label:"No overdue trackers", pass: !b.trackers.some(t=>t.status==="overdue"), view:"trackers" },
+    { label:"VAT filings up to date", pass: b.filingHistory.length>0 && b.filingHistory[0].status==="filed", view:"tax" },
+  ];
+}
+function renderHealthScore(){
+  const b = biz();
+  const checks = computeHealthChecks(b);
+  const passed = checks.filter(c=>c.pass).length;
+  const score = Math.round((passed/checks.length)*100);
+  const cls = score>=80 ? "" : score>=50 ? "score-mid" : "score-low";
+  const fillCls = score>=80 ? "" : score>=50 ? "fill-mid" : "fill-low";
+  $("healthScoreFigure").innerHTML = `${score}<small>/100</small>`;
+  $("healthScoreFigure").className = "health-score " + cls;
+  $("healthBarFill").style.width = score + "%";
+  $("healthBarFill").className = "health-bar-fill " + fillCls;
+  $("healthChecklist").innerHTML = checks.map(c => `
+    <div class="health-item ${c.pass?'pass':'fail'}">
+      <span class="lbl"><span class="ic">${c.pass?'✓':'○'}</span> ${c.label}</span>
+      ${c.pass ? "" : `<button class="btn btn-ghost btn-sm" onclick="goto('${c.view}')">Fix</button>`}
+    </div>`).join("");
+}
+
+/* ---------- Business Registration (single card: Business Name, LLC, or Partnership) ---------- */
+const REG_STATUS_PILL = {
+  approved: { cls:"pill-success", label:"● Approved" },
+  review: { cls:"pill-progress", label:"◐ Under Review" },
+  "action-needed": { cls:"pill-alert", label:"⚠ Action Needed" },
+  "not-started": { cls:"pill-neutral", label:"○ Not Started" },
+};
+function regCardHtml(name, status, note, opts){
+  opts = opts || {};
+  const p = REG_STATUS_PILL[status];
+  const btn = status==="approved" ? `<button class="btn btn-ghost btn-sm" onclick="toast('Opening certificate…')">View</button>`
+    : status==="not-started" ? `<button class="btn btn-primary btn-sm" onclick="toast('Starting ${name} application…')">Start</button>`
+    : status==="action-needed" ? `<button class="btn btn-accent btn-sm" onclick="toast('Upload flow would open here')">Upload</button>`
+    : ``;
+  const extraNote = status==="approved" ? `<div class="released-note">✓ Payment released</div>`
+    : (status==="review"||status==="action-needed") ? `<div class="escrow-note">💳 Payment held — releases when certificate arrives</div>` : "";
+  return `<div class="card reg-card">
+    <div class="info"><b>${name}${opts.celebrate && status==='approved' ? ' 🎉' : ''}</b><small>${note}</small></div>
+    <div style="display:flex;gap:10px;align-items:center"><span class="pill ${p.cls}">${p.label}</span>${btn}</div>
+    ${extraNote}
+  </div>`;
+}
+function renderRegistrations(){
+  const b = biz();
+  $("regPrimary").innerHTML = regCardHtml(b.regType + " Registration", b.regStatus, b.regNote);
+  $("regScuml").innerHTML = regCardHtml("SCUML Registration", b.scuml.status, b.scuml.status==="approved" ? "Certificate ready" : b.scuml.status==="not-started" ? "Not started" : (b.scuml.note || "In progress"), { celebrate: b.scuml.status==="approved" });
+}
+
+/* ---------- Payroll panel (business-scoped) ---------- */
+function addEmployee(){
+  const name = $("empName").value.trim();
+  const gross = Number($("empGross").value) || 0;
+  const rent = Number($("empRent").value) || 0;
+  if (!name || !gross) { toast("Enter a name and gross salary first"); return; }
+  const r = calcPAYE({ gross, annualRent: rent });
+  biz().employees.push({ name, gross, rent, ...r });
+  $("empName").value = ""; $("empGross").value = ""; $("empRent").value = "";
+  renderPayroll();
+  toast(`${name} added to payroll`);
+}
+function removeEmployee(i){ biz().employees.splice(i,1); renderPayroll(); }
+function renderPayroll(){
+  const employees = biz().employees;
+  $("empTableBody").innerHTML = employees.map((e,i)=>`
+    <tr><td>${e.name}</td><td>${naira(e.gross)}</td><td>${e.exempt?"Exempt":naira(e.tax)}</td><td>${naira(e.net)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="removeEmployee(${i})">Remove</button></td></tr>`).join("")
+    || `<tr><td colspan="5" class="muted">No employees added yet.</td></tr>`;
+  const sum = $("payrollSummary");
+  if (employees.length){
+    const totGross = employees.reduce((s,e)=>s+e.gross,0);
+    const totTax = employees.reduce((s,e)=>s+e.tax,0);
+    const totNet = employees.reduce((s,e)=>s+e.net,0);
+    sum.style.display = "block";
+    sum.innerHTML = `
+      <div class="breakdown-row"><span>Total employees</span><span>${employees.length}</span></div>
+      <div class="breakdown-row"><span>Total gross payroll (yr)</span><span>${naira(totGross)}</span></div>
+      <div class="breakdown-row"><span>Total tax remitted (yr)</span><span>${naira(totTax)}</span></div>
+      <div class="breakdown-row total"><span>Total net payroll (yr)</span><span>${naira(totNet)}</span></div>`;
+  } else { sum.style.display = "none"; }
+  renderPayslipSelect();
+}
+function renderPayslipSelect(){
+  const sel = $("payslipEmpSelect");
+  if (!sel) return;
+  const employees = biz().employees;
+  sel.innerHTML = employees.length
+    ? employees.map((e,i)=>`<option value="${i}">${e.name}</option>`).join("")
+    : `<option value="">Add an employee in Payroll first</option>`;
+  if (!$("payslipCompany").value) $("payslipCompany").value = biz().name;
+  renderPayslip();
+}
+
+/* ---------- Payslip panel ---------- */
+function renderPayslip(){
+  const wrap = $("payslipPreviewWrap");
+  const idx = $("payslipEmpSelect") ? $("payslipEmpSelect").value : "";
+  const employees = biz().employees;
+  if (idx === "" || !employees[idx]) { wrap.innerHTML = ""; return; }
+  const e = employees[idx];
+  const company = $("payslipCompany").value || biz().name;
+  wrap.innerHTML = `
+    <div class="payslip-preview">
+      <div class="ps-head">
+        <div><b>${company}</b><small>Payslip — ${new Date().toLocaleString('en-NG',{month:'long',year:'numeric'})}</small></div>
+        <div style="text-align:right"><b>${e.name}</b><small>Pay period: Monthly</small></div>
+      </div>
+      ${renderBreakdown(e)}
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-ghost btn-sm" onclick="toast('Payslip PDF downloaded')">Download PDF</button>
+        <button class="btn btn-accent btn-sm" onclick="toast('Payslip sent via WhatsApp')">Send via WhatsApp</button>
+      </div>
+    </div>`;
+}
+
+/* ---------- Annual Certificate panel ---------- */
+function generateCertificate(){
+  const employees = biz().employees;
+  if (!employees.length) { toast("Add at least one employee in Payroll first"); return; }
+  const totGross = employees.reduce((s,e)=>s+e.gross,0);
+  const totTax = employees.reduce((s,e)=>s+e.tax,0);
+  $("certSummary").innerHTML = `
+    <div class="breakdown-row"><span>Total gross income (yr)</span><span>${naira(totGross)}</span></div>
+    <div class="breakdown-row"><span>Total tax paid (yr)</span><span>${naira(totTax)}</span></div>
+    <div class="breakdown-row total"><span>Employees covered</span><span>${employees.length}</span></div>`;
+  toast("Annual Tax Certificate PDF generated");
+}
+
+/* ---------- E-Invoicing panel (business-scoped) ---------- */
+function createInvoice(){
+  const buyer = $("invBuyerName").value.trim();
+  const amount = Number($("invAmount").value) || 0;
+  if (!buyer || !amount) { toast("Enter buyer name and amount first"); return; }
+  const vat = amount * 0.075;
+  const irn = "IRN-" + Math.random().toString(36).slice(2,8).toUpperCase();
+  const csid = "CSID-" + Math.random().toString(36).slice(2,10).toUpperCase();
+  biz().invoices.unshift({ buyer, amount, vat, irn, csid, when: new Date().toLocaleDateString('en-NG',{day:'numeric',month:'short'}) });
+  $("invBuyerName").value = ""; $("invAmount").value = ""; $("invDesc").value = "";
+  renderInvoices();
+  toast("Invoice validated — IRN and QR code issued");
+}
+function renderInvoices(){
+  $("invoiceHistory").innerHTML = biz().invoices.map(inv => `
+    <div class="invoice-row">
+      <div class="info"><b>${inv.buyer} — ${naira(inv.amount + inv.vat)} (incl. VAT)</b><small>${inv.irn} · ${inv.csid} · ${inv.when}</small></div>
+      <span class="pill pill-success">● Validated by NRS</span>
+    </div>`).join("");
+}
+
+/* ---------- Tax Tools: VAT (business-scoped) ---------- */
+function recalc(){
+  const n = Math.round((30000 + Math.random()*40000)/100)*100;
+  biz().vatFigure = n;
+  $("vatFigure").textContent = naira(n);
+  toast("Estimate updated from your latest sales data");
+}
+function fileNow(){
+  biz().filingHistory.unshift({ label:"VAT — July 2026", status:"submitted", date:"Submitted just now" });
+  renderFilingHistory();
+  toast("Sent for filing");
+}
+function renderFilingHistory(){
+  const rows = biz().filingHistory;
+  $("filingHistory").innerHTML = rows.length ? rows.map(f=>`
+    <div class="filing-row"><span>${f.label}</span><span class="pill ${f.status==='filed'?'pill-success':'pill-progress'}">${f.status==='filed'?'● Filed':'◐ Submitted'}</span></div>`).join("")
+    : `<p style="color:var(--muted);font-size:13px;padding:10px 0">No filings yet for this business.</p>`;
+}
+
+/* ---------- Verification & Lookup (business-scoped history) ---------- */
+const CHECKS = [
+  { id:"tin", label:"TIN Verification", price:"₦1,000", placeholder:"e.g. 12345678-0001", automated:true },
+  { id:"bvn", label:"BVN Verification", price:"₦1,000", placeholder:"11-digit BVN", automated:true },
+  { id:"nin", label:"NIN Verification", price:"₦1,000", placeholder:"11-digit NIN", automated:true },
+  { id:"cacname", label:"Business Name Availability", price:"₦1,000", placeholder:"e.g. Amina Fashion Hub", automated:true },
+  { id:"cacstatus", label:"Business Status Check", price:"₦1,000", placeholder:"CAC/RC number", automated:true },
+  { id:"authenticity", label:"Document Authenticity Check", price:"₦2,000", placeholder:"Certificate/reference number", automated:false,
+    note:"High-value documents may require a manual review" },
+];
+let activeCheck = null;
+function renderVerifyList(){
+  $("verifyList").innerHTML = CHECKS.map(c => `
+    <div class="verify-item ${activeCheck===c.id?'active':''}" data-id="${c.id}">
+      <div class="info">
+        <b>🔍 ${c.label}</b>
+        ${c.note ? `<span class="note">ⓘ ${c.note}</span>` : ""}
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="price">${c.price}</span>
+        <button class="btn btn-primary btn-sm" onclick="selectCheck('${c.id}')">Verify →</button>
+      </div>
+    </div>`).join("");
+}
+function selectCheck(id){
+  activeCheck = id;
+  renderVerifyList();
+  const c = CHECKS.find(x=>x.id===id);
+  $("verifyLabel").textContent = `Enter the ${c.label.replace(" Verification","").replace(" Check","").replace(" Availability","")} to check`;
+  $("verifyInput").placeholder = c.placeholder;
+  $("verifyInput").value = (id === "tin" && biz().tin) ? biz().tin : "";
+  $("verifyResult").classList.remove("show");
+  $("verifyPanel").classList.add("show");
+  $("verifyTinNote") && ($("verifyTinNote").style.display = (id === "tin" && biz().tin) ? "block" : "none");
+  $("verifyPanel").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+function runCheck(){
+  const c = CHECKS.find(x=>x.id===activeCheck);
+  if(!c) return;
+  const val = $("verifyInput").value.trim();
+  if(!val){ toast("Enter a number first"); return; }
+  const resultText = c.automated ? "✓ Match found — verified instantly" : "✓ Automated check passed — flagged for manual review";
+  $("verifyResult").textContent = resultText;
+  $("verifyResult").classList.add("show");
+  const when = "Just now, " + (c.automated ? "instant" : "pending review");
+  biz().lookups.unshift({ label:c.label, result:resultText, when });
+  if (c.id === "tin"){
+    biz().tin = val;
+    toast("TIN verified — auto-filled across the rest of your dashboard");
+  } else {
+    toast(c.automated ? "Checked — saved to your Vault" : "Checked — sent for manual review");
+  }
+  renderLookups();
+  renderVault();
+  applyTinAutofill();
+  renderHealthScore();
+}
+function renderLookups(){
+  $("lookupHistory").innerHTML = biz().lookups.map(l => `
+    <div class="lookup-row"><span>${l.label} — ${l.result}</span><small>${l.when}</small></div>`).join("");
+}
+
+/* ---------- Trackers (business-scoped) ---------- */
+const pillFor = { "due-soon":"pill-progress", "upcoming":"pill-neutral", "overdue":"pill-alert", "done":"pill-success" };
+const iconFor = { "Licences & Documents":"📜","Rent/Lease":"🏠","Insurance":"🛡️","Payroll":"👥","Supplier/Vendor":"📦","Loan Repayment":"💳","Other":"📌" };
+function renderTrackers(){
+  const trackers = biz().trackers;
+  $("trackerList").innerHTML = trackers.length ? trackers.map((t,i)=>`
+    <div class="card tracker-card">
+      <div class="info"><b>${iconFor[t.cat]||"📌"} ${t.name}</b><small>${t.cat} · ${t.note}</small></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="pill ${pillFor[t.status]}">${t.status==='done'?'✓ Marked Done':t.statusLabel}</span>
+        ${t.status!=='done' && t.fileable ? `<button class="btn btn-primary btn-sm" onclick="toast('Starting '+${JSON.stringify(t.name)}+'…')">File now</button>` : ""}
+        ${t.status!=='done' && !t.fileable ? `<button class="btn btn-ghost btn-sm" onclick="markDone(${i})">Mark done</button>` : ""}
+      </div>
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No trackers yet for this business.</p>`;
+}
+function markDone(i){ biz().trackers[i].status="done"; renderTrackers(); renderCalendar(); toast("Marked done — saved to your Vault"); }
+function toggleAddTracker(){ $("addTrackerForm").classList.toggle("show"); }
+function addTracker(){
+  const name = $("trkName").value.trim();
+  if(!name){ toast("Give it a name first"); return; }
+  biz().trackers.unshift({ name, cat:$("trkCategory").value, status:"upcoming", statusLabel:"Upcoming", note:`Recurs ${$("trkRecur").value.toLowerCase()}`, fileable:$("trkCategory").value==="Licences & Documents" });
+  $("trkName").value="";
+  toggleAddTracker();
+  renderTrackers();
+  renderCalendar();
+  toast("Tracker added — reminders scheduled");
+}
+
+/* ---------- Compliance Calendar (statutory dates are business-agnostic; the Upcoming list's tracker rows are business-scoped) ---------- */
+function nextMonthlyDate(day){
+  const now = new Date();
+  let d = new Date(now.getFullYear(), now.getMonth(), day);
+  if (d < now) d = new Date(now.getFullYear(), now.getMonth()+1, day);
+  return d;
+}
+function nextAnnualDate(month, day){ // month is 0-indexed
+  const now = new Date();
+  let d = new Date(now.getFullYear(), month, day);
+  if (d < now) d = new Date(now.getFullYear()+1, month, day);
+  return d;
+}
+function daysUntil(d){ const now = new Date(); now.setHours(0,0,0,0); const t = new Date(d); t.setHours(0,0,0,0); return Math.round((t-now)/86400000); }
+function daysBadgeClass(n){ return n<=7 ? "days-soon" : n<=30 ? "days-mid" : "days-far"; }
+function daysLabel(n){ if(n<0) return "Overdue"; if(n===0) return "Today"; if(n===1) return "1 day"; return n+" days"; }
+
+function buildStatutoryDeadlines(){
+  return [
+    { name:"VAT Return", note:"Filing + payment, previous month's sales", due: nextMonthlyDate(21), action:"Estimate now", onAction:()=>goto("tax") },
+    { name:"PAYE Remittance", note:"Employee tax withheld, previous month", due: nextMonthlyDate(10), action:"Go to Payroll", onAction:()=>goto("tax") },
+    { name:"Withholding Tax Remittance", note:"Previous month's WHT deductions", due: nextMonthlyDate(21), action:"View", onAction:()=>goto("tax") },
+    { name:"CAC Annual Return", note:"Keeps your company active on the register", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>openCacWizard() },
+    { name:"Companies Income Tax Return", note:"~6 months after financial year end (Dec FYE shown)", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>toast("Starting Companies Income Tax filing…") },
+    { name:"Personal Income Tax Return", note:"Individual annual return + Tax Clearance renewal", due: nextAnnualDate(2, 31), action:"File now", onAction:()=>toast("Starting Personal Income Tax filing…") },
+  ];
+}
+
+/* ---------- Guided CAC Annual Return filing wizard ---------- */
+let cacWizardStep = 1;
+const CAC_WIZARD_STEPS = 3;
+function openCacWizard(){
+  cacWizardStep = 1;
+  $("cacWizardOverlay").classList.add("show");
+  renderCacWizard();
+}
+function closeCacWizard(){ $("cacWizardOverlay").classList.remove("show"); }
+function cacWizardGo(step){ cacWizardStep = step; renderCacWizard(); }
+function renderCacWizard(){
+  const b = biz();
+  $("cacStepDots").innerHTML = Array.from({length:CAC_WIZARD_STEPS}).map((_,i)=>`<span class="${i < cacWizardStep ? 'done' : ''}"></span>`).join("");
+  let body = "";
+  if (cacWizardStep === 1){
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 1 of 3 — confirm your business details. We've pre-filled what we already have on file.</p>
+      <div class="modal-review-row"><span>Business name</span><b>${b.name}</b></div>
+      <div class="modal-review-row"><span>Registration type</span><b>${b.regType}</b></div>
+      <div class="modal-review-row"><span>TIN</span><b>${b.tin ? b.tin : '⚠ Not verified yet'}</b></div>
+      ${!b.tin ? `<p style="font-size:12px;color:var(--accent);font-weight:700;margin-top:10px">Verifying your TIN first makes this faster — <a href="#" onclick="closeCacWizard();goto('verification');return false" style="color:var(--accent)">do that now</a>, or continue anyway.</p>` : ""}
+      <div class="modal-actions"><span></span><button class="btn btn-primary" onclick="cacWizardGo(2)">Continue →</button></div>`;
+  } else if (cacWizardStep === 2){
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 2 of 3 — has anything changed since your last filing?</p>
+      <label class="modal-radio"><input type="radio" name="cacChange" checked> No changes to directors, shareholders, or business address</label>
+      <label class="modal-radio"><input type="radio" name="cacChange"> Something has changed — I'll need to update it first</label>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="cacWizardGo(1)">← Back</button><button class="btn btn-primary" onclick="cacWizardGo(3)">Continue →</button></div>`;
+  } else {
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 3 of 3 — review and submit.</p>
+      <div class="modal-review-row"><span>Service</span><b>CAC Annual Return Filing</b></div>
+      <div class="modal-review-row"><span>Fee</span><b>₦20,000</b></div>
+      <div class="modal-review-row"><span>Payment</span><b>💳 Held in escrow — released only once filed</b></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">We file this on your behalf and update you here and on WhatsApp — no need to contact anyone else.</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="cacWizardGo(2)">← Back</button><button class="btn btn-primary" onclick="cacWizardSubmit()">Submit filing →</button></div>`;
+  }
+  $("cacWizardBody").innerHTML = body;
+}
+function cacWizardSubmit(){
+  closeCacWizard();
+  toast("CAC Annual Return submitted — payment held, we'll update you here and on WhatsApp");
+}
+
+let calActionRefs = [];
+function renderMonthGrid(gridEl, labelEl, monthOffset, statutory){
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth() + monthOffset;
+  const view = new Date(year, month, 1);
+  const viewYear = view.getFullYear(), viewMonth = view.getMonth();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const deadlinesByDay = {};
+  statutory.forEach(s=>{
+    if (s.due.getFullYear()===viewYear && s.due.getMonth()===viewMonth){
+      (deadlinesByDay[s.due.getDate()] ||= []).push(s);
+    }
+  });
+  labelEl.textContent = view.toLocaleDateString('en-NG',{month:'long',year:'numeric'});
+  const dow = ["S","M","T","W","T","F","S"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  let cells = "";
+  for(let i=0;i<firstDow;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const isToday = monthOffset===0 && d===now.getDate();
+    const items = deadlinesByDay[d];
+    const tip = items ? `<div class="cal-tip">${items.map(it=>`<div class="tip-item"><b>${it.name}</b>${it.note}</div>`).join("")}</div>` : "";
+    cells += `<div class="cal-cell ${isToday?'today':''} ${items?'has-deadline':''}">${d}${items?'<span class="dot"></span>':''}${tip}</div>`;
+  }
+  gridEl.innerHTML = dow + cells;
+}
+function renderCalendar(){
+  calActionRefs = [];
+  const statutory = buildStatutoryDeadlines();
+
+  const soonest = statutory.slice().sort((a,b)=>a.due-b.due)[0];
+  const n = daysUntil(soonest.due);
+  $("nextDeadlineFigure").innerHTML = `${daysLabel(n)} <small>${soonest.due.toLocaleDateString('en-NG',{day:'numeric',month:'short'})}</small>`;
+  $("nextDeadlineName").textContent = soonest.name;
+
+  renderMonthGrid($("calGrid0"), $("calMonthLabel0"), 0, statutory);
+  renderMonthGrid($("calGrid1"), $("calMonthLabel1"), 1, statutory);
+
+  const trackerDaysGuess = { "due-soon": 18, "overdue": 2, "upcoming": 45 };
+  const trackerItems = biz().trackers
+    .filter(t => t.status !== "done")
+    .map(t => ({
+      name: t.name, note: `Your Tracker · ${t.note}`, days: trackerDaysGuess[t.status] ?? 45, source: "tracker",
+      action: t.fileable ? "File now" : "View tracker",
+      onAction: t.fileable ? (()=>toast("Starting "+t.name+"…")) : (()=>goto("trackers")),
+    }));
+  const statutoryItems = statutory.map(s => ({ name: s.name, note: s.note, days: daysUntil(s.due), source: "statutory", action: s.action, onAction: s.onAction }));
+  const merged = statutoryItems.concat(trackerItems).sort((a,b)=>a.days-b.days);
+
+  $("calUpcoming").innerHTML = merged.map(item => {
+    const idx = calActionRefs.push(item.onAction) - 1;
+    return `<div class="deadline-row">
+      <div class="info"><b>${item.source==='statutory'?'🏛️ ':'📌 '}${item.name}</b><small>${item.note}</small></div>
+      <div class="action-col">
+        <span class="days ${daysBadgeClass(item.days)}">${daysLabel(item.days)}</span>
+        <button class="btn btn-ghost btn-sm" onclick="calActionRefs[${idx}]()">${item.action}</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- Templates (business-scoped documents) ---------- */
+const TPL_LABELS = { business:"Business Agreement", tenancy:"Tenancy Agreement", freelance:"Freelance / Service Contract", loan:"Loan Agreement", sales:"Sales / Supplier Agreement", proposal:"Proposal / Quote" };
+const BASIC_FIELDS = {
+  loan: ["Borrower & Lender names","Loan amount & currency","Repayment schedule","Signatures & date"],
+  tenancy: ["Landlord & Tenant names","Property address","Rent amount & payment schedule","Lease duration","Signatures & date"],
+  freelance: ["Client & Freelancer names","Scope of work","Payment terms","Signatures & date"],
+  business: ["Partner names","Business purpose","Capital contribution","Signatures & date"],
+  sales: ["Buyer & Seller names","Goods/services description","Price & payment terms","Seller's TIN","Signatures & date"],
+  proposal: ["Client & project summary","Scope of work","Pricing","Your business TIN","Validity period"],
+};
+const TPL_SUGGESTIONS = {
+  loan: ["Interest rate (optional — leave blank if none)","Collateral / security clause","Late payment penalty clause","Guarantor / co-signer details","Governing state / jurisdiction"],
+  tenancy: ["Renewal terms","Security deposit","Maintenance responsibilities","Termination conditions"],
+  freelance: ["Deliverable deadlines","Revision policy","Confidentiality clause","Termination conditions"],
+  business: ["Profit/loss sharing","Roles & responsibilities","Decision-making process","Exit/dissolution terms"],
+  sales: ["Delivery timeline","Warranty/returns policy","Late delivery penalty"],
+  proposal: ["Timeline","Optional add-ons"],
+};
+let selectedTpl = null;
+
+document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tpl-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  selectedTpl = b.dataset.tpl;
+  $("basicDocLabel").textContent = "Standard " + TPL_LABELS[selectedTpl];
+  $("basicDocFields").innerHTML = (BASIC_FIELDS[selectedTpl] || BASIC_FIELDS.business).map(f => {
+    if (/TIN/i.test(f)){
+      return biz().tin
+        ? `<div>✓ ${f} <span style="color:var(--primary)">— auto-filled: ${biz().tin}</span></div>`
+        : `<div>✓ ${f} <span style="color:var(--muted);font-weight:600">— verify your TIN to auto-fill this</span></div>`;
+    }
+    return `<div>✓ ${f}</div>`;
+  }).join("");
+  $("basicDoc").style.display = "block";
+  $("suggestList").classList.remove("show");
+  $("aiInput").value = "";
+}));
+
+function downloadBasic(){
+  const label = TPL_LABELS[selectedTpl];
+  biz().docs.unshift({ name: `${label} — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: selectedTpl === "loan" });
+  renderDocs();
+  renderVault();
+  toast("Standard document downloaded — saved to your Vault");
+  downloadText(`${label.replace(/\s+/g,'-').toLowerCase()}.txt`, `SellersPoint Docs — ${label} (Standard)\n\nFill in the blanks and it's ready to use.\nThis is a template for common situations, not a substitute for personalized legal advice.`);
+}
+function suggestFields(){
+  if(!selectedTpl) return;
+  const input = $("aiInput").value.trim();
+  if(!input){ toast("Tell us what's specific about your situation first"); return; }
+  const fields = TPL_SUGGESTIONS[selectedTpl] || TPL_SUGGESTIONS.business;
+  $("suggestList").innerHTML = fields.map((f,i)=>`
+    <label class="suggest-item"><input type="checkbox" checked> ${f}</label>`).join("") +
+    `<div style="margin-top:14px"><button class="btn btn-primary" onclick="generateImproved()">Generate improved document →</button></div>`;
+  $("suggestList").classList.add("show");
+  toast("AI matched this to clauses from the vetted template library");
+}
+function generateImproved(){
+  const label = TPL_LABELS[selectedTpl];
+  const isHighValue = selectedTpl === "loan";
+  biz().docs.unshift({ name: `${label} (Improved) — draft ${new Date().toLocaleDateString()}`, type: label, date: "Just now", warn: isHighValue });
+  renderDocs();
+  renderVault();
+  toast("Improved document generated — saved to your Vault");
+  downloadText(`${label.replace(/\s+/g,'-').toLowerCase()}-improved.txt`, `SellersPoint Docs — ${label} (Improved)\n\nStandard document, adjusted for what you told us.\nThis is a template for common situations, not a substitute for personalized legal advice.`);
+}
+function renderDocs(){
+  const docs = biz().docs;
+  $("docList").innerHTML = docs.length ? docs.map(d=>`
+    <div class="doc-row">
+      <div class="info"><b>🧾 ${d.name}</b><small>${d.date}</small>${d.warn?'<span class="warn">ⓘ High-value — consider a professionally reviewed version</span>':''}</div>
+      <div class="doc-actions">
+        <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${d.name}')">Download</button>
+        ${d.warn ? `<button class="btn btn-accent btn-sm" onclick="toast('Requesting expert review…')">Request expert review</button>` : `<button class="btn btn-ghost btn-sm" onclick="toast('Reopening the wizard with your prior answers')">Edit & regenerate</button>`}
+      </div>
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No documents yet for this business.</p>`;
+}
+function downloadText(filename, text){
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Vault (business-scoped) ---------- */
+function vaultItems(){
+  const b = biz();
+  const base = b.vaultExtra.slice();
+  const fromFilings = b.filingHistory.map(f=>({ name:f.label, type:"Tax", date:f.date }));
+  const fromVerify = b.lookups.map(l=>({ name:`${l.label} Result`, type:"Verification", date:`Checked ${l.when.split(",")[0]}` }));
+  const fromDocs = b.docs.map(d=>({ name:d.name, type:"Template", date:`Created ${d.date}` }));
+  return base.concat(fromFilings).concat(fromVerify).concat(fromDocs);
+}
+let activeFilter = "all";
+document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".filter-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  activeFilter = b.dataset.filter;
+  renderVault();
+}));
+function renderVault(){
+  const q = ($("vaultSearch").value||"").toLowerCase();
+  const typeClass = { Registration:"vt-registration", Tax:"vt-tax", Verification:"vt-verification", Template:"vt-template" };
+  const typeIcon = { Registration:"📄", Tax:"💰", Verification:"🔍", Template:"🧾" };
+  const items = vaultItems().filter(i => (activeFilter==="all"||i.type===activeFilter) && i.name.toLowerCase().includes(q));
+  $("vaultList").innerHTML = items.length ? items.map(i=>`
+    <div class="vault-row">
+      <div class="info"><b>${typeIcon[i.type]||"📄"} ${i.name}</b><small>${i.date}</small></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="vault-type ${typeClass[i.type]}">${i.type}</span>
+        <button class="btn btn-ghost btn-sm" onclick="toast('Downloading ${i.name}')">Download</button>
+      </div>
+    </div>`).join("") : `<p style="color:var(--muted);padding:20px 0;text-align:center">No documents match.</p>`;
+}
+
+/* ---------- Boot ---------- */
+renderAll();
+</script>
+</body>
+</html>
