@@ -1341,6 +1341,57 @@ app.delete(
   })
 );
 
+// --- SellersPoint Docs: business registration (CAC incorporation) ----------
+// Fulfilled manually via backend.html's Registration Queue for now - see
+// db.js's advanceBusinessRegistration comment for the plan to automate
+// once CAC accreditation clears.
+
+app.get(
+  "/api/docs/registration",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.getDocsRegistration(req.businessId)))
+);
+app.put(
+  "/api/docs/registration",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.saveRegistrationDetails(req.businessId, req.body || {})))
+);
+app.put(
+  "/api/docs/registration/shares",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.saveRegistrationShares(req.businessId, req.body || {})))
+);
+app.post(
+  "/api/docs/registration/affiliates",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.addRegistrationAffiliate(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/docs/registration/affiliates/:id",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => {
+    await db.deleteRegistrationAffiliate(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+app.post(
+  "/api/docs/registration/psc",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.addRegistrationPsc(req.businessId, req.body || {})))
+);
+app.post(
+  "/api/docs/registration/submit",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.submitBusinessRegistration(req.businessId)))
+);
+
 // --- Feedback (business -> SellersPoint team) --------------------------------
 app.get(
   "/api/feedback",
@@ -1533,6 +1584,25 @@ app.get(
   "/api/admin/payments",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.listAllPayments()))
+);
+
+// SellersPoint Docs Registration Queue - every business currently mid-flight
+// on CAC incorporation, and the action to advance them (manual fulfillment
+// until CAC accreditation clears - see db.js#advanceBusinessRegistration).
+app.get(
+  "/api/admin/registration-queue",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.listRegistrationQueue()))
+);
+app.get(
+  "/api/admin/registration-queue/:id",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.getDocsRegistration(req.params.id)))
+);
+app.put(
+  "/api/admin/registration-queue/:id",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.advanceBusinessRegistration(req.params.id, req.body || {})))
 );
 
 app.get(

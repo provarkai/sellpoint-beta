@@ -21,7 +21,7 @@ const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===und
 // permission gates those). Reports has its own plan-tier visibility rule
 // elsewhere (render()) which also checks can("reports.read") now, so it's
 // deliberately left out of this map to avoid the two fighting each other.
-const TAB_PERMISSIONS={products:"products.write",customers:"customers.write",orders:"orders.write",invoice:"invoices.use",pos:"pos.use",expenses:"expenses.write",suppliers:"suppliers.write",settings:"settings.write"};
+const TAB_PERMISSIONS={products:"products.write",customers:"customers.write",orders:"orders.write",invoice:"invoices.use",pos:"pos.use",expenses:"expenses.write",suppliers:"suppliers.write",settings:"settings.write",docs:"docs.manage"};
 function applyRoleVisibility(){
   document.querySelectorAll(".tab[data-tab]").forEach(btn=>{
     const perm=TAB_PERMISSIONS[btn.dataset.tab];
@@ -37,7 +37,7 @@ const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings",docs:"Docs"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos();if(tab==="docs")loadDocsRegistration()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -982,5 +982,39 @@ async function loadInsight(force){
   }
 }
 if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
+
+// --- SellersPoint Docs: business registration (CAC incorporation) ----------
+// Fulfilled manually by our team for now (see server/db.js's
+// advanceBusinessRegistration comment) - this UI captures the same data
+// the CAC API itself needs, so nothing here changes once accreditation
+// lets us automate the actual filing.
+let docsData=null;
+const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved"};
+document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
+function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view))}
+async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs()}catch(err){toast(err.message)}}
+function renderDocs(){
+  if(!docsData)return;
+  const b=docsData.business;
+  $("docsRegStatusBox").innerHTML=`<div class="row"><span>Registration type</span><b>${b.regType?clean(b.regType.replace(/_/g," ")):"Not chosen yet"}</b></div><div class="row"><span>Status</span><b>${DOCS_STATUS_LABELS[b.regStatus]||b.regStatus}</b></div>${b.regNote?`<div class="row"><span>Note from our team</span><b>${clean(b.regNote)}</b></div>`:""}<div class="row"><span>TIN</span><b>${b.tin?clean(b.tin):"Not issued yet"}</b></div><div class="row"><span>SCUML</span><b>${DOCS_STATUS_LABELS[b.scumlStatus]||b.scumlStatus}</b></div>`;
+  $("docsRegType").value=b.regType||"";
+  $("docsNobCategory").value=b.regNatureOfBusinessCategory||"";
+  $("docsNob").value=b.regNatureOfBusiness||"";
+  $("docsObjects").value=(b.regObjects||[]).join("\n");
+  $("docsRegAddress").value=b.regAddress?.registeredAddress?.full||"";
+  $("docsHeadAddress").value=b.regAddress?.headOffice?.full||"";
+  $("docsOrdinaryShares").value=docsData.shares.ordinaryIssuedShare||0;
+  $("docsPreferenceShares").value=docsData.shares.preferenceIssuedShare||0;
+  $("docsPricePerShare").value=docsData.shares.pricePerShare||0;
+  $("docsAffiliateList").innerHTML=docsData.affiliates.map(a=>`<div class="item"><div class="item-top"><strong>${clean(a.firstname)} ${clean(a.surname)}</strong><span>${clean((a.affiliateType||[]).join(", "))}</span></div><div class="meta">${clean(a.email||"")}${a.idType?` - ${clean(a.idType)} ${clean(a.idNumber)}`:""}</div><div class="item-actions"><button onclick="deleteDocsAffiliate('${a.id}')">Remove</button></div></div>`).join("");
+  opts($("docsPscAffiliate"),docsData.affiliates,a=>`${a.firstname} ${a.surname} (${(a.affiliateType||[]).join(", ")})`,"Add an affiliate first");
+  $("docsPscList").innerHTML=docsData.psc.map(p=>{const aff=docsData.affiliates.find(a=>a.id===p.affiliateId);const flags=[p.ownsDirectShares?"Owns shares directly":"",p.hasSignificantControl?"Has significant control":"",p.isPep?"PEP":""].filter(Boolean).join(" - ");return `<div class="item"><div class="item-top"><strong>${aff?clean(aff.firstname+" "+aff.surname):"Unknown"}</strong><span>${p.sharePercent}%</span></div><div class="meta">${clean(flags)}</div></div>`}).join("");
+}
+if($("docsDetailsForm"))$("docsDetailsForm").onsubmit=async e=>{e.preventDefault();try{docsData=await api("PUT","/api/docs/registration",{regType:$("docsRegType").value,natureOfBusinessCategory:$("docsNobCategory").value.trim(),natureOfBusiness:$("docsNob").value.trim(),objects:$("docsObjects").value.split("\n").map(s=>s.trim()).filter(Boolean),address:{registeredAddress:{full:$("docsRegAddress").value.trim()},headOffice:{full:$("docsHeadAddress").value.trim()}}});renderDocs();toast("Company details saved")}catch(err){toast(err.message)}};
+if($("docsSharesForm"))$("docsSharesForm").onsubmit=async e=>{e.preventDefault();try{docsData=await api("PUT","/api/docs/registration/shares",{ordinaryIssuedShare:+$("docsOrdinaryShares").value,preferenceIssuedShare:+$("docsPreferenceShares").value,pricePerShare:+$("docsPricePerShare").value});renderDocs();toast("Shares saved")}catch(err){toast(err.message)}};
+if($("docsAffiliateForm"))$("docsAffiliateForm").onsubmit=async e=>{e.preventDefault();try{const affiliateType=[...document.querySelectorAll('input[name="docsAffiliateType"]:checked')].map(c=>c.value);await api("POST","/api/docs/registration/affiliates",{affiliateType,firstname:$("docsAffFirstname").value.trim(),surname:$("docsAffSurname").value.trim(),email:$("docsAffEmail").value.trim(),phoneNumber:$("docsAffPhone").value.trim(),idType:$("docsAffIdType").value,idNumber:$("docsAffIdNumber").value.trim(),isShareholder:$("docsAffIsShareholder").checked});e.target.reset();await loadDocsRegistration();toast("Affiliate added")}catch(err){toast(err.message)}};
+async function deleteDocsAffiliate(id){try{await api("DELETE","/api/docs/registration/affiliates/"+id);await loadDocsRegistration();toast("Affiliate removed")}catch(err){toast(err.message)}}
+if($("docsPscForm"))$("docsPscForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/registration/psc",{affiliateId:$("docsPscAffiliate").value,sharePercent:+$("docsPscSharePercent").value,ownsDirectShares:$("docsPscOwnsDirectShares").checked,hasSignificantControl:$("docsPscHasControl").checked,isPep:$("docsPscIsPep").checked});e.target.reset();await loadDocsRegistration();toast("PSC entry added")}catch(err){toast(err.message)}};
+if($("docsSubmitRegistration"))$("docsSubmitRegistration").onclick=async()=>{try{docsData=await api("POST","/api/docs/registration/submit");renderDocs();showDocsView("overview");toast("Registration submitted - our team will review it shortly")}catch(err){toast(err.message)}};
 
 (async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));

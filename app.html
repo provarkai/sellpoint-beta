@@ -23,6 +23,7 @@
       <button class="tab" data-tab="reports" id="reportsTab" style="display:none">📈 Reports</button>
       <button class="tab" data-tab="expenses">💰 Expenses</button>
       <button class="tab" data-tab="suppliers">📥 Suppliers</button>
+      <button class="tab" data-tab="docs">📋 Docs</button>
       <button class="tab" data-tab="feedback">💬 Feedback</button>
       <button class="tab" data-tab="settings">⚙️ Settings</button>
       <button id="upgrade" class="tab-upgrade">🚀 Upgrade</button>
@@ -72,6 +73,95 @@
       <form id="feedbackForm"><h2>Send feedback</h2><p class="meta">Bugs, feature requests, or anything else - goes straight to the SellersPoint team.</p><label>Message<textarea id="fbMessage" rows="5" required placeholder="What's on your mind?"></textarea></label><label>Rating <span class="meta">(optional)</span><select id="fbRating"><option value="">No rating</option><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Okay</option><option value="2">2 - Poor</option><option value="1">1 - Very poor</option></select></label><button>Send Feedback</button></form>
       <article><h2>Your feedback <small id="fbCount"></small></h2><div id="fbList" class="list"></div></article>
     </div></section>
+    <section id="docs" class="page">
+      <div class="docs-subnav">
+        <button class="docs-tab active" data-view="overview">Overview</button>
+        <button class="docs-tab" data-view="registration">Business Registration</button>
+        <button class="docs-tab" data-view="verification">Verification</button>
+        <button class="docs-tab" data-view="calendar">Compliance Calendar</button>
+        <button class="docs-tab" data-view="tax">Tax Tools</button>
+        <button class="docs-tab" data-view="trackers">Trackers</button>
+        <button class="docs-tab" data-view="vault">Document Vault</button>
+      </div>
+
+      <div id="docs-overview" class="docs-subpage active">
+        <article>
+          <h2>Business Registration status</h2>
+          <p class="meta">Nigeria's business-formation and regulatory-compliance layer for SellersPoint sellers - incorporation, tax, and compliance in one place.</p>
+          <div id="docsRegStatusBox"></div>
+        </article>
+      </div>
+
+      <div id="docs-registration" class="docs-subpage">
+        <article>
+          <h2>1. Company details</h2>
+          <form id="docsDetailsForm">
+            <label>Registration type<select id="docsRegType" required><option value="">Choose...</option><option value="business_name">Business Name</option><option value="llc">Limited Liability Company</option><option value="partnership">Partnership</option></select></label>
+            <label>Nature of business category<input id="docsNobCategory" placeholder="e.g. Retail Trade"></label>
+            <label>Nature of business<input id="docsNob" placeholder="e.g. Sale of fashion accessories"></label>
+            <label>Objects of memorandum <span class="meta">(one per line - what the business is formed to do)</span><textarea id="docsObjects" rows="3" placeholder="Retail sale of clothing and accessories&#10;Import and distribution of fashion goods"></textarea></label>
+            <label>Registered address<input id="docsRegAddress" placeholder="15A Adeola Odeku Street, Ikeja, Lagos"></label>
+            <label>Head office address<input id="docsHeadAddress" placeholder="45B Ahmadu Bello Way, Victoria Island, Lagos"></label>
+            <button>Save Company Details</button>
+          </form>
+        </article>
+        <article>
+          <h2>2. Shares</h2>
+          <form id="docsSharesForm">
+            <label>Ordinary issued shares<input id="docsOrdinaryShares" type="number" min="0" value="0"></label>
+            <label>Preference issued shares<input id="docsPreferenceShares" type="number" min="0" value="0"></label>
+            <label>Price per share (NGN)<input id="docsPricePerShare" type="number" min="0" step="0.01" value="0"></label>
+            <button>Save Shares</button>
+          </form>
+        </article>
+        <article>
+          <h2>3. Affiliates <small class="meta">(directors, secretary, shareholders, etc.)</small></h2>
+          <form id="docsAffiliateForm">
+            <label>Role(s) <span class="meta">(select all that apply)</span></label>
+            <p class="actions">
+              <label><input type="checkbox" name="docsAffiliateType" value="Director"> Director</label>
+              <label><input type="checkbox" name="docsAffiliateType" value="Secretary"> Secretary</label>
+              <label><input type="checkbox" name="docsAffiliateType" value="Shareholder"> Shareholder</label>
+              <label><input type="checkbox" name="docsAffiliateType" value="Witness"> Witness</label>
+              <label><input type="checkbox" name="docsAffiliateType" value="Presenter"> Presenter</label>
+            </p>
+            <label>First name<input id="docsAffFirstname"></label>
+            <label>Surname<input id="docsAffSurname"></label>
+            <label>Email<input id="docsAffEmail" type="email"></label>
+            <label>Phone<input id="docsAffPhone"></label>
+            <label>ID type<select id="docsAffIdType"><option value="NIN">NIN</option><option value="International_passport">International Passport</option><option value="Driver_license">Driver's License</option></select></label>
+            <label>ID number<input id="docsAffIdNumber"></label>
+            <label><input type="checkbox" id="docsAffIsShareholder"> This person is a shareholder</label>
+            <button>Add Affiliate</button>
+          </form>
+          <div id="docsAffiliateList" class="list"></div>
+        </article>
+        <article>
+          <h2>4. Persons with Significant Control (PSC)</h2>
+          <form id="docsPscForm">
+            <label>Affiliate<select id="docsPscAffiliate" required></select></label>
+            <label>Share percent<input id="docsPscSharePercent" type="number" min="0" max="100" step="0.01" value="0"></label>
+            <label><input type="checkbox" id="docsPscOwnsDirectShares"> Owns shares directly</label>
+            <label><input type="checkbox" id="docsPscHasControl"> Has significant control (voting rights / can appoint directors)</label>
+            <label><input type="checkbox" id="docsPscIsPep"> Is a politically exposed person (PEP)</label>
+            <button>Add PSC Entry</button>
+          </form>
+          <div id="docsPscList" class="list"></div>
+        </article>
+        <article>
+          <h2>5. Submit</h2>
+          <p class="meta">Once submitted, our team files your registration with CAC and keeps you updated here as it progresses.</p>
+          <p class="actions"><button type="button" id="docsSubmitRegistration">Submit Registration</button></p>
+        </article>
+      </div>
+
+      <div id="docs-verification" class="docs-subpage docs-coming-soon"><article><h2>Verification</h2><p class="meta">TIN, BVN, NIN, and CAC lookups - coming soon.</p></article></div>
+      <div id="docs-calendar" class="docs-subpage docs-coming-soon"><article><h2>Compliance Calendar</h2><p class="meta">Every statutory deadline and tracker due date in one view - coming soon.</p></article></div>
+      <div id="docs-tax" class="docs-subpage docs-coming-soon"><article><h2>Tax Tools</h2><p class="meta">PAYE calculator, payroll, and e-invoicing - coming soon.</p></article></div>
+      <div id="docs-trackers" class="docs-subpage docs-coming-soon"><article><h2>Trackers</h2><p class="meta">Rent, insurance, payroll, and licence renewal reminders - coming soon.</p></article></div>
+      <div id="docs-vault" class="docs-subpage docs-coming-soon"><article><h2>Document Vault</h2><p class="meta">Every document from every Docs feature, in one place - coming soon.</p></article></div>
+    </section>
+
     <section id="settings" class="page"><article id="installAppCard" style="display:none"><h2>Install App</h2><p class="meta">Add SellersPoint to your home screen for one-tap access, like a native app.</p><button type="button" id="installAppBtn">Install App</button></article><div class="grid"><form id="settingsForm"><h2>Business Profile</h2><label>Business logo<input id="sLogo" type="file" accept="image/*"></label><label>Business name<input id="sBusiness" required></label><label>Phone<input id="sPhone" placeholder="2348012345678"></label><label>Address<input id="sAddress" placeholder="123 Market Street, Lagos"></label><label>Payment details <span class="meta">(sent to customers with pending-payment orders)</span><textarea id="sPayment" rows="4" placeholder="Bank: Example Bank
 Account: 1234567890
 Name: Your Business"></textarea></label><label>Currency <span class="meta">(display only - amounts are shown in this currency, doesn't change how you get paid)</span><select id="sCurrency"><option value="NGN">NGN - Nigerian Naira (₦)</option><option value="GHS">GHS - Ghanaian Cedi (GH₵)</option><option value="KES">KES - Kenyan Shilling (KSh)</option><option value="ZAR">ZAR - South African Rand (R)</option><option value="EGP">EGP - Egyptian Pound (E£)</option><option value="XOF">XOF - West African CFA Franc (CFA)</option><option value="UGX">UGX - Ugandan Shilling (USh)</option><option value="TZS">TZS - Tanzanian Shilling (TSh)</option><option value="RWF">RWF - Rwandan Franc (RF)</option><option value="USD">USD - US Dollar ($)</option></select></label><button>Save Settings</button></form>

@@ -101,6 +101,11 @@ function toBusinessJson(b) {
     autoReminderEnabled: !!b.auto_reminder_enabled,
     autoReminderDaysAfter: Number(b.auto_reminder_days_after ?? 2),
     shipbubbleSenderAddressCode: b.shipbubble_sender_address_code || null,
+    regType: b.reg_type || null,
+    regStatus: b.reg_status || "not_started",
+    regNote: b.reg_note || "",
+    tin: b.tin || "",
+    scumlStatus: b.scuml_status || "not_started",
   };
 }
 function effectivePlan(b) {
@@ -2382,6 +2387,189 @@ async function getBusinessDetailForAdmin(businessId) {
   };
 }
 
+// --- SellersPoint Docs: business registration (CAC incorporation) ----------
+// Fulfilled manually via backend.html's Registration Queue for now (no CAC
+// accreditation yet) - see advanceBusinessRegistration, the single function
+// both the manual admin action and a future automated API-poll job will
+// call, so accreditation becomes a backend swap rather than a rebuild.
+
+function toSharesJson(s) {
+  if (!s) return { ordinaryIssuedShare: 0, preferenceIssuedShare: 0, pricePerShare: 0 };
+  return {
+    ordinaryIssuedShare: Number(s.ordinary_issued_share),
+    preferenceIssuedShare: Number(s.preference_issued_share),
+    pricePerShare: Number(s.price_per_share),
+  };
+}
+function toAffiliateJson(a) {
+  return {
+    id: a.id,
+    affiliateType: a.affiliate_type || [],
+    isCorporate: a.is_corporate,
+    firstname: a.firstname,
+    surname: a.surname,
+    otherName: a.other_name,
+    corporateName: a.corporate_name,
+    email: a.email,
+    phoneNumber: a.phone_number,
+    idType: a.id_type,
+    idNumber: a.id_number,
+    hasIdImage: !!a.id_image,
+    hasSignature: !!a.signature,
+    hasPassport: !!a.passport,
+    isShareholder: a.is_shareholder,
+    allottedOrdinaryShares: Number(a.allotted_ordinary_shares),
+    allottedPreferenceShares: Number(a.allotted_preference_shares),
+    createdAt: a.created_at,
+  };
+}
+function toPscJson(p) {
+  return {
+    id: p.id,
+    affiliateId: p.affiliate_id,
+    ownsDirectShares: p.owns_direct_shares,
+    sharePercent: Number(p.share_percent),
+    isPep: p.is_pep,
+    hasSignificantControl: p.has_significant_control,
+    createdAt: p.created_at,
+  };
+}
+
+async function getDocsRegistration(businessId) {
+  const [bizRows, sharesRows, affiliateRows, pscRows] = await Promise.all([
+    query("SELECT * FROM businesses WHERE id = $1", [businessId]),
+    query("SELECT * FROM business_registration_shares WHERE business_id = $1", [businessId]),
+    query("SELECT * FROM business_registration_affiliates WHERE business_id = $1 ORDER BY created_at", [businessId]),
+    query("SELECT * FROM business_registration_psc WHERE business_id = $1 ORDER BY created_at", [businessId]),
+  ]);
+  const b = bizRows.rows[0];
+  if (!b) throw new OrderError("Business not found");
+  return {
+    business: {
+      ...toBusinessJson(b),
+      regReservationCode: b.reg_reservation_code || "",
+      regTransactionRef: b.reg_transaction_ref || "",
+      regNatureOfBusinessCategory: b.reg_nature_of_business_category || "",
+      regNatureOfBusiness: b.reg_nature_of_business || "",
+      regObjects: b.reg_objects || [],
+      regAddress: b.reg_address || {},
+      hasRegCertificate: !!b.reg_certificate,
+    },
+    shares: toSharesJson(sharesRows.rows[0]),
+    affiliates: affiliateRows.rows.map(toAffiliateJson),
+    psc: pscRows.rows.map(toPscJson),
+  };
+}
+
+async function saveRegistrationDetails(businessId, data) {
+  const regType = requireString(data.regType, "Registration type");
+  if (!["business_name", "llc", "partnership"].includes(regType)) throw new OrderError("Invalid registration type");
+  await query(
+    `UPDATE businesses SET reg_type=$1, reg_nature_of_business_category=$2, reg_nature_of_business=$3,
+     reg_objects=$4, reg_address=$5 WHERE id=$6`,
+    [
+      regType,
+      data.natureOfBusinessCategory || "",
+      data.natureOfBusiness || "",
+      JSON.stringify(data.objects || []),
+      JSON.stringify(data.address || {}),
+      businessId,
+    ]
+  );
+  return getDocsRegistration(businessId);
+}
+
+async function saveRegistrationShares(businessId, data) {
+  await query(
+    `INSERT INTO business_registration_shares (business_id, ordinary_issued_share, preference_issued_share, price_per_share, updated_at)
+     VALUES ($1,$2,$3,$4,now())
+     ON CONFLICT (business_id) DO UPDATE SET ordinary_issued_share=$2, preference_issued_share=$3, price_per_share=$4, updated_at=now()`,
+    [businessId, Number(data.ordinaryIssuedShare) || 0, Number(data.preferenceIssuedShare) || 0, Number(data.pricePerShare) || 0]
+  );
+  return getDocsRegistration(businessId);
+}
+
+async function addRegistrationAffiliate(businessId, data) {
+  const { rows } = await query(
+    `INSERT INTO business_registration_affiliates
+     (business_id, affiliate_type, is_corporate, firstname, surname, other_name, corporate_name, email, phone_number,
+      id_type, id_number, id_image, signature, passport, is_shareholder, allotted_ordinary_shares, allotted_preference_shares)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+    [
+      businessId,
+      data.affiliateType || [],
+      !!data.isCorporate,
+      data.firstname || "",
+      data.surname || "",
+      data.otherName || "",
+      data.corporateName || "",
+      data.email || "",
+      data.phoneNumber || "",
+      data.idType || "",
+      data.idNumber || "",
+      data.idImage || "",
+      data.signature || "",
+      data.passport || "",
+      !!data.isShareholder,
+      Number(data.allottedOrdinaryShares) || 0,
+      Number(data.allottedPreferenceShares) || 0,
+    ]
+  );
+  return toAffiliateJson(rows[0]);
+}
+
+async function deleteRegistrationAffiliate(businessId, affiliateId) {
+  await query("DELETE FROM business_registration_affiliates WHERE id=$1 AND business_id=$2", [affiliateId, businessId]);
+}
+
+async function addRegistrationPsc(businessId, data) {
+  const { rows } = await query(
+    `INSERT INTO business_registration_psc (business_id, affiliate_id, owns_direct_shares, share_percent, is_pep, has_significant_control)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [businessId, data.affiliateId || null, !!data.ownsDirectShares, Number(data.sharePercent) || 0, !!data.isPep, !!data.hasSignificantControl]
+  );
+  return toPscJson(rows[0]);
+}
+
+async function submitBusinessRegistration(businessId) {
+  const { rows } = await query("SELECT reg_type, reg_address FROM businesses WHERE id=$1", [businessId]);
+  const b = rows[0];
+  if (!b) throw new OrderError("Business not found");
+  if (!b.reg_type) throw new OrderError("Choose a registration type first");
+  const { rows: affiliateRows } = await query("SELECT id FROM business_registration_affiliates WHERE business_id=$1", [businessId]);
+  if (!affiliateRows.length) throw new OrderError("Add at least one affiliate (director/shareholder/etc.) before submitting");
+  await query("UPDATE businesses SET reg_status='submitted' WHERE id=$1", [businessId]);
+  return getDocsRegistration(businessId);
+}
+
+// Cross-tenant queue for backend.html's Registration Queue tab - every
+// business currently mid-flight (submitted/in_review/action_needed).
+async function listRegistrationQueue() {
+  const { rows } = await query(
+    `SELECT id, name, reg_type, reg_status, reg_note, created_at
+     FROM businesses WHERE reg_status IN ('submitted','in_review','action_needed')
+     ORDER BY created_at`
+  );
+  return rows.map((b) => ({ id: b.id, businessName: b.name, regType: b.reg_type, regStatus: b.reg_status, regNote: b.reg_note, createdAt: b.created_at }));
+}
+
+// The single fulfillment entry point - called today from the manual admin
+// action in backend.html, and (once CAC accreditation clears) from an
+// automated job polling the CAC API status endpoint with the exact same
+// shape of update, so no second code path needs to exist later.
+async function advanceBusinessRegistration(businessId, { status, note, certificate, tin, scumlStatus }) {
+  if (!["in_review", "action_needed", "approved"].includes(status)) throw new OrderError("Invalid status");
+  const sets = ["reg_status=$1", "reg_note=$2"];
+  const params = [status, note || ""];
+  let i = 3;
+  if (certificate) { sets.push(`reg_certificate=$${i++}`); params.push(certificate); }
+  if (tin) { sets.push(`tin=$${i++}`); params.push(tin); }
+  if (scumlStatus) { sets.push(`scuml_status=$${i++}`); params.push(scumlStatus); }
+  params.push(businessId);
+  await query(`UPDATE businesses SET ${sets.join(",")} WHERE id=$${i}`, params);
+  return getBusinessDetailForAdmin(businessId);
+}
+
 // --- Platform admins (who can access backend.html) --------------------------
 
 async function isPlatformAdmin(email) {
@@ -3045,6 +3233,15 @@ module.exports = {
   listAllBusinesses,
   listAllPayments,
   getBusinessDetailForAdmin,
+  getDocsRegistration,
+  saveRegistrationDetails,
+  saveRegistrationShares,
+  addRegistrationAffiliate,
+  deleteRegistrationAffiliate,
+  addRegistrationPsc,
+  submitBusinessRegistration,
+  listRegistrationQueue,
+  advanceBusinessRegistration,
   isPlatformAdmin,
   listPlatformAdmins,
   addPlatformAdmin,

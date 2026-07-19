@@ -551,6 +551,70 @@ alter table customers add column if not exists wallet_balance numeric not null d
 alter table businesses add column if not exists auto_reminder_enabled boolean not null default false;
 alter table businesses add column if not exists auto_reminder_days_after integer not null default 2;
 
+-- SellersPoint Docs: business incorporation (CAC registration). Fulfilled
+-- manually by staff via backend.html's Registration Queue for now (no CAC
+-- accreditation yet); columns/tables mirror the CAC VAS API's own request
+-- shape 1:1 (see SellerPointDocs_Prompt.md) so switching to direct API
+-- calls later reuses this exact data without a rework. reg_type/reg_status
+-- track the single active registration per business (never more than one
+-- at a time, per the product brief); tin/scuml_status are separate since
+-- SCUML is a distinct one-time, EFCC-issued step after CAC registration.
+alter table businesses add column if not exists reg_type text;
+alter table businesses add column if not exists reg_status text not null default 'not_started';
+alter table businesses add column if not exists reg_note text not null default '';
+alter table businesses add column if not exists reg_reservation_code text not null default '';
+alter table businesses add column if not exists reg_transaction_ref text not null default '';
+alter table businesses add column if not exists reg_nature_of_business_category text not null default '';
+alter table businesses add column if not exists reg_nature_of_business text not null default '';
+alter table businesses add column if not exists reg_objects jsonb not null default '[]'::jsonb;
+alter table businesses add column if not exists reg_address jsonb not null default '{}'::jsonb;
+alter table businesses add column if not exists reg_certificate text not null default '';
+alter table businesses add column if not exists tin text not null default '';
+alter table businesses add column if not exists scuml_status text not null default 'not_started';
+
+create table if not exists business_registration_shares (
+  business_id uuid primary key references businesses(id) on delete cascade,
+  ordinary_issued_share integer not null default 0,
+  preference_issued_share integer not null default 0,
+  price_per_share numeric not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists business_registration_affiliates (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  affiliate_type text[] not null default '{}',
+  is_corporate boolean not null default false,
+  firstname text not null default '',
+  surname text not null default '',
+  other_name text not null default '',
+  corporate_name text not null default '',
+  email text not null default '',
+  phone_number text not null default '',
+  id_type text not null default '',
+  id_number text not null default '',
+  id_image text not null default '',
+  signature text not null default '',
+  passport text not null default '',
+  is_shareholder boolean not null default false,
+  allotted_ordinary_shares integer not null default 0,
+  allotted_preference_shares integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists business_registration_affiliates_business_id_idx on business_registration_affiliates(business_id);
+
+create table if not exists business_registration_psc (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  affiliate_id uuid references business_registration_affiliates(id) on delete cascade,
+  owns_direct_shares boolean not null default false,
+  share_percent numeric not null default 0,
+  is_pep boolean not null default false,
+  has_significant_control boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists business_registration_psc_business_id_idx on business_registration_psc(business_id);
+
 -- Ledgers, not just running totals, so a customer's timeline can show the
 -- full history of how their balance got where it is (matches the cashbook's
 -- append-only design elsewhere in this schema).

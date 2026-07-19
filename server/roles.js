@@ -27,6 +27,7 @@ const ROLE_PERMISSIONS = {
     "coupons.manage",
     "logistics.manage",
     "settings.write",
+    "docs.manage",
   ]),
   sales_staff: new Set(["customers.write", "orders.write", "pos.use", "invoices.use"]),
   accountant: new Set(["reports.read", "expenses.write", "invoices.use"]),

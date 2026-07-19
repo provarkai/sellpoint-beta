@@ -16,6 +16,7 @@
       <button class="tab" data-tab="growth">📈 Growth</button>
       <button class="tab" data-tab="auditlog">📜 Audit Log</button>
       <button class="tab" data-tab="settings">⚙️ Platform Settings</button>
+      <button class="tab" data-tab="registrations">📋 Registration Queue</button>
       <button class="tab" data-tab="admins">🔑 Platform Admins</button>
     </div>
   </aside>
@@ -53,6 +54,10 @@
           <form id="logisticsForm"><h2>SellersPoint Logistics</h2><p class="meta">Platform-run delivery, offered alongside a seller's own self/rider delivery. Charged the same way as online payments: a flat fee plus a percentage, added to the order when a seller selects it. API credentials are optional for now while a courier provider is still being evaluated - the fee and toggle work independently of that.</p><label><input id="logEnabled" type="checkbox"> Enable SellersPoint Logistics for sellers</label><label>Flat fee (NGN per order)<input id="logFlatFee" type="number" min="0" step="1" value="0"></label><label>Percent fee (% of order value)<input id="logPercentFee" type="number" min="0" max="100" step="0.1" value="0"></label><label>Courier API base URL <span class="meta">(optional, for later)</span><input id="logApiBase" placeholder="https://api.example-courier.com"></label><label>Courier API key <span class="meta" id="logApiKeyStatus">(not set)</span><input id="logApiKey" type="password" placeholder="Leave blank to keep the current key"></label><button>Save Logistics Settings</button></form>
           <form id="socialLinksForm"><h2>Footer Social Links</h2><p class="meta">Shown as clickable icons in the public landing page footer. Leave blank to hide an icon.</p><label>Instagram<input id="socialInstagram" placeholder="https://instagram.com/sellerspoint"></label><label>Facebook<input id="socialFacebook" placeholder="https://facebook.com/sellerspoint"></label><label>TikTok<input id="socialTiktok" placeholder="https://tiktok.com/@sellerspoint"></label><label>X (Twitter)<input id="socialX" placeholder="https://x.com/sellerspoint"></label><label>WhatsApp<input id="socialWhatsapp" placeholder="https://wa.me/2348012345678"></label><label>LinkedIn<input id="socialLinkedin" placeholder="https://linkedin.com/company/sellerspoint"></label><button>Save Social Links</button></form>
         </div>
+      </section>
+
+      <section id="registrations" class="page">
+        <article><h2>Registration Queue <small id="registrationQueueCount"></small></h2><p class="meta">Businesses mid-flight on CAC incorporation - filed manually until CAC accreditation clears (see SellerPointDocs_Prompt.md).</p><div id="registrationQueueList" class="list"></div></article>
       </section>
 
       <section id="admins" class="page">
