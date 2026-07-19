@@ -990,13 +990,15 @@ if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
 // lets us automate the actual filing.
 let docsData=null;
 const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved"};
+const DOCS_STATUS_PILL={not_started:"docs-pill-neutral",submitted:"docs-pill-progress",in_review:"docs-pill-progress",action_needed:"docs-pill-alert",approved:"docs-pill-success"};
+const docsPill=(status,label)=>`<span class="docs-pill ${DOCS_STATUS_PILL[status]||"docs-pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
 function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view));if(view==="trackers"||view==="calendar")loadDocsTrackers();if(view==="vault")loadDocsVault()}
 async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs()}catch(err){toast(err.message)}}
 function renderDocs(){
   if(!docsData)return;
   const b=docsData.business;
-  $("docsRegStatusBox").innerHTML=`<div class="row"><span>Registration type</span><b>${b.regType?clean(b.regType.replace(/_/g," ")):"Not chosen yet"}</b></div><div class="row"><span>Status</span><b>${DOCS_STATUS_LABELS[b.regStatus]||b.regStatus}</b></div>${b.regNote?`<div class="row"><span>Note from our team</span><b>${clean(b.regNote)}</b></div>`:""}<div class="row"><span>TIN</span><b>${b.tin?clean(b.tin):"Not issued yet"}</b></div><div class="row"><span>SCUML</span><b>${DOCS_STATUS_LABELS[b.scumlStatus]||b.scumlStatus}</b></div>`;
+  $("docsRegStatusBox").innerHTML=`<div class="row"><span>Registration type</span><b>${b.regType?clean(b.regType.replace(/_/g," ")):"Not chosen yet"}</b></div><div class="row"><span>Status</span><b>${docsPill(b.regStatus,DOCS_STATUS_LABELS[b.regStatus]||b.regStatus)}</b></div>${b.regNote?`<div class="row"><span>Note from our team</span><b>${clean(b.regNote)}</b></div>`:""}<div class="row"><span>TIN</span><b>${b.tin?clean(b.tin):"Not issued yet"}</b></div><div class="row"><span>SCUML</span><b>${docsPill(b.scumlStatus,DOCS_STATUS_LABELS[b.scumlStatus]||b.scumlStatus)}</b></div>`;
   $("docsRegType").value=b.regType||"";
   $("docsNobCategory").value=b.regNatureOfBusinessCategory||"";
   $("docsNob").value=b.regNatureOfBusiness||"";
@@ -1063,27 +1065,29 @@ function buildStatutoryDeadlines(){return[
 
 let docsTrackers=[];
 async function loadDocsTrackers(){try{docsTrackers=await api("GET","/api/docs/trackers");renderDocsTrackers();renderDocsCalendar()}catch(err){toast(err.message)}}
-const TRACKER_STATUS_LABEL=t=>{if(t.status==="done")return "Done";const n=daysUntil(t.dueDate);return n<0?"Overdue":n<=7?`Due in ${daysLabel(n)}`:"Upcoming"};
+const TRACKER_STATUS_PILL=t=>{if(t.status==="done")return docsPill("approved","Done");const n=daysUntil(t.dueDate);return n<0?docsPill("action_needed","Overdue"):n<=7?docsPill("submitted",`Due in ${daysLabel(n)}`):docsPill("not_started","Upcoming")};
 function renderDocsTrackers(){
-  $("docsTrackerList").innerHTML=docsTrackers.map(t=>`<div class="item"><div class="item-top"><strong>${clean(t.name)}</strong><span>${TRACKER_STATUS_LABEL(t)}</span></div><div class="meta">${clean(t.category)} - due ${date(t.dueDate)}${t.recurrence!=="none"?" - recurs "+t.recurrence:""}${t.note?" - "+clean(t.note):""}</div><div class="item-actions">${t.status!=="done"?`<button onclick="markDocsTrackerDone('${t.id}')">Mark done</button>`:""}<button onclick="deleteDocsTracker('${t.id}')">Delete</button></div></div>`).join("");
+  $("docsTrackerList").innerHTML=docsTrackers.map(t=>`<div class="item"><div class="item-top"><strong>${clean(t.name)}</strong><span>${TRACKER_STATUS_PILL(t)}</span></div><div class="meta">${clean(t.category)} - due ${date(t.dueDate)}${t.recurrence!=="none"?" - recurs "+t.recurrence:""}${t.note?" - "+clean(t.note):""}</div><div class="item-actions">${t.status!=="done"?`<button onclick="markDocsTrackerDone('${t.id}')">Mark done</button>`:""}<button onclick="deleteDocsTracker('${t.id}')">Delete</button></div></div>`).join("");
 }
 if($("docsTrackerForm"))$("docsTrackerForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/trackers",{name:$("docsTrackerName").value.trim(),category:$("docsTrackerCategory").value,dueDate:$("docsTrackerDue").value,recurrence:$("docsTrackerRecurrence").value,note:$("docsTrackerNote").value.trim()});e.target.reset();await loadDocsTrackers();toast("Tracker added")}catch(err){toast(err.message)}};
 async function markDocsTrackerDone(id){try{await api("PUT","/api/docs/trackers/"+id,{status:"done"});await loadDocsTrackers();toast("Marked done")}catch(err){toast(err.message)}}
 async function deleteDocsTracker(id){try{await api("DELETE","/api/docs/trackers/"+id);await loadDocsTrackers();toast("Tracker deleted")}catch(err){toast(err.message)}}
 
+const docsDaysBadge=n=>`<span class="docs-days ${n<=7?"docs-days-soon":n<=30?"docs-days-mid":"docs-days-far"}">${daysLabel(n)}</span>`;
 function renderDocsCalendar(){
   const statutory=buildStatutoryDeadlines().map(s=>({name:s.name,note:s.note,days:daysUntil(s.due),source:"statutory"}));
   const trackerItems=docsTrackers.filter(t=>t.status!=="done").map(t=>({name:t.name,note:clean(t.category)+" - Tracker",days:daysUntil(t.dueDate),source:"tracker"}));
   const merged=statutory.concat(trackerItems).sort((a,b)=>a.days-b.days);
   const soonest=merged[0];
-  $("docsNextDeadline").innerHTML=soonest?`<div class="row"><span>${clean(soonest.name)}</span><b>${daysLabel(soonest.days)}</b></div>`:'<p class="meta">Nothing due yet.</p>';
-  $("docsCalendarList").innerHTML=merged.map(item=>`<div class="item"><div class="item-top"><strong>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</strong><span>${daysLabel(item.days)}</span></div><div class="meta">${clean(item.note)}</div></div>`).join("");
+  $("docsNextDeadline").innerHTML=soonest?`<div class="row"><span>${clean(soonest.name)}</span><b>${docsDaysBadge(soonest.days)}</b></div>`:'<p class="meta">Nothing due yet.</p>';
+  $("docsCalendarList").innerHTML=merged.map(item=>`<div class="item"><div class="item-top"><strong>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</strong>${docsDaysBadge(item.days)}</div><div class="meta">${clean(item.note)}</div></div>`).join("");
 }
 
+const DOCS_VAULT_TYPE_CLASS={Registration:"docs-type-registration",Tracker:"docs-type-tracker"};
 let docsVaultItems=[];
 async function loadDocsVault(){try{docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault()}catch(err){toast(err.message)}}
 function renderDocsVault(){
-  $("docsVaultList").innerHTML=docsVaultItems.map(v=>`<div class="item"><div class="item-top"><strong>${clean(v.name)}</strong><span>${clean(v.docType)}</span></div><div class="meta">${date(v.createdAt)}</div><div class="item-actions"><a class="button-link" href="${v.file}" download="${clean(v.name)}">Download</a></div></div>`).join("");
+  $("docsVaultList").innerHTML=docsVaultItems.map(v=>`<div class="item"><div class="item-top"><strong>${clean(v.name)}</strong><span class="docs-type ${DOCS_VAULT_TYPE_CLASS[v.docType]||""}">${clean(v.docType)}</span></div><div class="meta">${date(v.createdAt)}</div><div class="item-actions"><a class="button-link" href="${v.file}" download="${clean(v.name)}">Download</a></div></div>`).join("");
 }
 if($("docsVaultForm"))$("docsVaultForm").onsubmit=async e=>{e.preventDefault();try{const file=$("docsVaultFile").files?.[0];if(!file)return toast("Choose a file first");const dataUrl=await readFileAsDataUrl(file);await api("POST","/api/docs/vault",{name:$("docsVaultName").value.trim(),docType:$("docsVaultType").value,file:dataUrl});e.target.reset();await loadDocsVault();toast("Document uploaded")}catch(err){toast(err.message)}};
 
