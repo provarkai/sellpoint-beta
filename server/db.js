@@ -2630,13 +2630,16 @@ function toVaultItemJson(v) {
 }
 
 // Aggregates real uploads with documents already produced elsewhere in
-// Docs (the registration certificate, tracker proof-of-completion) into
-// one list, same concept as the mockup's vaultItems() but over real data.
+// Docs (registration certificate, tracker proof-of-completion, filings,
+// verification results) into one list, same concept as the mockup's
+// vaultItems() but over real data.
 async function listVaultItems(businessId) {
-  const [uploadRows, bizRows, trackerRows] = await Promise.all([
+  const [uploadRows, bizRows, trackerRows, filingRows, verificationRows] = await Promise.all([
     query("SELECT * FROM docs_vault_items WHERE business_id=$1 ORDER BY created_at DESC", [businessId]),
     query("SELECT reg_certificate, created_at FROM businesses WHERE id=$1", [businessId]),
     query("SELECT id, name, proof_document, created_at FROM docs_trackers WHERE business_id=$1 AND proof_document != ''", [businessId]),
+    query("SELECT id, filing_type, period, status, created_at FROM docs_filings WHERE business_id=$1", [businessId]),
+    query("SELECT id, check_type, status, created_at FROM docs_verifications WHERE business_id=$1", [businessId]),
   ]);
   const items = uploadRows.rows.map(toVaultItemJson);
   const biz = bizRows.rows[0];
@@ -2645,6 +2648,12 @@ async function listVaultItems(businessId) {
   }
   trackerRows.rows.forEach((t) => {
     items.push({ id: "tracker-" + t.id, name: t.name + " - Proof", docType: "Tracker", file: t.proof_document, createdAt: t.created_at, source: "tracker" });
+  });
+  filingRows.rows.forEach((f) => {
+    items.push({ id: "filing-" + f.id, name: `${f.filing_type} filing${f.period ? " - " + f.period : ""}`, docType: "Tax", file: "", status: f.status, createdAt: f.created_at, source: "filing" });
+  });
+  verificationRows.rows.forEach((v) => {
+    items.push({ id: "verification-" + v.id, name: `${v.check_type} verification`, docType: "Verification", file: "", status: v.status, createdAt: v.created_at, source: "verification" });
   });
   items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return items;
@@ -2658,6 +2667,108 @@ async function createVaultItem(businessId, data) {
     [businessId, name, data.docType || "Other", file]
   );
   return toVaultItemJson(rows[0]);
+}
+
+// --- SellersPoint Docs Phase 3: Tax Suite (Payroll/Payslip/Annual Certificate) --
+
+function toEmployeeJson(e) {
+  return { id: e.id, name: e.name, grossAnnual: Number(e.gross_annual), annualRent: Number(e.annual_rent), createdAt: e.created_at };
+}
+async function listEmployees(businessId) {
+  const { rows } = await query("SELECT * FROM docs_employees WHERE business_id=$1 ORDER BY created_at", [businessId]);
+  return rows.map(toEmployeeJson);
+}
+async function createEmployee(businessId, data) {
+  const name = requireString(data.name, "Employee name");
+  const grossAnnual = Number(data.grossAnnual);
+  if (!grossAnnual || grossAnnual <= 0) throw new OrderError("Gross salary is required");
+  const { rows } = await query(
+    "INSERT INTO docs_employees (business_id, name, gross_annual, annual_rent) VALUES ($1,$2,$3,$4) RETURNING *",
+    [businessId, name, grossAnnual, Number(data.annualRent) || 0]
+  );
+  return toEmployeeJson(rows[0]);
+}
+async function deleteEmployee(businessId, id) {
+  await query("DELETE FROM docs_employees WHERE id=$1 AND business_id=$2", [id, businessId]);
+}
+
+// --- SellersPoint Docs Phase 3: E-Invoicing ---------------------------------
+// IRN/CSID are generated locally (crypto.randomBytes, same intent as the
+// mockup's Math.random() stub) - not a real NRS call. Swap-in point once
+// the platform is NRS/Access-Point-Provider integrated.
+
+function toInvoiceJson(i) {
+  return { id: i.id, buyerName: i.buyer_name, buyerTin: i.buyer_tin, description: i.description, amount: Number(i.amount), vat: Number(i.vat), irn: i.irn, csid: i.csid, createdAt: i.created_at };
+}
+async function listInvoices(businessId) {
+  const { rows } = await query("SELECT * FROM docs_invoices WHERE business_id=$1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toInvoiceJson);
+}
+async function createInvoice(businessId, data) {
+  const buyerName = requireString(data.buyerName, "Buyer name");
+  const amount = Number(data.amount);
+  if (!amount || amount <= 0) throw new OrderError("Amount is required");
+  const vat = amount * 0.075;
+  const irn = "IRN-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+  const csid = "CSID-" + crypto.randomBytes(5).toString("hex").toUpperCase();
+  const { rows } = await query(
+    "INSERT INTO docs_invoices (business_id, buyer_name, buyer_tin, description, amount, vat, irn, csid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+    [businessId, buyerName, data.buyerTin || "", data.description || "", amount, vat, irn, csid]
+  );
+  return toInvoiceJson(rows[0]);
+}
+
+// --- SellersPoint Docs Phase 3: Verification (manual until a KYC vendor is wired in) --
+
+function toVerificationJson(v) {
+  return { id: v.id, checkType: v.check_type, inputValue: v.input_value, status: v.status, resultNote: v.result_note, createdAt: v.created_at };
+}
+async function listVerifications(businessId) {
+  const { rows } = await query("SELECT * FROM docs_verifications WHERE business_id=$1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toVerificationJson);
+}
+async function createVerification(businessId, data) {
+  const checkType = requireString(data.checkType, "Check type");
+  const inputValue = requireString(data.inputValue, "Value to check");
+  const { rows } = await query(
+    "INSERT INTO docs_verifications (business_id, check_type, input_value) VALUES ($1,$2,$3) RETURNING *",
+    [businessId, checkType, inputValue]
+  );
+  return toVerificationJson(rows[0]);
+}
+async function listVerificationQueue() {
+  const { rows } = await query(
+    `SELECT v.*, b.name AS business_name FROM docs_verifications v
+     JOIN businesses b ON b.id = v.business_id WHERE v.status = 'pending' ORDER BY v.created_at`
+  );
+  return rows.map((r) => ({ ...toVerificationJson(r), businessName: r.business_name }));
+}
+async function resolveVerification(id, { status, resultNote }) {
+  if (!["verified", "failed"].includes(status)) throw new OrderError("Invalid status");
+  const { rows } = await query(
+    "UPDATE docs_verifications SET status=$1, result_note=$2 WHERE id=$3 RETURNING *",
+    [status, resultNote || "", id]
+  );
+  if (!rows[0]) throw new OrderError("Verification not found");
+  return toVerificationJson(rows[0]);
+}
+
+// --- SellersPoint Docs Phase 3: Filings (VAT + CAC Annual Return) ----------
+
+function toFilingJson(f) {
+  return { id: f.id, filingType: f.filing_type, period: f.period, amount: f.amount == null ? null : Number(f.amount), status: f.status, createdAt: f.created_at };
+}
+async function listFilings(businessId) {
+  const { rows } = await query("SELECT * FROM docs_filings WHERE business_id=$1 ORDER BY created_at DESC", [businessId]);
+  return rows.map(toFilingJson);
+}
+async function createFiling(businessId, data) {
+  const filingType = requireString(data.filingType, "Filing type");
+  const { rows } = await query(
+    "INSERT INTO docs_filings (business_id, filing_type, period, amount) VALUES ($1,$2,$3,$4) RETURNING *",
+    [businessId, filingType, data.period || "", data.amount == null ? null : Number(data.amount)]
+  );
+  return toFilingJson(rows[0]);
 }
 
 // --- Platform admins (who can access backend.html) --------------------------
@@ -3338,6 +3449,17 @@ module.exports = {
   deleteTracker,
   listVaultItems,
   createVaultItem,
+  listEmployees,
+  createEmployee,
+  deleteEmployee,
+  listInvoices,
+  createInvoice,
+  listVerifications,
+  createVerification,
+  listVerificationQueue,
+  resolveVerification,
+  listFilings,
+  createFiling,
   isPlatformAdmin,
   listPlatformAdmins,
   addPlatformAdmin,

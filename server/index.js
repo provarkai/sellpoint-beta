@@ -1433,6 +1433,67 @@ app.post(
   handle(async (req, res) => res.status(201).json(await db.createVaultItem(req.businessId, req.body || {})))
 );
 
+app.get(
+  "/api/docs/employees",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listEmployees(req.businessId)))
+);
+app.post(
+  "/api/docs/employees",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createEmployee(req.businessId, req.body || {})))
+);
+app.delete(
+  "/api/docs/employees/:id",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => {
+    await db.deleteEmployee(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+
+app.get(
+  "/api/docs/invoices",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listInvoices(req.businessId)))
+);
+app.post(
+  "/api/docs/invoices",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createInvoice(req.businessId, req.body || {})))
+);
+
+app.get(
+  "/api/docs/verifications",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listVerifications(req.businessId)))
+);
+app.post(
+  "/api/docs/verifications",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createVerification(req.businessId, req.body || {})))
+);
+
+app.get(
+  "/api/docs/filings",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listFilings(req.businessId)))
+);
+app.post(
+  "/api/docs/filings",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createFiling(req.businessId, req.body || {})))
+);
+
 // --- Feedback (business -> SellersPoint team) --------------------------------
 app.get(
   "/api/feedback",
@@ -1644,6 +1705,19 @@ app.put(
   "/api/admin/registration-queue/:id",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.advanceBusinessRegistration(req.params.id, req.body || {})))
+);
+
+// Manual resolution for Verification requests until a KYC vendor (QoreID
+// or similar) is wired in - see db.js#createVerification.
+app.get(
+  "/api/admin/verification-queue",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.listVerificationQueue()))
+);
+app.put(
+  "/api/admin/verification-queue/:id",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json(await db.resolveVerification(req.params.id, req.body || {})))
 );
 
 app.get(

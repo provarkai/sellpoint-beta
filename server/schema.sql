@@ -645,6 +645,59 @@ create table if not exists docs_vault_items (
 );
 create index if not exists docs_vault_items_business_id_idx on docs_vault_items(business_id);
 
+-- SellersPoint Docs Phase 3: Tax Suite (Payroll/Payslip/Annual Certificate
+-- all read docs_employees; E-Invoicing writes docs_invoices with a
+-- locally-generated IRN/CSID, matching the mockup's own stub level - a
+-- real NRS integration is a later swap-in), Verification (status starts
+-- 'pending' - no KYC vendor wired in yet, resolved manually via
+-- backend.html's Verification Queue until one is), and Filings (covers
+-- both VAT and the CAC Annual Return wizard's submission).
+create table if not exists docs_employees (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  gross_annual numeric not null,
+  annual_rent numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_employees_business_id_idx on docs_employees(business_id);
+
+create table if not exists docs_invoices (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  buyer_name text not null,
+  buyer_tin text not null default '',
+  description text not null default '',
+  amount numeric not null,
+  vat numeric not null,
+  irn text not null,
+  csid text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_invoices_business_id_idx on docs_invoices(business_id);
+
+create table if not exists docs_verifications (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  check_type text not null,
+  input_value text not null,
+  status text not null default 'pending',
+  result_note text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_verifications_business_id_idx on docs_verifications(business_id);
+
+create table if not exists docs_filings (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  filing_type text not null,
+  period text not null default '',
+  amount numeric,
+  status text not null default 'submitted',
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_filings_business_id_idx on docs_filings(business_id);
+
 -- Ledgers, not just running totals, so a customer's timeline can show the
 -- full history of how their balance got where it is (matches the cashbook's
 -- append-only design elsewhere in this schema).
