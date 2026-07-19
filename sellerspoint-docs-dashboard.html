@@ -251,25 +251,67 @@ main{padding:32px 36px;overflow:auto}
 .wa-link{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);color:#eaf6f0;padding:11px 14px;border-radius:8px;font-weight:800;font-size:13px;margin:6px 0}
 .wa-link:hover{background:rgba(255,255,255,.12);color:#fff}
 
+/* Business Health Score */
+.health-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.health-score{font-size:28px;font-weight:800;color:var(--primary);white-space:nowrap}
+.health-score small{font-size:13px;font-weight:700;color:var(--muted)}
+.health-score.score-mid{color:var(--accent)}
+.health-score.score-low{color:var(--danger)}
+.health-bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:12px 0}
+.health-bar-fill{height:100%;background:var(--primary);transition:width .3s ease}
+.health-bar-fill.fill-mid{background:var(--accent)}
+.health-bar-fill.fill-low{background:var(--danger)}
+.health-checklist{display:grid;gap:9px;margin-top:2px}
+.health-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700}
+.health-item .lbl{display:flex;align-items:center;gap:8px}
+.health-item .ic{width:16px;text-align:center;flex:0 0 auto}
+.health-item.pass .ic{color:var(--primary)}
+.health-item.fail .ic{color:var(--muted)}
+
+/* Guided filing modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(6,46,38,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-box{position:relative;background:#fff;border-radius:14px;max-width:460px;width:100%;padding:26px;box-shadow:0 30px 70px rgba(0,0,0,.35);max-height:88vh;overflow:auto}
+.modal-box h2{font-size:17px;font-weight:800;padding-right:24px}
+.modal-x{position:absolute;top:16px;right:16px;background:transparent;color:var(--muted);font-size:20px;line-height:1;width:28px;height:28px;border-radius:6px}
+.modal-x:hover{color:var(--ink);background:var(--bg)}
+.modal-step-dots{display:flex;gap:6px;margin:16px 0}
+.modal-step-dots span{height:5px;flex:1;border-radius:99px;background:var(--line)}
+.modal-step-dots span.done{background:var(--primary)}
+.modal-review-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.modal-review-row:last-child{border-bottom:0}
+.modal-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px}
+.modal-radio{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-top:10px}
+
 /* Compliance Calendar */
 .next-deadline{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .next-deadline .figure{font-size:34px;font-weight:800;color:var(--accent);margin:6px 0 2px}
 .next-deadline .figure small{font-size:14px;font-weight:700;color:var(--muted);margin-left:6px}
-.cal-months{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:900px){.cal-months{grid-template-columns:1fr}}
+.cal-months{display:flex;flex-direction:column;gap:22px}
+.cal-months .card + .card{position:relative}
+.cal-months .card + .card::before{content:"";position:absolute;top:-11px;left:20px;right:20px;border-top:1px dashed var(--line)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:14px}
 .cal-dow{font-size:10px;font-weight:800;color:var(--muted);text-align:center;text-transform:uppercase;padding-bottom:2px}
-.cal-cell{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink);background:#fbfcfb;border:1px solid var(--line)}
+.cal-cell{position:relative;aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink);background:#fbfcfb;border:1px solid var(--line);transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
 .cal-cell.empty{background:transparent;border-color:transparent}
 .cal-cell.today{border-color:var(--primary);color:var(--primary);background:#f0faf6}
+.cal-cell.has-deadline{cursor:pointer}
+.cal-cell.has-deadline:hover{border-color:var(--danger);background:#fff5f4;box-shadow:0 6px 16px rgba(180,35,24,.18);z-index:6}
 .cal-cell .dot{width:5px;height:5px;border-radius:50%;background:var(--danger)}
+.cal-tip{position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--dark);color:#eef8f1;padding:10px 12px;border-radius:8px;font-size:11.5px;font-weight:600;line-height:1.45;width:200px;text-align:left;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease,transform .15s ease;box-shadow:0 14px 30px rgba(0,0,0,.3);z-index:20}
+.cal-tip .tip-item b{display:block;font-size:11.5px;font-weight:800;color:#fff}
+.cal-tip .tip-item{color:#c7ddd2}
+.cal-tip .tip-item + .tip-item{margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.14)}
+.cal-cell.has-deadline:hover .cal-tip{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
 .cal-legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted);font-weight:700}
 .cal-legend span{display:flex;align-items:center;gap:5px}
 .cal-legend .sw{width:8px;height:8px;border-radius:50%}
-.deadline-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.deadline-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
 .deadline-row:last-child{border-bottom:0}
+.deadline-row .info{min-width:0}
 .deadline-row .info b{font-size:14px;font-weight:800;display:block}
 .deadline-row .info small{color:var(--muted);font-size:12px}
+.deadline-row .action-col{display:flex;align-items:center;gap:10px;justify-self:end}
 .deadline-row .days{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
 .days-soon{background:#fff1f0;color:var(--danger)}
 .days-mid{background:#fff4e8;color:var(--accent)}
@@ -357,6 +399,18 @@ main{padding:32px 36px;overflow:auto}
       </div>
     </div>
 
+    <div class="card health-card" style="margin-top:16px">
+      <div class="health-head">
+        <div>
+          <h3 style="font-size:15px;font-weight:800">Business Health Score</h3>
+          <p style="color:var(--muted);font-size:12.5px;margin-top:2px">How compliant and bank-ready this business is right now.</p>
+        </div>
+        <div class="health-score" id="healthScoreFigure">—</div>
+      </div>
+      <div class="health-bar"><div class="health-bar-fill" id="healthBarFill" style="width:0%"></div></div>
+      <div class="health-checklist" id="healthChecklist"></div>
+    </div>
+
     <div class="card bundle-card" style="margin-top:16px">
       <div class="info">
         <b>📅 Everything due, in one place</b>
@@ -433,7 +487,7 @@ main{padding:32px 36px;overflow:auto}
 
     <div class="cat-title">Also available</div>
     <div class="card" style="margin-bottom:10px;background:#f0faf6">
-      <p style="font-size:13px;font-weight:700;color:var(--dark)">🏦 Get this early — most Nigerian banks won't open a business account without your SCUML certificate. We recommend starting it right after your TIN.</p>
+      <p style="font-size:13px;font-weight:700;color:var(--dark)">🏦 Get this early — most Nigerian banks won't open a business account without your SCUML certificate. It's a one-time certificate issued by the EFCC, no renewal needed once approved — we recommend starting it right after your TIN.</p>
     </div>
     <div id="regScuml"></div>
 
@@ -449,6 +503,7 @@ main{padding:32px 36px;overflow:auto}
       <div id="verifyList"></div>
       <div class="verify-panel" id="verifyPanel">
         <label style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em" id="verifyLabel">Enter the number to check</label>
+        <p id="verifyTinNote" style="display:none;font-size:12px;font-weight:700;color:var(--primary);margin:2px 0 8px">✓ Auto-filled from your last verified TIN</p>
         <input id="verifyInput" placeholder="e.g. 12345678901">
         <button class="btn btn-primary" onclick="runCheck()">Run check</button>
         <div class="verify-result" id="verifyResult"></div>
@@ -582,7 +637,7 @@ main{padding:32px 36px;overflow:auto}
         <p style="color:var(--muted);font-size:13px;margin-top:4px">Nigeria's e-invoicing mandate (Merchant-Buyer Solution / Electronic Fiscal System) rolled out for large taxpayers from Nov 2025, with medium and small businesses phased in through 2026–2027. Every compliant invoice gets an FIRS/NRS-issued <b>Invoice Reference Number (IRN)</b>, a <b>Cryptographic Stamp (CSID)</b>, and a <b>QR code</b> before it reaches the buyer — B2B/B2G go through pre-clearance, B2C over ₦50,000 gets reported within 24 hours. Check current NRS guidance for your business's exact compliance deadline.</p>
 
         <div class="field-grid cols-3" style="margin-top:14px">
-          <div class="field">Your TIN<input id="invSellerTin" placeholder="e.g. 12345678-0001"></div>
+          <div class="field">Your TIN<input id="invSellerTin" placeholder="e.g. 12345678-0001"><small id="invTinNote" style="display:none;color:var(--primary);font-weight:700">✓ Auto-filled from Verification</small></div>
           <div class="field">Buyer name<input id="invBuyerName" placeholder="e.g. Zenith Bank PLC"></div>
           <div class="field">Buyer TIN<input id="invBuyerTin" placeholder="e.g. 98765432-0001"></div>
           <div class="field span2">Description of goods/services<input id="invDesc" placeholder="e.g. Consulting services — July 2026"></div>
@@ -693,6 +748,15 @@ main{padding:32px 36px;overflow:auto}
   </section>
 
 </main>
+
+<div class="modal-overlay" id="cacWizardOverlay" onclick="if(event.target===this) closeCacWizard()">
+  <div class="modal-box">
+    <button class="modal-x" onclick="closeCacWizard()">×</button>
+    <h2>Guided CAC Annual Return Filing</h2>
+    <div class="modal-step-dots" id="cacStepDots"></div>
+    <div id="cacWizardBody"></div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -809,6 +873,7 @@ const BUSINESSES = [
   {
     id: "biz1", name: "Amina Fashion Hub", regType: "Business Name",
     regStatus: "approved", regNote: "Certificate ready",
+    tin: null,
     scuml: { status: "approved", celebrate: true },
     setupSteps: [
       { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
@@ -844,12 +909,13 @@ const BUSINESSES = [
     ],
     vaultExtra: [
       { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12" },
-      { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · Renews Jul 2027" },
+      { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · One-time, EFCC-issued — no renewal" },
     ],
   },
   {
     id: "biz2", name: "TechBuild Nigeria Ltd", regType: "Limited Liability Company",
     regStatus: "approved", regNote: "Certificate ready",
+    tin: "20304050-0001",
     scuml: { status: "not-started" },
     setupSteps: [
       { text:"LLC ✓", done:true }, { text:"TIN ✓", done:true },
@@ -890,6 +956,7 @@ const BUSINESSES = [
   {
     id: "biz3", name: "Coastal Traders", regType: "Business Name",
     regStatus: "action-needed", regNote: "We need a certified copy of your means of ID",
+    tin: null,
     scuml: { status: "not-started" },
     setupSteps: [
       { text:"Business Name (action needed)", done:false }, { text:"TIN —", done:false },
@@ -940,16 +1007,25 @@ function switchBusiness(id){
 function renderAll(){
   renderBizSwitcher();
   renderOverview();
+  renderHealthScore();
   renderRegistrations();
   renderVerifyList(); renderLookups();
   $("vatFigure").textContent = naira(biz().vatFigure);
   renderFilingHistory();
   renderPayroll();
   renderInvoices();
+  applyTinAutofill();
   renderTrackers();
   renderCalendar();
   renderDocs();
   renderVault();
+}
+function applyTinAutofill(){
+  const tin = biz().tin;
+  if ($("invSellerTin")){
+    $("invSellerTin").value = tin || "";
+    $("invTinNote").style.display = tin ? "block" : "none";
+  }
 }
 
 /* ---------- Overview (per business) ---------- */
@@ -970,6 +1046,34 @@ function renderOverview(){
     const icon = i.type==='Registration'?'📄':i.type==='Tax'?'💰':i.type==='Verification'?'🔍':'🧾';
     return `<div class="vault-mini-row"><span>${icon} ${i.name}</span><span class="tag">${i.type} · ${i.date.replace(/^(Issued|Filed|Checked|Created)\s/,'')}</span></div>`;
   }).join("") : `<p style="color:var(--muted);font-size:13px;padding:8px 0">Nothing here yet.</p>`;
+}
+
+/* ---------- Business Health Score (per business, computed from live state) ---------- */
+function computeHealthChecks(b){
+  return [
+    { label:"Registration approved", pass: b.regStatus==="approved", view:"registrations" },
+    { label:"SCUML certificate (bank-ready)", pass: b.scuml.status==="approved", view:"registrations" },
+    { label:"TIN verified", pass: !!b.tin, view:"verification" },
+    { label:"No overdue trackers", pass: !b.trackers.some(t=>t.status==="overdue"), view:"trackers" },
+    { label:"VAT filings up to date", pass: b.filingHistory.length>0 && b.filingHistory[0].status==="filed", view:"tax" },
+  ];
+}
+function renderHealthScore(){
+  const b = biz();
+  const checks = computeHealthChecks(b);
+  const passed = checks.filter(c=>c.pass).length;
+  const score = Math.round((passed/checks.length)*100);
+  const cls = score>=80 ? "" : score>=50 ? "score-mid" : "score-low";
+  const fillCls = score>=80 ? "" : score>=50 ? "fill-mid" : "fill-low";
+  $("healthScoreFigure").innerHTML = `${score}<small>/100</small>`;
+  $("healthScoreFigure").className = "health-score " + cls;
+  $("healthBarFill").style.width = score + "%";
+  $("healthBarFill").className = "health-bar-fill " + fillCls;
+  $("healthChecklist").innerHTML = checks.map(c => `
+    <div class="health-item ${c.pass?'pass':'fail'}">
+      <span class="lbl"><span class="ic">${c.pass?'✓':'○'}</span> ${c.label}</span>
+      ${c.pass ? "" : `<button class="btn btn-ghost btn-sm" onclick="goto('${c.view}')">Fix</button>`}
+    </div>`).join("");
 }
 
 /* ---------- Registrations (per business, single either/or card) ---------- */
@@ -1149,9 +1253,10 @@ function selectCheck(id){
   const c = CHECKS.find(x=>x.id===id);
   $("verifyLabel").textContent = `Enter the ${c.label.replace(" Verification","").replace(" Check","").replace(" Availability","")} to check`;
   $("verifyInput").placeholder = c.placeholder;
-  $("verifyInput").value = "";
+  $("verifyInput").value = (id === "tin" && biz().tin) ? biz().tin : "";
   $("verifyResult").classList.remove("show");
   $("verifyPanel").classList.add("show");
+  $("verifyTinNote") && ($("verifyTinNote").style.display = (id === "tin" && biz().tin) ? "block" : "none");
   $("verifyPanel").scrollIntoView({ behavior:"smooth", block:"nearest" });
 }
 function runCheck(){
@@ -1164,9 +1269,16 @@ function runCheck(){
   $("verifyResult").classList.add("show");
   const when = "Just now, " + (c.automated ? "instant" : "pending review");
   biz().lookups.unshift({ label:c.label, result:resultText, when });
+  if (c.id === "tin"){
+    biz().tin = val;
+    toast("TIN verified — auto-filled across the rest of your dashboard");
+  } else {
+    toast(c.automated ? "Checked — saved to your Vault" : "Checked — sent for manual review");
+  }
   renderLookups();
   renderVault();
-  toast(c.automated ? "Checked — saved to your Vault" : "Checked — sent for manual review");
+  applyTinAutofill();
+  renderHealthScore();
 }
 function renderLookups(){
   $("lookupHistory").innerHTML = biz().lookups.map(l => `
@@ -1223,10 +1335,54 @@ function buildStatutoryDeadlines(){
     { name:"VAT Return", note:"Filing + payment, previous month's sales", due: nextMonthlyDate(21), action:"Estimate now", onAction:()=>goto("tax") },
     { name:"PAYE Remittance", note:"Employee tax withheld, previous month", due: nextMonthlyDate(10), action:"Go to Payroll", onAction:()=>goto("tax") },
     { name:"Withholding Tax Remittance", note:"Previous month's WHT deductions", due: nextMonthlyDate(21), action:"View", onAction:()=>goto("tax") },
-    { name:"CAC Annual Return", note:"Keeps your company active on the register", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>toast("Starting CAC Annual Return filing…") },
+    { name:"CAC Annual Return", note:"Keeps your company active on the register", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>openCacWizard() },
     { name:"Companies Income Tax Return", note:"~6 months after financial year end (Dec FYE shown)", due: nextAnnualDate(5, 30), action:"File now", onAction:()=>toast("Starting Companies Income Tax filing…") },
     { name:"Personal Income Tax Return", note:"Individual annual return + Tax Clearance renewal", due: nextAnnualDate(2, 31), action:"File now", onAction:()=>toast("Starting Personal Income Tax filing…") },
   ];
+}
+
+/* ---------- Guided CAC Annual Return filing wizard ---------- */
+let cacWizardStep = 1;
+const CAC_WIZARD_STEPS = 3;
+function openCacWizard(){
+  cacWizardStep = 1;
+  $("cacWizardOverlay").classList.add("show");
+  renderCacWizard();
+}
+function closeCacWizard(){ $("cacWizardOverlay").classList.remove("show"); }
+function cacWizardGo(step){ cacWizardStep = step; renderCacWizard(); }
+function renderCacWizard(){
+  const b = biz();
+  $("cacStepDots").innerHTML = Array.from({length:CAC_WIZARD_STEPS}).map((_,i)=>`<span class="${i < cacWizardStep ? 'done' : ''}"></span>`).join("");
+  let body = "";
+  if (cacWizardStep === 1){
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 1 of 3 — confirm your business details. We've pre-filled what we already have on file.</p>
+      <div class="modal-review-row"><span>Business name</span><b>${b.name}</b></div>
+      <div class="modal-review-row"><span>Registration type</span><b>${b.regType}</b></div>
+      <div class="modal-review-row"><span>TIN</span><b>${b.tin ? b.tin : '⚠ Not verified yet'}</b></div>
+      ${!b.tin ? `<p style="font-size:12px;color:var(--accent);font-weight:700;margin-top:10px">Verifying your TIN first makes this faster — <a href="#" onclick="closeCacWizard();goto('verification');return false" style="color:var(--accent)">do that now</a>, or continue anyway.</p>` : ""}
+      <div class="modal-actions"><span></span><button class="btn btn-primary" onclick="cacWizardGo(2)">Continue →</button></div>`;
+  } else if (cacWizardStep === 2){
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 2 of 3 — has anything changed since your last filing?</p>
+      <label class="modal-radio"><input type="radio" name="cacChange" checked> No changes to directors, shareholders, or business address</label>
+      <label class="modal-radio"><input type="radio" name="cacChange"> Something has changed — I'll need to update it first</label>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="cacWizardGo(1)">← Back</button><button class="btn btn-primary" onclick="cacWizardGo(3)">Continue →</button></div>`;
+  } else {
+    body = `
+      <p style="color:var(--muted);font-size:13px">Step 3 of 3 — review and submit.</p>
+      <div class="modal-review-row"><span>Service</span><b>CAC Annual Return Filing</b></div>
+      <div class="modal-review-row"><span>Fee</span><b>₦20,000</b></div>
+      <div class="modal-review-row"><span>Payment</span><b>💳 Held in escrow — released only once filed</b></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">We file this on your behalf and update you here and on WhatsApp — no need to contact anyone else.</p>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="cacWizardGo(2)">← Back</button><button class="btn btn-primary" onclick="cacWizardSubmit()">Submit filing →</button></div>`;
+  }
+  $("cacWizardBody").innerHTML = body;
+}
+function cacWizardSubmit(){
+  closeCacWizard();
+  toast("CAC Annual Return submitted — payment held, we'll update you here and on WhatsApp");
 }
 
 let calActionRefs = [];
@@ -1237,14 +1393,21 @@ function renderMonthGrid(gridEl, labelEl, monthOffset, statutory){
   const viewYear = view.getFullYear(), viewMonth = view.getMonth();
   const firstDow = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
-  const deadlineDays = new Set(statutory.filter(s=>s.due.getFullYear()===viewYear && s.due.getMonth()===viewMonth).map(s=>s.due.getDate()));
+  const deadlinesByDay = {};
+  statutory.forEach(s=>{
+    if (s.due.getFullYear()===viewYear && s.due.getMonth()===viewMonth){
+      (deadlinesByDay[s.due.getDate()] ||= []).push(s);
+    }
+  });
   labelEl.textContent = view.toLocaleDateString('en-NG',{month:'long',year:'numeric'});
   const dow = ["S","M","T","W","T","F","S"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
   let cells = "";
   for(let i=0;i<firstDow;i++) cells += `<div class="cal-cell empty"></div>`;
   for(let d=1; d<=daysInMonth; d++){
     const isToday = monthOffset===0 && d===now.getDate();
-    cells += `<div class="cal-cell ${isToday?'today':''}">${d}${deadlineDays.has(d)?'<span class="dot"></span>':''}</div>`;
+    const items = deadlinesByDay[d];
+    const tip = items ? `<div class="cal-tip">${items.map(it=>`<div class="tip-item"><b>${it.name}</b>${it.note}</div>`).join("")}</div>` : "";
+    cells += `<div class="cal-cell ${isToday?'today':''} ${items?'has-deadline':''}">${d}${items?'<span class="dot"></span>':''}${tip}</div>`;
   }
   gridEl.innerHTML = dow + cells;
 }
@@ -1275,7 +1438,7 @@ function renderCalendar(){
     const idx = calActionRefs.push(item.onAction) - 1;
     return `<div class="deadline-row">
       <div class="info"><b>${item.source==='statutory'?'🏛️ ':'📌 '}${item.name}</b><small>${item.note}</small></div>
-      <div style="display:flex;gap:10px;align-items:center">
+      <div class="action-col">
         <span class="days ${daysBadgeClass(item.days)}">${daysLabel(item.days)}</span>
         <button class="btn btn-ghost btn-sm" onclick="calActionRefs[${idx}]()">${item.action}</button>
       </div>
@@ -1290,8 +1453,8 @@ const BASIC_FIELDS = {
   tenancy: ["Landlord & Tenant names","Property address","Rent amount & payment schedule","Lease duration","Signatures & date"],
   freelance: ["Client & Freelancer names","Scope of work","Payment terms","Signatures & date"],
   business: ["Partner names","Business purpose","Capital contribution","Signatures & date"],
-  sales: ["Buyer & Seller names","Goods/services description","Price & payment terms","Signatures & date"],
-  proposal: ["Client & project summary","Scope of work","Pricing","Validity period"],
+  sales: ["Buyer & Seller names","Goods/services description","Price & payment terms","Seller's TIN","Signatures & date"],
+  proposal: ["Client & project summary","Scope of work","Pricing","Your business TIN","Validity period"],
 };
 const TPL_SUGGESTIONS = {
   loan: ["Interest rate (optional — leave blank if none)","Collateral / security clause","Late payment penalty clause","Guarantor / co-signer details","Governing state / jurisdiction"],
@@ -1308,7 +1471,14 @@ document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>
   b.classList.add("active");
   selectedTpl = b.dataset.tpl;
   $("basicDocLabel").textContent = "Standard " + TPL_LABELS[selectedTpl];
-  $("basicDocFields").innerHTML = (BASIC_FIELDS[selectedTpl] || BASIC_FIELDS.business).map(f => `<div>✓ ${f}</div>`).join("");
+  $("basicDocFields").innerHTML = (BASIC_FIELDS[selectedTpl] || BASIC_FIELDS.business).map(f => {
+    if (/TIN/i.test(f)){
+      return biz().tin
+        ? `<div>✓ ${f} <span style="color:var(--primary)">— auto-filled: ${biz().tin}</span></div>`
+        : `<div>✓ ${f} <span style="color:var(--muted);font-weight:600">— verify your TIN to auto-fill this</span></div>`;
+    }
+    return `<div>✓ ${f}</div>`;
+  }).join("");
   $("basicDoc").style.display = "block";
   $("suggestList").classList.remove("show");
   $("aiInput").value = "";

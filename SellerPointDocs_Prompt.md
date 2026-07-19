@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v11)
+# SellersPoint Docs — Product & Automation Brief (v12)
 
 ## 1. Product Overview
 
@@ -31,7 +31,7 @@ Government filings require a licensed party of record, so two specialist partner
 | **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, SCUML registration — plus CAC Annual Returns filing | Law firm or CAC-accredited agent |
 | **Partner B — Tax & Regulatory** | Everything about tax — TIN, Tax Filing, and Tax Clearance Certificate — plus state-specific permits | Chartered accountant (ICAN) or licensed tax/regulatory-filing agent |
 
-**CAC Annual Returns filing does not renew the underlying Business Name or LLC registration.** It's a separate, recurring compliance obligation that keeps a business in good standing with CAC — the registration certificate itself doesn't expire or get reissued through it. Product copy treats these as two distinct things: the registration certificate (issued once, shown in Registrations/Vault) and the Annual Returns filing (recurring, shown in the Compliance Calendar and, if overdue, the "Licences & Documents" Tracker category). SCUML is the exception — it does carry its own independent renewal cycle, unrelated to Annual Returns.
+**CAC Annual Returns filing does not renew the underlying Business Name or LLC registration.** It's a separate, recurring compliance obligation that keeps a business in good standing with CAC — the registration certificate itself doesn't expire or get reissued through it. Product copy treats these as two distinct things: the registration certificate (issued once, shown in Registrations/Vault) and the Annual Returns filing (recurring, shown in the Compliance Calendar and, if overdue, the "Licences & Documents" Tracker category). **SCUML is a one-time requirement, not a recurring one** — it's issued once by the EFCC after registration and never needs renewal; product copy must never attach a renewal or expiry date to it (corrected in v12, after an earlier draft incorrectly implied a renewal cycle).
 
 **Verification & Lookup is almost entirely automated, not partner-routed.** Verification API vendors exist that cover TIN, BVN, NIN, and CAC lookups under one integration — QoreID's public docs confirm all four — so this whole tier can run on SellersPoint's own infrastructure with near-instant turnaround, instead of the ~12 hours a manual agent needs. Only document authenticity verification on a high-stakes document might still warrant a manual cross-check as a fallback.
 
@@ -132,7 +132,7 @@ Built on the **Nigeria Tax Act 2025** (effective 1 January 2026), which replaced
 
 **Product note:** this expansion turns Tax Tools from a single VAT estimate into a genuine payroll/compliance suite — worth its own pricing and go-to-market pass rather than treating it as "one more feature" of the existing free tier.
 
-## 13. Compliance Calendar (upgraded in v9)
+## 13. Compliance Calendar (upgraded in v9, layout redesigned in v12)
 
 **Why it exists:** Trackers, the Tax Suite, and Registrations each know about their own deadlines, but nothing pulled them into one place — meaning a seller had no reason to open the app on a day nothing was urgently overdue. The Compliance Calendar is the retention answer: one view of everything due, regardless of which subsystem owns it.
 
@@ -151,8 +151,9 @@ Each of these now computes its *actual next occurrence* from today's date (rolli
 
 **Three visible pieces:**
 1. **Next deadline hero stat** — the single soonest statutory obligation, shown prominently ("12 days · 21 Jul") with a direct action.
-2. **Two-month grid view** — this month *and* next month, both rendered with dot markers on deadline days. This exists specifically because a single-month view hides real near-term deadlines that fall just past the month boundary — e.g. on 18 July, the next PAYE remittance (10th of the month) has already passed for July and doesn't land until 10 August, invisible on a one-month grid but clearly visible on two.
-3. **Merged upcoming list** — statutory deadlines plus open Trackers, sorted soonest-first, each tagged by source (🏛️ statutory / 📌 tracker) with a contextual action ("File now" for filing-type obligations, "Estimate now" for VAT, "View tracker" for self-tracked items).
+2. **Two-month grid view, always stacked (v12)** — this month, then next month directly below it, separated by a visible divider and each carrying its own full month-name header (e.g. "July 2026" / "August 2026"). Originally this sat in a two-column layout that only stacked at narrow widths as a responsive side-effect; v12 makes the stacked order permanent and deliberate so the relationship between the two months always reads clearly, regardless of screen width. This exists specifically because a single-month view hides real near-term deadlines that fall just past the month boundary — e.g. on 18 July, the next PAYE remittance (10th of the month) has already passed for July and doesn't land until 10 August, invisible on a one-month grid but clearly visible on two.
+3. **Hover detail on deadline days (v12)** — a day cell with a deadline dot highlights on hover and shows a tooltip listing every obligation due that day (name + note), since more than one statutory deadline can land on the same date (e.g. VAT Return and Withholding Tax Remittance both fall on the 21st).
+4. **Merged upcoming list, fixed two-column layout (v12)** — statutory deadlines plus open Trackers, sorted soonest-first, each tagged by source (🏛️ statutory / 📌 tracker) with a contextual action ("File now" for filing-type obligations, "Estimate now" for VAT, "View tracker" for self-tracked items). Each row is a two-column grid — description on the left (wraps freely), due-date badge and action on the right (fixed width, pinned to the row's right edge) — so a long obligation name or note can never push the date out of alignment or wrap it onto its own line, which the original flex layout allowed.
 
 **What it pulls together:** the full statutory list above (computed, not stored) + every non-completed Tracker (self-tracked and Licences & Documents categories) + the current VAT deadline from the Tax Suite. No new data model beyond the statutory rule table itself — it's a read-through/computed view, so it stays in sync automatically as Trackers change and time passes.
 
@@ -172,15 +173,29 @@ Each of these now computes its *actual next occurrence* from today's date (rolli
 
 **What this unlocks:** the consultant/accountant-managing-multiple-SMEs persona (Section 6) moves from "not yet served" to served. It also quietly serves the more common case of a single seller who, e.g., runs a registered LLC for one line of business and a separate Business Name for a side venture — two different `regType` values under one login.
 
-## 14. Feedback & Roadmap (not yet built — logged for future prioritization)
+## 13b. TIN Auto-fill, Business Health Score & Guided CAC Filing (built in v12)
 
-Three further suggestions surfaced in review, not built in this pass:
+The three remaining items from the original Feedback & Roadmap list (Section 14) are now built, alongside the Compliance Calendar layout work in Section 13.
 
-- **TIN auto-fill across tools** — once a TIN is verified in the Verification tab, pre-fill it into the Tax Suite and Templates instead of asking the seller to re-enter it. Small implementation, but it's the difference between feeling like one dashboard vs. five separate tools. Now scoped per-business as of v10 (each business's verified TIN would pre-fill only within that business's context).
-- **Business Health Score on Overview** — a composite signal ("Registrations 100%, Tax filings up to date, 2 documents expiring soon") giving a reason to check in even with nothing urgent pending, and a natural upsell trigger ("unlock auto-renewal reminders"). Overlaps conceptually with the Compliance Calendar — worth designing together rather than as two competing "why open the app" surfaces. Would be computed per-business, with a switcher badge surfacing which businesses need attention.
-- **CAC Annual Return reminder + guided filing** — already partially addressed by the Licences & Documents tracker category and the Compliance Calendar's "File now" action; a fuller guided-filing wizard specifically for this flow is still open, and worth prioritizing since missed CAC annual returns is one of the most common ways small Nigerian businesses accidentally lapse into non-compliance.
+**TIN auto-fill across tools.** Verifying a TIN in the Verification tab now stores it on that business's record (`biz().tin`), not just in the lookup history. Everywhere else the seller would otherwise re-type the same TIN, it's pre-filled automatically:
+- The Verification tab itself pre-fills the input and shows "Auto-filled from your last verified TIN" the next time a TIN check is opened.
+- The NRS/FIRS E-Invoicing form's "Your TIN" field pre-fills from the business's stored TIN, with a small "Auto-filled from Verification" note when it does.
+- Templates that legitimately carry the issuing business's TIN (Sales/Supplier Agreement, Proposal/Quote) show the live verified value inline once known, or a prompt to verify first if not.
+- This is scoped per-business (per Section 13a) — switching businesses in the switcher switches which TIN auto-fills, since each business's TIN is part of its own independent state bundle, not a shared value.
 
-**Multi-business/multi-entity support — built in v10, see Section 13a.**
+**Business Health Score on Overview.** A composite score (0–100) computed per business from five live signals: registration approved, SCUML certificate approved, TIN verified, no overdue Trackers, and VAT filings up to date. Shown as a score, a progress bar, and a checklist where every failing item carries a "Fix" button that routes straight to the view that resolves it (Registrations, Verification, Trackers, or Tax Tools) — turning the score from a passive number into a worklist. Color-coded (green ≥80, amber 50–79, red <50) so a seller or a consultant managing several businesses can tell at a glance, from the switcher alone, which business needs attention first.
+
+**Guided CAC Annual Return filing.** The Compliance Calendar's "File now" action on CAC Annual Return now opens a 3-step guided wizard instead of a bare toast: (1) confirm business details, with TIN pulled from auto-fill and a nudge to verify it first if missing; (2) confirm nothing has changed since the last filing (directors, shareholders, business address); (3) review the fee and escrow terms and submit. This is the fuller guided-filing flow the original roadmap note called for, replacing the single-click stub — and it reuses the same auto-filled TIN and escrow-payment language used everywhere else in the product, rather than introducing a one-off pattern.
+
+## 14. Feedback & Roadmap
+
+All four items originally logged here are now built:
+- **Multi-business/multi-entity support** — built in v10, see Section 13a.
+- **TIN auto-fill across tools** — built in v12, see Section 13b.
+- **Business Health Score on Overview** — built in v12, see Section 13b.
+- **CAC Annual Return guided filing** — built in v12, see Section 13b.
+
+No open items at time of writing — future suggestions land here as they come in.
 
 ## 15. Customer Dashboard vs. Platform Admin Backend (built in v11)
 
@@ -212,7 +227,7 @@ Three further suggestions surfaced in review, not built in this pass:
 | **7. Partner review & filing** | Final legal/professional review and filing. Payment held escrow-style up to this point, not released upfront. | **Partner (required, internal only)** | Routed package | Filing reference |
 | **8. Status tracking** | Per-service WhatsApp/email updates — SellersPoint-branded, no partner mention | SellersPoint (automated) | Filing references | Status updates |
 | **9. Delivery & storage** | Certificates/filed returns delivered digitally into the Document Vault; payment releases to the partner internally; approval triggers a congratulatory notification/badge moment | SellersPoint (automated) | Government-issued documents | Stored, retrievable per service |
-| **10. Ongoing compliance** | SCUML renewal, Tax Filing, and CAC Annual Returns all surface as Compliance Calendar entries (the Business Name/LLC registration certificate itself doesn't recur); Licences & Documents trackers can be actioned straight back into this pipeline | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
+| **10. Ongoing compliance** | Tax Filing and CAC Annual Returns recur and surface as Compliance Calendar entries (neither the Business Name/LLC registration certificate nor the one-time, EFCC-issued SCUML certificate recur); Licences & Documents trackers can be actioned straight back into this pipeline | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
 
 ### B. Self-Serve Documents & Tools
 
@@ -270,3 +285,5 @@ As of v8, the dashboard is no longer sketched in ASCII here — the product has 
 **v10 note:** the sidebar now opens with a business switcher above the nav. Every view (Overview, Registrations, Verification, Tax Suite, Trackers, Templates, Vault) renders against whichever business is currently active, and Registrations always shows a single Company Registration card matching that business's actual registration type — see Section 13a for the full data-model rationale.
 
 **v11 note:** Trademark is gone from Registrations, the data model, and every business's setup checklist — SCUML is now the featured "Also available" item, with copy explaining it's what unblocks a business bank account, positioned to be started right after TIN. Registration certificates in the Document Vault no longer claim a "Renews via Annual Returns" date for Business Name/LLC — see Section 3 for why that framing was wrong. There's also a second, separate file now: `sellerspoint-docs-admin.html` — a staff-only "Platform Admin" backend (cross-tenant business list, internal fulfillment queue, and Package & Pricing management), not linked from the customer dashboard, mirroring the core app's `backend.html` pattern. See Section 15.
+
+**v12 note:** the SCUML certificate no longer carries a renewal date anywhere in the file — it's a one-time, EFCC-issued certificate (see Section 3). The Compliance Calendar's two months are now always stacked with a divider and full month-name headers, deadline days highlight and show a detail tooltip on hover, and the Upcoming list is a fixed two-column grid so due-date badges never lose their right-alignment (see Section 13). Overview now shows a live Business Health Score with per-item "Fix" links, TIN verified in the Verification tab auto-fills into E-Invoicing and TIN-bearing Templates, and the Compliance Calendar's "File now" on CAC Annual Return opens a 3-step guided filing wizard instead of a single toast (see Section 13b).
