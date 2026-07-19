@@ -991,7 +991,7 @@ if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
 let docsData=null;
 const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved"};
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view))}
+function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view));if(view==="trackers"||view==="calendar")loadDocsTrackers();if(view==="vault")loadDocsVault()}
 async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs()}catch(err){toast(err.message)}}
 function renderDocs(){
   if(!docsData)return;
@@ -1016,5 +1016,75 @@ if($("docsAffiliateForm"))$("docsAffiliateForm").onsubmit=async e=>{e.preventDef
 async function deleteDocsAffiliate(id){try{await api("DELETE","/api/docs/registration/affiliates/"+id);await loadDocsRegistration();toast("Affiliate removed")}catch(err){toast(err.message)}}
 if($("docsPscForm"))$("docsPscForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/registration/psc",{affiliateId:$("docsPscAffiliate").value,sharePercent:+$("docsPscSharePercent").value,ownsDirectShares:$("docsPscOwnsDirectShares").checked,hasSignificantControl:$("docsPscHasControl").checked,isPep:$("docsPscIsPep").checked});e.target.reset();await loadDocsRegistration();toast("PSC entry added")}catch(err){toast(err.message)}};
 if($("docsSubmitRegistration"))$("docsSubmitRegistration").onclick=async()=>{try{docsData=await api("POST","/api/docs/registration/submit");renderDocs();showDocsView("overview");toast("Registration submitted - our team will review it shortly")}catch(err){toast(err.message)}};
+
+// --- SellersPoint Docs Phase 2: Trackers, Compliance Calendar, Tax Tools, Vault
+// calcPAYE/buildStatutoryDeadlines/date-math ported verbatim from
+// sellerspoint-docs-dashboard.html (already vetted against the Nigeria Tax
+// Act 2025 bands and the real statutory filing calendar) - both are pure
+// functions, no server round trip needed.
+const NTA_BANDS=[{width:800000,rate:0},{width:2200000,rate:.15},{width:9000000,rate:.18},{width:13000000,rate:.21},{width:25000000,rate:.23},{width:Infinity,rate:.25}];
+function calcPAYE({gross,annualRent=0,pension=0,nhf=0,nhis=0,mortgage=0,life=0,minWageMonthly=70000}){
+  gross=Number(gross)||0;
+  const minWageAnnual=(Number(minWageMonthly)||0)*12;
+  if(gross>0&&gross<=minWageAnnual)return{exempt:true,gross,tax:0,net:gross,rentRelief:0,totalDeductions:0,chargeable:0,breakdown:[]};
+  const rentRelief=Math.min((Number(annualRent)||0)*.2,500000);
+  const totalDeductions=rentRelief+(Number(pension)||0)+(Number(nhf)||0)+(Number(nhis)||0)+(Number(mortgage)||0)+(Number(life)||0);
+  const chargeable=Math.max(gross-totalDeductions,0);
+  let remaining=chargeable,tax=0;const breakdown=[];
+  for(const band of NTA_BANDS){if(remaining<=0)break;const amt=Math.min(remaining,band.width);const bandTax=amt*band.rate;tax+=bandTax;if(amt>0)breakdown.push({amt,rate:band.rate,bandTax});remaining-=amt}
+  const net=gross-tax-(Number(pension)||0)-(Number(nhf)||0)-(Number(nhis)||0);
+  return{exempt:false,gross,rentRelief,totalDeductions,chargeable,tax,net,breakdown};
+}
+function naira(n){return "NGN "+Math.round(n).toLocaleString()}
+if($("docsPayeCalc"))$("docsPayeCalc").onclick=()=>{
+  const period=$("docsPayePeriod").value;
+  const rawGross=Number($("docsPayeGross").value)||0;
+  const gross=period==="monthly"?rawGross*12:rawGross;
+  const r=calcPAYE({gross,annualRent:$("docsPayeRent").value,pension:$("docsPayePension").value,nhf:$("docsPayeNHF").value,nhis:$("docsPayeNHIS").value});
+  if(!r.gross){$("docsPayeResult").innerHTML="";return}
+  if(r.exempt){$("docsPayeResult").innerHTML='<p class="meta">No tax due - annual income is at or below the National Minimum Wage.</p>';return}
+  const bandLabels=["0% band","15% band","18% band","21% band","23% band","25% band"];
+  const bandRows=r.breakdown.map((b,i)=>`<div class="row"><span>${bandLabels[i]} (${naira(b.amt)} x ${(b.rate*100).toFixed(0)}%)</span><b>${naira(b.bandTax)}</b></div>`).join("");
+  $("docsPayeResult").innerHTML=`<div class="item-details"><div class="row"><span>Gross income (yr)</span><b>${naira(r.gross)}</b></div><div class="row"><span>Rent relief</span><b>-${naira(r.rentRelief)}</b></div><div class="row"><span>Chargeable income</span><b>${naira(r.chargeable)}</b></div>${bandRows}<div class="row"><span>Annual tax</span><b>${naira(r.tax)}</b></div><div class="row"><span>Monthly tax</span><b>${naira(r.tax/12)}</b></div><div class="row"><span>Net pay (yr)</span><b>${naira(r.net)}</b></div><div class="row"><span>Net pay (mo)</span><b>${naira(r.net/12)}</b></div></div>`;
+};
+
+function nextMonthlyDate(day){const now=new Date();let d=new Date(now.getFullYear(),now.getMonth(),day);if(d<now)d=new Date(now.getFullYear(),now.getMonth()+1,day);return d}
+function nextAnnualDate(month,day){const now=new Date();let d=new Date(now.getFullYear(),month,day);if(d<now)d=new Date(now.getFullYear()+1,month,day);return d}
+function daysUntil(d){const now=new Date();now.setHours(0,0,0,0);const t=new Date(d);t.setHours(0,0,0,0);return Math.round((t-now)/86400000)}
+function daysLabel(n){if(n<0)return "Overdue";if(n===0)return "Today";if(n===1)return "1 day";return n+" days"}
+function buildStatutoryDeadlines(){return[
+  {name:"VAT Return",note:"Filing + payment, previous month's sales",due:nextMonthlyDate(21)},
+  {name:"PAYE Remittance",note:"Employee tax withheld, previous month",due:nextMonthlyDate(10)},
+  {name:"Withholding Tax Remittance",note:"Previous month's WHT deductions",due:nextMonthlyDate(21)},
+  {name:"CAC Annual Return",note:"Keeps your company active on the register",due:nextAnnualDate(5,30)},
+  {name:"Companies Income Tax Return",note:"~6 months after financial year end (Dec FYE shown)",due:nextAnnualDate(5,30)},
+  {name:"Personal Income Tax Return",note:"Individual annual return + Tax Clearance renewal",due:nextAnnualDate(2,31)},
+]}
+
+let docsTrackers=[];
+async function loadDocsTrackers(){try{docsTrackers=await api("GET","/api/docs/trackers");renderDocsTrackers();renderDocsCalendar()}catch(err){toast(err.message)}}
+const TRACKER_STATUS_LABEL=t=>{if(t.status==="done")return "Done";const n=daysUntil(t.dueDate);return n<0?"Overdue":n<=7?`Due in ${daysLabel(n)}`:"Upcoming"};
+function renderDocsTrackers(){
+  $("docsTrackerList").innerHTML=docsTrackers.map(t=>`<div class="item"><div class="item-top"><strong>${clean(t.name)}</strong><span>${TRACKER_STATUS_LABEL(t)}</span></div><div class="meta">${clean(t.category)} - due ${date(t.dueDate)}${t.recurrence!=="none"?" - recurs "+t.recurrence:""}${t.note?" - "+clean(t.note):""}</div><div class="item-actions">${t.status!=="done"?`<button onclick="markDocsTrackerDone('${t.id}')">Mark done</button>`:""}<button onclick="deleteDocsTracker('${t.id}')">Delete</button></div></div>`).join("");
+}
+if($("docsTrackerForm"))$("docsTrackerForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/trackers",{name:$("docsTrackerName").value.trim(),category:$("docsTrackerCategory").value,dueDate:$("docsTrackerDue").value,recurrence:$("docsTrackerRecurrence").value,note:$("docsTrackerNote").value.trim()});e.target.reset();await loadDocsTrackers();toast("Tracker added")}catch(err){toast(err.message)}};
+async function markDocsTrackerDone(id){try{await api("PUT","/api/docs/trackers/"+id,{status:"done"});await loadDocsTrackers();toast("Marked done")}catch(err){toast(err.message)}}
+async function deleteDocsTracker(id){try{await api("DELETE","/api/docs/trackers/"+id);await loadDocsTrackers();toast("Tracker deleted")}catch(err){toast(err.message)}}
+
+function renderDocsCalendar(){
+  const statutory=buildStatutoryDeadlines().map(s=>({name:s.name,note:s.note,days:daysUntil(s.due),source:"statutory"}));
+  const trackerItems=docsTrackers.filter(t=>t.status!=="done").map(t=>({name:t.name,note:clean(t.category)+" - Tracker",days:daysUntil(t.dueDate),source:"tracker"}));
+  const merged=statutory.concat(trackerItems).sort((a,b)=>a.days-b.days);
+  const soonest=merged[0];
+  $("docsNextDeadline").innerHTML=soonest?`<div class="row"><span>${clean(soonest.name)}</span><b>${daysLabel(soonest.days)}</b></div>`:'<p class="meta">Nothing due yet.</p>';
+  $("docsCalendarList").innerHTML=merged.map(item=>`<div class="item"><div class="item-top"><strong>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</strong><span>${daysLabel(item.days)}</span></div><div class="meta">${clean(item.note)}</div></div>`).join("");
+}
+
+let docsVaultItems=[];
+async function loadDocsVault(){try{docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault()}catch(err){toast(err.message)}}
+function renderDocsVault(){
+  $("docsVaultList").innerHTML=docsVaultItems.map(v=>`<div class="item"><div class="item-top"><strong>${clean(v.name)}</strong><span>${clean(v.docType)}</span></div><div class="meta">${date(v.createdAt)}</div><div class="item-actions"><a class="button-link" href="${v.file}" download="${clean(v.name)}">Download</a></div></div>`).join("");
+}
+if($("docsVaultForm"))$("docsVaultForm").onsubmit=async e=>{e.preventDefault();try{const file=$("docsVaultFile").files?.[0];if(!file)return toast("Choose a file first");const dataUrl=await readFileAsDataUrl(file);await api("POST","/api/docs/vault",{name:$("docsVaultName").value.trim(),docType:$("docsVaultType").value,file:dataUrl});e.target.reset();await loadDocsVault();toast("Document uploaded")}catch(err){toast(err.message)}};
 
 (async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));

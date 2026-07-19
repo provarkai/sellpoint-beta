@@ -2570,6 +2570,96 @@ async function advanceBusinessRegistration(businessId, { status, note, certifica
   return getBusinessDetailForAdmin(businessId);
 }
 
+// --- SellersPoint Docs Phase 2: Trackers & Document Vault -------------------
+// Compliance Calendar and the PAYE Calculator are computed client-side from
+// this data plus statutory date math - no server-side support needed for
+// either (see app.js).
+
+function toTrackerJson(t) {
+  return {
+    id: t.id,
+    name: t.name,
+    category: t.category,
+    dueDate: t.due_date,
+    recurrence: t.recurrence,
+    status: t.status,
+    note: t.note,
+    hasProof: !!t.proof_document,
+    createdAt: t.created_at,
+  };
+}
+
+async function listTrackers(businessId) {
+  const { rows } = await query("SELECT * FROM docs_trackers WHERE business_id=$1 ORDER BY due_date", [businessId]);
+  return rows.map(toTrackerJson);
+}
+
+async function createTracker(businessId, data) {
+  const name = requireString(data.name, "Tracker name");
+  const category = requireString(data.category, "Category");
+  const dueDate = requireString(data.dueDate, "Due date");
+  const { rows } = await query(
+    `INSERT INTO docs_trackers (business_id, name, category, due_date, recurrence, note)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [businessId, name, category, dueDate, data.recurrence || "none", data.note || ""]
+  );
+  return toTrackerJson(rows[0]);
+}
+
+async function updateTracker(businessId, id, data) {
+  const sets = [];
+  const params = [];
+  let i = 1;
+  if (data.status !== undefined) { sets.push(`status=$${i++}`); params.push(data.status); }
+  if (data.note !== undefined) { sets.push(`note=$${i++}`); params.push(data.note); }
+  if (data.proofDocument) { sets.push(`proof_document=$${i++}`); params.push(data.proofDocument); }
+  if (data.dueDate !== undefined) { sets.push(`due_date=$${i++}`); params.push(data.dueDate); }
+  if (!sets.length) throw new OrderError("Nothing to update");
+  params.push(businessId, id);
+  const { rows } = await query(`UPDATE docs_trackers SET ${sets.join(",")} WHERE business_id=$${i++} AND id=$${i} RETURNING *`, params);
+  if (!rows[0]) throw new OrderError("Tracker not found");
+  return toTrackerJson(rows[0]);
+}
+
+async function deleteTracker(businessId, id) {
+  await query("DELETE FROM docs_trackers WHERE id=$1 AND business_id=$2", [id, businessId]);
+}
+
+function toVaultItemJson(v) {
+  return { id: v.id, name: v.name, docType: v.doc_type, file: v.file, createdAt: v.created_at, source: "upload" };
+}
+
+// Aggregates real uploads with documents already produced elsewhere in
+// Docs (the registration certificate, tracker proof-of-completion) into
+// one list, same concept as the mockup's vaultItems() but over real data.
+async function listVaultItems(businessId) {
+  const [uploadRows, bizRows, trackerRows] = await Promise.all([
+    query("SELECT * FROM docs_vault_items WHERE business_id=$1 ORDER BY created_at DESC", [businessId]),
+    query("SELECT reg_certificate, created_at FROM businesses WHERE id=$1", [businessId]),
+    query("SELECT id, name, proof_document, created_at FROM docs_trackers WHERE business_id=$1 AND proof_document != ''", [businessId]),
+  ]);
+  const items = uploadRows.rows.map(toVaultItemJson);
+  const biz = bizRows.rows[0];
+  if (biz?.reg_certificate) {
+    items.push({ id: "reg-certificate", name: "Business Registration Certificate", docType: "Registration", file: biz.reg_certificate, createdAt: biz.created_at, source: "registration" });
+  }
+  trackerRows.rows.forEach((t) => {
+    items.push({ id: "tracker-" + t.id, name: t.name + " - Proof", docType: "Tracker", file: t.proof_document, createdAt: t.created_at, source: "tracker" });
+  });
+  items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return items;
+}
+
+async function createVaultItem(businessId, data) {
+  const name = requireString(data.name, "Document name");
+  const file = requireString(data.file, "File");
+  const { rows } = await query(
+    "INSERT INTO docs_vault_items (business_id, name, doc_type, file) VALUES ($1,$2,$3,$4) RETURNING *",
+    [businessId, name, data.docType || "Other", file]
+  );
+  return toVaultItemJson(rows[0]);
+}
+
 // --- Platform admins (who can access backend.html) --------------------------
 
 async function isPlatformAdmin(email) {
@@ -3242,6 +3332,12 @@ module.exports = {
   submitBusinessRegistration,
   listRegistrationQueue,
   advanceBusinessRegistration,
+  listTrackers,
+  createTracker,
+  updateTracker,
+  deleteTracker,
+  listVaultItems,
+  createVaultItem,
   isPlatformAdmin,
   listPlatformAdmins,
   addPlatformAdmin,

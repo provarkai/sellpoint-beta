@@ -615,6 +615,36 @@ create table if not exists business_registration_psc (
 );
 create index if not exists business_registration_psc_business_id_idx on business_registration_psc(business_id);
 
+-- SellersPoint Docs Phase 2: Trackers (seller-set reminders: rent,
+-- insurance, payroll, supplier payments, licence renewals) and the
+-- Document Vault. Compliance Calendar and the PAYE Calculator are
+-- computed views over this data plus statutory date math - no storage of
+-- their own. status is only 'upcoming'/'done' - overdue/due-soon is
+-- derived from due_date at render time so it never goes stale.
+create table if not exists docs_trackers (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  category text not null,
+  due_date date not null,
+  recurrence text not null default 'none',
+  status text not null default 'upcoming',
+  note text not null default '',
+  proof_document text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_trackers_business_id_idx on docs_trackers(business_id);
+
+create table if not exists docs_vault_items (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references businesses(id) on delete cascade,
+  name text not null,
+  doc_type text not null default 'Other',
+  file text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists docs_vault_items_business_id_idx on docs_vault_items(business_id);
+
 -- Ledgers, not just running totals, so a customer's timeline can show the
 -- full history of how their balance got where it is (matches the cashbook's
 -- append-only design elsewhere in this schema).

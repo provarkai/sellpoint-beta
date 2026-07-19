@@ -1392,6 +1392,47 @@ app.post(
   handle(async (req, res) => res.json(await db.submitBusinessRegistration(req.businessId)))
 );
 
+app.get(
+  "/api/docs/trackers",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listTrackers(req.businessId)))
+);
+app.post(
+  "/api/docs/trackers",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createTracker(req.businessId, req.body || {})))
+);
+app.put(
+  "/api/docs/trackers/:id",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.updateTracker(req.businessId, req.params.id, req.body || {})))
+);
+app.delete(
+  "/api/docs/trackers/:id",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => {
+    await db.deleteTracker(req.businessId, req.params.id);
+    res.status(204).end();
+  })
+);
+
+app.get(
+  "/api/docs/vault",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.listVaultItems(req.businessId)))
+);
+app.post(
+  "/api/docs/vault",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.status(201).json(await db.createVaultItem(req.businessId, req.body || {})))
+);
+
 // --- Feedback (business -> SellersPoint team) --------------------------------
 app.get(
   "/api/feedback",

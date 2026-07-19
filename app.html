@@ -156,10 +156,67 @@
       </div>
 
       <div id="docs-verification" class="docs-subpage docs-coming-soon"><article><h2>Verification</h2><p class="meta">TIN, BVN, NIN, and CAC lookups - coming soon.</p></article></div>
-      <div id="docs-calendar" class="docs-subpage docs-coming-soon"><article><h2>Compliance Calendar</h2><p class="meta">Every statutory deadline and tracker due date in one view - coming soon.</p></article></div>
-      <div id="docs-tax" class="docs-subpage docs-coming-soon"><article><h2>Tax Tools</h2><p class="meta">PAYE calculator, payroll, and e-invoicing - coming soon.</p></article></div>
-      <div id="docs-trackers" class="docs-subpage docs-coming-soon"><article><h2>Trackers</h2><p class="meta">Rent, insurance, payroll, and licence renewal reminders - coming soon.</p></article></div>
-      <div id="docs-vault" class="docs-subpage docs-coming-soon"><article><h2>Document Vault</h2><p class="meta">Every document from every Docs feature, in one place - coming soon.</p></article></div>
+      <div id="docs-calendar" class="docs-subpage">
+        <article>
+          <h2>Next deadline</h2>
+          <div id="docsNextDeadline"></div>
+        </article>
+        <article>
+          <h2>Upcoming</h2>
+          <div id="docsCalendarList" class="list"></div>
+        </article>
+      </div>
+
+      <div id="docs-tax" class="docs-subpage">
+        <article>
+          <h2>PAYE Calculator <small class="meta">(Nigeria Tax Act 2025)</small></h2>
+          <p class="meta">Free - estimate an employee's tax and net pay under the current PAYE bands.</p>
+          <form id="docsPayeForm">
+            <label>Period<select id="docsPayePeriod"><option value="monthly">Monthly</option><option value="annual">Annual</option></select></label>
+            <label>Gross income<input id="docsPayeGross" type="number" min="0" required></label>
+            <label>Annual rent paid <span class="meta">(optional - 20% relief, capped at NGN 500,000/yr)</span><input id="docsPayeRent" type="number" min="0" value="0"></label>
+            <label>Pension (optional)<input id="docsPayePension" type="number" min="0" value="0"></label>
+            <label>NHF (optional)<input id="docsPayeNHF" type="number" min="0" value="0"></label>
+            <label>NHIS (optional)<input id="docsPayeNHIS" type="number" min="0" value="0"></label>
+            <button type="button" id="docsPayeCalc">Calculate</button>
+          </form>
+          <div id="docsPayeResult"></div>
+        </article>
+      </div>
+
+      <div id="docs-trackers" class="docs-subpage">
+        <article>
+          <h2>Add a tracker</h2>
+          <form id="docsTrackerForm">
+            <label>Name<input id="docsTrackerName" required placeholder="e.g. Shop Rent Renewal"></label>
+            <label>Category<select id="docsTrackerCategory"><option>Rent/Lease</option><option>Insurance</option><option>Payroll</option><option>Supplier/Vendor</option><option>Licences &amp; Documents</option><option>Other</option></select></label>
+            <label>Due date<input id="docsTrackerDue" type="date" required></label>
+            <label>Recurrence<select id="docsTrackerRecurrence"><option value="none">One-off</option><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label>
+            <label>Note (optional)<input id="docsTrackerNote"></label>
+            <button>Add Tracker</button>
+          </form>
+        </article>
+        <article>
+          <h2>Trackers</h2>
+          <div id="docsTrackerList" class="list"></div>
+        </article>
+      </div>
+
+      <div id="docs-vault" class="docs-subpage">
+        <article>
+          <h2>Upload a document</h2>
+          <form id="docsVaultForm">
+            <label>Name<input id="docsVaultName" required placeholder="e.g. Tenancy Agreement"></label>
+            <label>Type<select id="docsVaultType"><option>Other</option><option>Legal</option><option>Financial</option><option>Insurance</option></select></label>
+            <label>File<input id="docsVaultFile" type="file" required></label>
+            <button>Upload</button>
+          </form>
+        </article>
+        <article>
+          <h2>Documents</h2>
+          <div id="docsVaultList" class="list"></div>
+        </article>
+      </div>
     </section>
 
     <section id="settings" class="page"><article id="installAppCard" style="display:none"><h2>Install App</h2><p class="meta">Add SellersPoint to your home screen for one-tap access, like a native app.</p><button type="button" id="installAppBtn">Install App</button></article><div class="grid"><form id="settingsForm"><h2>Business Profile</h2><label>Business logo<input id="sLogo" type="file" accept="image/*"></label><label>Business name<input id="sBusiness" required></label><label>Phone<input id="sPhone" placeholder="2348012345678"></label><label>Address<input id="sAddress" placeholder="123 Market Street, Lagos"></label><label>Payment details <span class="meta">(sent to customers with pending-payment orders)</span><textarea id="sPayment" rows="4" placeholder="Bank: Example Bank
