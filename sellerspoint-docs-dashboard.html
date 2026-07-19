@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SellersPoint Docs — Dashboard Mockup</title>
-<meta name="description" content="Clickable dashboard mockup for SellersPoint Docs: Registrations, Tax Tools, Trackers, Templates, and the Document Vault.">
+<meta name="description" content="Clickable dashboard mockup for SellersPoint Docs: Business Registration, Tax Tools, Trackers, Templates, and the Document Vault.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,24 +41,10 @@ aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-d
 .back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
 .back-link:hover{color:#fff}
 
-/* Business switcher */
-.biz-switcher{position:relative;margin-bottom:16px}
-.biz-current{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.07);color:#fff;padding:10px 12px;border-radius:8px;text-align:left}
-.biz-current:hover{background:rgba(255,255,255,.12)}
-.biz-current .biz-info{display:grid;gap:1px;overflow:hidden;min-width:0}
-.biz-current b{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.biz-current small{font-size:11px;color:#9fc3b3;font-weight:700}
-.biz-current .chev{font-size:10px;color:#9fc3b3;flex:0 0 auto;transition:transform .15s ease}
-.biz-switcher.open .chev{transform:rotate(180deg)}
-.biz-menu{display:none;position:absolute;top:100%;left:0;right:0;margin-top:6px;background:#fff;border-radius:10px;box-shadow:0 20px 44px rgba(0,0,0,.3);overflow:hidden;z-index:30}
-.biz-switcher.open .biz-menu{display:block}
-.biz-menu-item{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 14px;background:#fff;color:var(--ink);border-bottom:1px solid var(--line)}
-.biz-menu-item:hover{background:#f0faf6}
-.biz-menu-item.active{background:#f0faf6;color:var(--primary)}
-.biz-menu-item b{font-size:13px;font-weight:800}
-.biz-menu-item small{font-size:11px;color:var(--muted);font-weight:700}
-.biz-menu-add{width:100%;text-align:left;padding:11px 14px;background:#fbfcfb;color:var(--primary);font-weight:800;font-size:13px}
-.biz-menu-add:hover{background:#f0faf6}
+/* Business info (single business per login — see Section 13a) */
+.biz-static{display:grid;gap:1px;background:rgba(255,255,255,.07);padding:10px 12px;border-radius:8px;margin-bottom:16px}
+.biz-static b{font-size:13px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.biz-static small{font-size:11px;color:#9fc3b3;font-weight:700}
 
 /* ===== Main ===== */
 main{padding:32px 36px;overflow:auto}
@@ -325,7 +311,7 @@ main{padding:32px 36px;overflow:auto}
   body{grid-template-columns:1fr}
   aside{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;padding:12px;gap:8px;align-items:center}
   .brandmark{margin-bottom:0}
-  .biz-switcher{margin-bottom:0;min-width:180px}
+  .biz-static{margin-bottom:0;min-width:180px}
   .nav-item{white-space:nowrap}
   .back-link{display:none}
   main{padding:20px}
@@ -349,18 +335,14 @@ main{padding:32px 36px;overflow:auto}
     <span class="brand-word">Sellers<span class="w-point">Point</span> <span style="font-weight:600;opacity:.7">Docs</span></span>
   </div>
 
-  <div class="biz-switcher" id="bizSwitcher">
-    <button class="biz-current" onclick="toggleBizMenu()">
-      <span class="biz-info"><b id="bizCurrentName">—</b><small id="bizCurrentType">—</small></span>
-      <span class="chev">▾</span>
-    </button>
-    <div class="biz-menu" id="bizMenu"></div>
+  <div class="biz-static" id="bizStatic">
+    <b id="bizCurrentName">—</b><small id="bizCurrentType">—</small>
   </div>
 
   <nav>
     <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
     <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar</button>
-    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Registrations</button>
+    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
     <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
     <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
     <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
@@ -475,14 +457,14 @@ main{padding:32px 36px;overflow:auto}
 
   <!-- ===== REGISTRATIONS ===== -->
   <section class="view" id="view-registrations">
-    <div class="view-header"><h1>Registrations</h1><p>Filed and tracked for you. Payment is held until delivery — never released upfront.</p></div>
+    <div class="view-header"><h1>Business Registration</h1><p>Filed and tracked for you. Payment is held until delivery — never released upfront.</p></div>
 
     <div class="card bundle-card" style="margin-bottom:18px">
       <div class="info"><b>💡 Buying more than one?</b><small>Bundle pricing beats paying for each service separately.</small></div>
       <button class="btn btn-ghost btn-sm" onclick="toast('Bundle pricing would open here')">See bundle pricing</button>
     </div>
 
-    <div class="cat-title">Company Registration — it's either Business Name or Limited Liability Company, never both at once</div>
+    <div class="cat-title">Business Registration — Business Name, Limited Liability Company, or Partnership: exactly one, never more than one at a time</div>
     <div id="regPrimary"></div>
 
     <div class="cat-title">Also available</div>
@@ -729,7 +711,7 @@ main{padding:32px 36px;overflow:auto}
 
   <!-- ===== VAULT ===== -->
   <section class="view" id="view-vault">
-    <div class="view-header"><h1>Document Vault</h1><p>Everything from Registrations, Tax, and Templates — searchable in one place.</p></div>
+    <div class="view-header"><h1>Document Vault</h1><p>Everything from Business Registration, Tax, and Templates — searchable in one place.</p></div>
     <div class="card bundle-card" style="margin-bottom:16px">
       <div class="info"><b>🧾 Need a contract, tenancy agreement, or proposal?</b><small>Create a basic document instantly, no status tracking.</small></div>
       <button class="btn btn-ghost btn-sm" onclick="goto('templates')">Create a document</button>
@@ -861,151 +843,69 @@ function renderBreakdown(r){
    MULTI-BUSINESS DATA MODEL
    Every business carries its own full state - registrations, trackers,
    templates, verification history, payroll, VAT/filing history. The
-   registration choice is a single field (regType), never two parallel
-   fields, so "Business Name OR Limited Liability Company" is enforced
-   by the data model itself, not just the UI.
+   registration choice is a single field (regType), one of "Business
+   Name", "Limited Liability Company", or "Partnership" — never more
+   than one at a time.
    SCUML is ordered right after TIN in setupSteps since it's usually the
    blocker for opening a business bank account. CAC Annual Returns is a
    recurring compliance filing (see Compliance Calendar) - it does not
-   renew the Business Name / LLC registration certificate itself.
+   renew the Business Name / LLC / Partnership registration certificate.
+   This dashboard is scoped to one business per login (v13) — managing
+   several businesses under one login is now a Partner Sub-Account
+   capability on the admin backend, see sellerspoint-docs-admin.html.
    ============================================================ */
-const BUSINESSES = [
-  {
-    id: "biz1", name: "Amina Fashion Hub", regType: "Business Name",
-    regStatus: "approved", regNote: "Certificate ready",
-    tin: null,
-    scuml: { status: "approved", celebrate: true },
-    setupSteps: [
-      { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
-      { text:"SCUML ✓", done:true },
-    ],
-    setupProgress: 100,
-    congrats: "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account. You've earned the Verified Business badge.",
-    alerts: [
-      { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
-      { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
-    ],
-    trackers: [
-      { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
-      { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
-      { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
-      { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
-    ],
-    docs: [
-      { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
-      { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
-      { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
-    ],
-    lookups: [
-      { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
-      { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
-    ],
-    employees: [],
-    invoices: [],
-    vatFigure: 42300,
-    filingHistory: [
-      { label:"VAT — June 2026", status:"filed", date:"Filed Jul 15" },
-      { label:"VAT — May 2026", status:"filed", date:"Filed Jun 15" },
-    ],
-    vaultExtra: [
-      { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12" },
-      { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · One-time, EFCC-issued — no renewal" },
-    ],
-  },
-  {
-    id: "biz2", name: "TechBuild Nigeria Ltd", regType: "Limited Liability Company",
-    regStatus: "approved", regNote: "Certificate ready",
-    tin: "20304050-0001",
-    scuml: { status: "not-started" },
-    setupSteps: [
-      { text:"LLC ✓", done:true }, { text:"TIN ✓", done:true },
-      { text:"SCUML —", done:false },
-    ],
-    setupProgress: 67,
-    congrats: "",
-    alerts: [
-      { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
-      { title:"Reminder", text:"You'll need SCUML to open your business bank account — start it now", action:"Start", view:"registrations" },
-    ],
-    trackers: [
-      { name:"Office Lease Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 25 days", note:"Recurs annually" },
-      { name:"Software License Renewals", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually" },
-      { name:"Staff Salary Run", cat:"Payroll", status:"due-soon", statusLabel:"Due in 6 days", note:"Recurs monthly" },
-    ],
-    docs: [
-      { name:"Freelance / Service Contract — UI Designer", type:"Freelance / Service Contract", date:"Jul 8", warn:false },
-    ],
-    lookups: [
-      { label:"NIN Verification", result:"✓ Match found", when:"Jul 14, instant" },
-      { label:"TIN Verification", result:"✓ Match found", when:"Jul 3, instant" },
-    ],
-    employees: [
-      (function(){ const g=4800000, r=1200000; return { name:"Chidi Okafor", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
-      (function(){ const g=3600000, r=900000; return { name:"Ngozi Eze", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
-    ],
-    invoices: [],
-    vatFigure: 128400,
-    filingHistory: [
-      { label:"VAT — June 2026", status:"filed", date:"Filed Jul 14" },
-      { label:"VAT — May 2026", status:"filed", date:"Filed Jun 13" },
-    ],
-    vaultExtra: [
-      { name:"LLC Incorporation Certificate", type:"Registration", date:"Issued May 2" },
-    ],
-  },
-  {
-    id: "biz3", name: "Coastal Traders", regType: "Business Name",
-    regStatus: "action-needed", regNote: "We need a certified copy of your means of ID",
-    tin: null,
-    scuml: { status: "not-started" },
-    setupSteps: [
-      { text:"Business Name (action needed)", done:false }, { text:"TIN —", done:false },
-      { text:"SCUML —", done:false },
-    ],
-    setupProgress: 0,
-    congrats: "",
-    alerts: [
-      { title:"Action needed", text:"We need a certified copy of your means of ID for your Business Name registration", action:"Upload", view:"registrations" },
-    ],
-    trackers: [
-      { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually" },
-    ],
-    docs: [],
-    lookups: [],
-    employees: [],
-    invoices: [],
-    vatFigure: 0,
-    filingHistory: [],
-    vaultExtra: [],
-  },
-];
-let currentBusinessId = "biz1";
-function biz(){ return BUSINESSES.find(b=>b.id===currentBusinessId); }
-
-function renderBizSwitcher(){
-  const b = biz();
-  $("bizCurrentName").textContent = b.name;
-  $("bizCurrentType").textContent = b.regType;
-  $("bizMenu").innerHTML = BUSINESSES.map(x=>`
-    <button class="biz-menu-item ${x.id===currentBusinessId?'active':''}" onclick="switchBusiness('${x.id}')">
-      <b>${x.name}</b><small>${x.regType}</small>
-    </button>`).join("") + `<button class="biz-menu-add" onclick="toast('Add Business flow would open here'); toggleBizMenu()">+ Add business</button>`;
-}
-function toggleBizMenu(){ $("bizSwitcher").classList.toggle("open"); }
-document.addEventListener("click", (e)=>{
-  if (!$("bizSwitcher").contains(e.target)) $("bizSwitcher").classList.remove("open");
-});
-function switchBusiness(id){
-  currentBusinessId = id;
-  $("bizSwitcher").classList.remove("open");
-  // Reset any mid-flow UI state that belongs to the previous business's session, not its data
-  activeCheck = null; $("verifyPanel") && $("verifyPanel").classList.remove("show");
-  selectedTpl = null; $("basicDoc") && ($("basicDoc").style.display = "none");
-  renderAll();
-  toast(`Switched to ${biz().name}`);
+const BUSINESS = {
+  name: "Amina Fashion Hub", regType: "Business Name",
+  regStatus: "approved", regNote: "Certificate ready",
+  tin: null,
+  scuml: { status: "approved", celebrate: true },
+  setupSteps: [
+    { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
+    { text:"SCUML ✓", done:true },
+  ],
+  setupProgress: 100,
+  congrats: "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account. You've earned the Verified Business badge.",
+  alerts: [
+    { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
+    { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
+  ],
+  trackers: [
+    { name:"Shop Rent Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 18 days", note:"Recurs annually · monthly reminder while due" },
+    { name:"Shop Insurance", cat:"Insurance", status:"upcoming", statusLabel:"Upcoming", note:"Recurs annually · next due Mar 2027" },
+    { name:"Staff Salary Run", cat:"Payroll", status:"overdue", statusLabel:"Due in 2 days", note:"Recurs monthly" },
+    { name:"Supplier Payment — ABC Ltd", cat:"Supplier/Vendor", status:"upcoming", statusLabel:"Upcoming", note:"Recurs monthly" },
+  ],
+  docs: [
+    { name:"Tenancy Agreement — 14 Herbert Macaulay", type:"Tenancy Agreement", date:"Jul 2", warn:false },
+    { name:"Proposal — Wireless Earbuds Bulk Order", type:"Proposal / Quote", date:"Jun 28", warn:false },
+    { name:"Loan Agreement — ₦500,000", type:"Loan Agreement", date:"Jun 20", warn:true },
+  ],
+  lookups: [
+    { label:"BVN Verification", result:"✓ Match found", when:"Jul 16, instant" },
+    { label:"CAC Business Name", result:"✓ Available", when:"Jul 10, instant" },
+  ],
+  employees: [
+    (function(){ const g=4800000, r=1200000; return { name:"Chidi Okafor", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+    (function(){ const g=3600000, r=900000; return { name:"Ngozi Eze", gross:g, rent:r, ...calcPAYE({gross:g, annualRent:r}) }; })(),
+  ],
+  invoices: [],
+  vatFigure: 42300,
+  filingHistory: [
+    { label:"VAT — June 2026", status:"filed", date:"Filed Jul 15" },
+    { label:"VAT — May 2026", status:"filed", date:"Filed Jun 15" },
+  ],
+  vaultExtra: [
+    { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12" },
+    { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · One-time, EFCC-issued — no renewal" },
+  ],
+};
+function biz(){ return BUSINESS; }
+function renderBizInfo(){
+  $("bizCurrentName").textContent = BUSINESS.name;
+  $("bizCurrentType").textContent = BUSINESS.regType;
 }
 function renderAll(){
-  renderBizSwitcher();
+  renderBizInfo();
   renderOverview();
   renderHealthScore();
   renderRegistrations();
@@ -1076,7 +976,7 @@ function renderHealthScore(){
     </div>`).join("");
 }
 
-/* ---------- Registrations (per business, single either/or card) ---------- */
+/* ---------- Business Registration (single card: Business Name, LLC, or Partnership) ---------- */
 const REG_STATUS_PILL = {
   approved: { cls:"pill-success", label:"● Approved" },
   review: { cls:"pill-progress", label:"◐ Under Review" },

@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v12)
+# SellersPoint Docs — Product & Automation Brief (v13)
 
 ## 1. Product Overview
 
@@ -10,7 +10,7 @@
 
 | Category | Services | Fulfillment |
 |---|---|---|
-| **Corporate & Legal** | CAC Business Name registration, full LLC incorporation, **SCUML registration** (recommended right after TIN — most banks won't open a business account without it), **CAC Annual Returns filing** (recurring) | Partner A |
+| **Corporate & Legal** | **Business Registration** — CAC Business Name, full LLC incorporation, or Partnership registration (exactly one per business), **SCUML registration** (recommended right after TIN — most banks won't open a business account without it), **CAC Annual Returns filing** (recurring) | Partner A |
 | **Tax & Regulatory** | TIN generation/verification, state-specific permits (LASAA, local govt), **Tax Filing** (VAT, CIT, PIT returns), **Tax Clearance Certificate (TCC)** | Partner B |
 | **Verification & Lookup** | TIN verification, **BVN verification**, NIN verification, CAC Business Name availability check, CAC business status lookup — all automated via a KYC/verification API vendor, no partner involved for the routine checks; document authenticity verification (checking a specific certificate is genuine) gets an automated first pass with a manual cross-check available for high-stakes cases | Automated (vendor API), with Partner A as an internal fallback only for document authenticity on high-stakes documents |
 | **Tax Suite** *(expanded in v8)* | PAYE Calculator, VAT Estimator (free); Mini Payroll, Payslip Generator, Annual Tax Certificate, NRS/FIRS E-Invoicing (paid tier) — see Section 12 | SellersPoint, no partner |
@@ -20,6 +20,8 @@
 
 **Trademark registration — removed in v11.** It's no longer part of the catalog, the data model, or the dashboard. **SCUML moves up to be the priority registration right after TIN** — in practice it's the item that unblocks a business bank account, so the product now nudges sellers to start it early rather than treating it as a same-tier "also available" option alongside a dropped service.
 
+**Business Registration — renamed and extended to three types in v13.** What was "Registrations" is now labeled **Business Registration** throughout the dashboard, and the underlying choice is no longer binary: `regType` is one of `"Business Name"`, `"Limited Liability Company"`, or `"Partnership"` — exactly one, never more than one at a time. The single-card rendering rule from Section 13a is unchanged; it just now covers three possible labels instead of two.
+
 **Templates positioning decision (v9):** kept, not removed — free doesn't mean unfocused, and it was one of the three founding pillars of this product (business creation, regulatory compliance, *and documentation*). The "looks unfocused" concern was real but about prominence, not existence: Templates no longer has its own sidebar tab. It's reachable from an Overview quick action ("New document") and from a "Create a document" prompt inside the Document Vault, so it stays available as a trust-building, retention-driving free tool without visually competing with the paid, higher-stakes services in primary navigation.
 
 ## 3. Delivery Model — two partners, several self-serve product lines
@@ -28,10 +30,10 @@ Government filings require a licensed party of record, so two specialist partner
 
 | Partner slot | Owns | Likely partner type |
 |---|---|---|
-| **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, SCUML registration — plus CAC Annual Returns filing | Law firm or CAC-accredited agent |
+| **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, or Partnership registration, SCUML registration — plus CAC Annual Returns filing | Law firm or CAC-accredited agent |
 | **Partner B — Tax & Regulatory** | Everything about tax — TIN, Tax Filing, and Tax Clearance Certificate — plus state-specific permits | Chartered accountant (ICAN) or licensed tax/regulatory-filing agent |
 
-**CAC Annual Returns filing does not renew the underlying Business Name or LLC registration.** It's a separate, recurring compliance obligation that keeps a business in good standing with CAC — the registration certificate itself doesn't expire or get reissued through it. Product copy treats these as two distinct things: the registration certificate (issued once, shown in Registrations/Vault) and the Annual Returns filing (recurring, shown in the Compliance Calendar and, if overdue, the "Licences & Documents" Tracker category). **SCUML is a one-time requirement, not a recurring one** — it's issued once by the EFCC after registration and never needs renewal; product copy must never attach a renewal or expiry date to it (corrected in v12, after an earlier draft incorrectly implied a renewal cycle).
+**CAC Annual Returns filing does not renew the underlying Business Name, LLC, or Partnership registration.** It's a separate, recurring compliance obligation that keeps a business in good standing with CAC — the registration certificate itself doesn't expire or get reissued through it. Product copy treats these as two distinct things: the registration certificate (issued once, shown in Business Registration/Vault) and the Annual Returns filing (recurring, shown in the Compliance Calendar and, if overdue, the "Licences & Documents" Tracker category). **SCUML is a one-time requirement, not a recurring one** — it's issued once by the EFCC after registration and never needs renewal; product copy must never attach a renewal or expiry date to it (corrected in v12, after an earlier draft incorrectly implied a renewal cycle).
 
 **Verification & Lookup is almost entirely automated, not partner-routed.** Verification API vendors exist that cover TIN, BVN, NIN, and CAC lookups under one integration — QoreID's public docs confirm all four — so this whole tier can run on SellersPoint's own infrastructure with near-instant turnaround, instead of the ~12 hours a manual agent needs. Only document authenticity verification on a high-stakes document might still warrant a manual cross-check as a fallback.
 
@@ -63,7 +65,7 @@ Every document from every fulfillment line lands here, organized by type and ren
 - **Existing SellersPoint core users** — cross-sell target for the Tax Suite (pulls their existing revenue data) and Proposal/Quote Generator.
 - **Graduating sellers** — Business Name → LLC upgrade, SCUML (the door to a business bank account), and recurring compliance as the anchor once registered.
 - **Any seller, registered or not** — Trackers isn't gated behind registration; rent/insurance/payroll renewals apply regardless.
-- **Consultants/accountants managing multiple SMEs, and sellers who simply run more than one business** — now served as of v10 via multi-business support (see Section 13a).
+- **Consultants/accountants/agencies managing multiple SMEs** — served via Partner Sub-Accounts on the admin backend, not the seller-facing dashboard (see Section 13a and Section 15). A seller who personally runs more than one business today registers each business separately, one seller login per business, matching the "the dashboard is for one business" principle in Section 13a.
 
 ## 7. Automation Tiers
 
@@ -159,19 +161,21 @@ Each of these now computes its *actual next occurrence* from today's date (rolli
 
 **Ties three systems together, which is exactly the point:** it's the first surface where marking a tracker done, a VAT deadline, and a CAC Annual Return date all show up together, making the product feel like one system instead of several tools glued together.
 
-## 13a. Multi-Business Support (built in v10)
+## 13a. One Business Per Dashboard, Multi-Business via Partner Sub-Accounts (revised in v13)
 
-**Why now, not later:** the core SellersPoint app itself started single-tenant and had to be substantially reworked to support multiple businesses per login — a retrofit, not a design choice. Docs is built multi-business from this point forward specifically to avoid repeating that migration pain, even though most sellers today only have one business.
+**v10 originally built a multi-business switcher directly into the seller-facing dashboard** — one login, a sidebar dropdown, multiple independent business records. **v13 reverses that:** the seller-facing dashboard (`sellerspoint-docs-dashboard.html`) is scoped to **one business per login**, full stop. Multi-business management still exists, but it moved to the admin backend as a distinct capability — **Partner Sub-Accounts** — rather than living inside the product a typical seller uses.
 
-**Hard constraint carried through the whole data model:** a business's company registration is **one field, not two** — `regType` is either `"Business Name"` or `"Limited Liability Company"`, never both at once, and never rendered as two parallel registration cards. Registrations always renders exactly one Company Registration card per business, whose label follows that business's actual `regType`.
+**Why the reversal:** the overwhelming majority of sellers run exactly one business, and a switcher in their primary nav added a UI affordance (and a whole data-model layer) that served a minority case — the accountant/consultant managing several clients. That case is real, but it isn't a *seller* need, it's a *service-provider* need, and service providers are a different audience who should be provisioned and managed by SellersPoint staff, not self-served through the same dashboard as an ordinary seller. Putting it in the admin backend also means SellersPoint controls who gets multi-business access, rather than every seller carrying the data-model overhead of a feature only a few will ever use.
 
-**Architecture:**
-- Each business is a fully independent state bundle — registration status, SCUML status, setup progress/steps, alerts, Trackers, Templates/documents, Verification & Lookup history, Payroll employees, Invoices, current VAT figure, filing history, and Vault contents all live *inside* that business's record, not in a shared global store filtered by an "active business" flag. This was a deliberate choice over a shared-store-plus-filter model: it's what the core app's own migration proved is worth avoiding.
-- A sidebar business switcher lets the seller (or consultant) move between businesses at any time; switching re-renders every view against the newly active business and resets any mid-flow UI state (an in-progress Verification check, a Template selection) so nothing bleeds across businesses.
-- **What stays shared across all businesses, deliberately:** the Compliance Calendar's statutory deadline dates (VAT/PAYE/WHT/CAC/CIT/PIT recurrence rules) are Nigerian tax law, not business-specific data — they compute the same way regardless of which business is active. Only the *merged* Tracker rows inside the Calendar's upcoming list are per-business.
-- Adding a business is a first-class action from the switcher, not a settings-page afterthought — this is what makes the feature usable for a consultant onboarding a new client mid-session, not just for a seller who happens to run two shops.
+**Hard constraint, unchanged in spirit:** a business's registration is **one field, not several** — `regType` is one of `"Business Name"`, `"Limited Liability Company"`, or `"Partnership"` (extended from two options to three in v13 — see Section 2), never more than one at a time, and never rendered as more than one registration card. Business Registration always renders exactly one card, labeled from that business's actual `regType`.
 
-**What this unlocks:** the consultant/accountant-managing-multiple-SMEs persona (Section 6) moves from "not yet served" to served. It also quietly serves the more common case of a single seller who, e.g., runs a registered LLC for one line of business and a separate Business Name for a side venture — two different `regType` values under one login.
+**Current architecture (v13):**
+- `sellerspoint-docs-dashboard.html` holds a single `BUSINESS` object — no array, no switcher, no `currentBusinessId`. Every view's render function still calls a `biz()` helper for consistency with the rest of the codebase, but `biz()` now just returns that one object.
+- The sidebar shows a static, non-interactive business name/type readout in place of the old switcher — useful context, no affordance to imply more businesses live behind it.
+- **Multi-business management now lives in `sellerspoint-docs-admin.html`**, under a new **Partner Sub-Accounts** section: agencies/consultants (e.g. "Adaeze & Co. Chartered Accountants") get an account that's linked to a set of client businesses via a `managedBy` field on each business record. Staff (or, in a fuller build, the partner via a scoped login) can filter the cross-tenant Businesses table down to just that partner's managed businesses and act on them from there.
+- **Naming collision, deliberately avoided:** "partner" already means something specific in this product — Partner A (Corporate & Legal) and Partner B (Tax & Regulatory), the licensed fulfillment partners from Section 3, invisible to sellers. Partner Sub-Accounts are a completely different kind of partner — a service-provider/reseller relationship, visible only to staff, never confused with fulfillment routing. Every UI label and this document call this out explicitly wherever the term appears, to keep the two meanings from bleeding into each other.
+
+**What this means for the personas in Section 6:** the consultant/accountant-managing-multiple-SMEs case is still served — just through the admin backend's Partner Sub-Accounts, not through the seller-facing dashboard. A seller who happens to run two businesses (e.g. an LLC for one line of business and a separate Business Name for a side venture) now registers and manages each one under its own login, same as any two unrelated sellers would.
 
 ## 13b. TIN Auto-fill, Business Health Score & Guided CAC Filing (built in v12)
 
@@ -181,16 +185,16 @@ The three remaining items from the original Feedback & Roadmap list (Section 14)
 - The Verification tab itself pre-fills the input and shows "Auto-filled from your last verified TIN" the next time a TIN check is opened.
 - The NRS/FIRS E-Invoicing form's "Your TIN" field pre-fills from the business's stored TIN, with a small "Auto-filled from Verification" note when it does.
 - Templates that legitimately carry the issuing business's TIN (Sales/Supplier Agreement, Proposal/Quote) show the live verified value inline once known, or a prompt to verify first if not.
-- This is scoped per-business (per Section 13a) — switching businesses in the switcher switches which TIN auto-fills, since each business's TIN is part of its own independent state bundle, not a shared value.
+- The dashboard is single-business (Section 13a), so this is simply the one business's TIN, remembered once and reused everywhere on that login rather than re-typed per tool.
 
-**Business Health Score on Overview.** A composite score (0–100) computed per business from five live signals: registration approved, SCUML certificate approved, TIN verified, no overdue Trackers, and VAT filings up to date. Shown as a score, a progress bar, and a checklist where every failing item carries a "Fix" button that routes straight to the view that resolves it (Registrations, Verification, Trackers, or Tax Tools) — turning the score from a passive number into a worklist. Color-coded (green ≥80, amber 50–79, red <50) so a seller or a consultant managing several businesses can tell at a glance, from the switcher alone, which business needs attention first.
+**Business Health Score on Overview.** A composite score (0–100) computed from five live signals: registration approved, SCUML certificate approved, TIN verified, no overdue Trackers, and VAT filings up to date. Shown as a score, a progress bar, and a checklist where every failing item carries a "Fix" button that routes straight to the view that resolves it (Business Registration, Verification, Trackers, or Tax Tools) — turning the score from a passive number into a worklist. Color-coded (green ≥80, amber 50–79, red <50). On the admin side, the same signals are what a Partner Sub-Account holder or staff member would triage across the Businesses table when deciding which client needs attention first.
 
 **Guided CAC Annual Return filing.** The Compliance Calendar's "File now" action on CAC Annual Return now opens a 3-step guided wizard instead of a bare toast: (1) confirm business details, with TIN pulled from auto-fill and a nudge to verify it first if missing; (2) confirm nothing has changed since the last filing (directors, shareholders, business address); (3) review the fee and escrow terms and submit. This is the fuller guided-filing flow the original roadmap note called for, replacing the single-click stub — and it reuses the same auto-filled TIN and escrow-payment language used everywhere else in the product, rather than introducing a one-off pattern.
 
 ## 14. Feedback & Roadmap
 
 All four items originally logged here are now built:
-- **Multi-business/multi-entity support** — built in v10, see Section 13a.
+- **Multi-business/multi-entity support** — built in v10 as a customer-dashboard switcher, revised in v13 into admin-side Partner Sub-Accounts, see Section 13a.
 - **TIN auto-fill across tools** — built in v12, see Section 13b.
 - **Business Health Score on Overview** — built in v12, see Section 13b.
 - **CAC Annual Return guided filing** — built in v12, see Section 13b.
@@ -201,13 +205,14 @@ No open items at time of writing — future suggestions land here as they come i
 
 **Why this split exists from day one:** the core SellersPoint app already draws this line — `index.html` is the seller-facing app, `backend.html` is a separate, staff-only "Platform Admin" page giving a cross-tenant view across every business on the platform. Docs follows the same precedent instead of bolting on an admin surface later.
 
-- **`sellerspoint-docs-dashboard.html`** — the seller/customer-facing product covered by everything above. One seller login, its businesses (via the Section 13a switcher), and never a partner name anywhere in it (Section 8).
+- **`sellerspoint-docs-dashboard.html`** — the seller/customer-facing product covered by everything above. One seller login, one business (Section 13a), and never a partner name anywhere in it (Section 8).
 - **`sellerspoint-docs-admin.html`** — a new, separate, internal-only file. Not linked from the customer dashboard, the same way `backend.html` isn't linked from `index.html` — staff navigate to it directly. It's the one surface in the whole product where Partner A / Partner B legitimately appear by name, because the audience is SellersPoint staff, not sellers.
 
 **What the admin backend shows that the customer dashboard structurally cannot:**
 - **Fulfillment queue** — every item currently routed to Partner A or Partner B (the seller-invisible side of Workflow A, stages 6–7), tagged by partner, stage, days in queue, and escrow payment status, so staff can chase a stalled filing before a seller has to ask.
-- **Cross-tenant business list** — every business across every seller login, not one login's switcher — status, registration type, SCUML status, package, and last activity, with action-needed rows flagged for follow-up.
-- **Package & Pricing management** — every priced service (Business Name Registration, LLC Incorporation, SCUML Registration, CAC Annual Returns Filing, Tax Filing, Tax Clearance Certificate, TIN/BVN/NIN/CAC Verification, Document Authenticity Check, the New Business Bundle, and the Tax Suite paid tier) as an editable table: seller-facing price, internal partner/vendor cost, and computed margin. This is where "See bundle pricing" and "Bundle pricing would open here" on the customer dashboard actually get their numbers from — pricing is set once, here, never exposed as an editable surface to sellers. Figures shown in the mockup are current working examples for planning, not published rates.
+- **Partner Sub-Accounts (v13)** — agency/consultant accounts (e.g. "Adaeze & Co. Chartered Accountants") each linked to a set of client businesses via a `managedBy` field, with a "View businesses" action that filters the cross-tenant Businesses table down to just that partner's clients. This is where the multi-business capability originally built into the customer dashboard in v10 now lives — see Section 13a for the full rationale. Deliberately named and presented separately from Partner A/Partner B fulfillment routing directly above it, since both are called "partner" but mean entirely different things.
+- **Cross-tenant business list** — every business across every seller login, filterable by managing partner, with a "Managed by" column (self-managed or a named Partner Sub-Account) — status, registration type, SCUML status, package, and last activity, with action-needed rows flagged for follow-up.
+- **Package & Pricing management** — every priced service (Business Name Registration, LLC Incorporation, Partnership Registration, SCUML Registration, CAC Annual Returns Filing, Tax Filing, Tax Clearance Certificate, TIN/BVN/NIN/CAC Verification, Document Authenticity Check, the New Business Bundle, and the Tax Suite paid tier) as an editable table: seller-facing price, internal partner/vendor cost, and computed margin. This is where "See bundle pricing" and "Bundle pricing would open here" on the customer dashboard actually get their numbers from — pricing is set once, here, never exposed as an editable surface to sellers. Figures shown in the mockup are current working examples for planning, not published rates.
 
 ---
 
@@ -282,8 +287,10 @@ As of v8, the dashboard is no longer sketched in ASCII here — the product has 
 
 **v9 note:** Templates no longer has a sidebar entry in the live file (see the positioning decision in Section 2) — find it via Overview's "New document" quick action or the Document Vault's "Create a document" prompt. The Compliance Calendar tab now uses real statutory recurrence math and a two-month grid instead of estimated day-counts.
 
-**v10 note:** the sidebar now opens with a business switcher above the nav. Every view (Overview, Registrations, Verification, Tax Suite, Trackers, Templates, Vault) renders against whichever business is currently active, and Registrations always shows a single Company Registration card matching that business's actual registration type — see Section 13a for the full data-model rationale.
+**v10 note (superseded by v13 — see below):** the sidebar opened with a business switcher above the nav, and every view rendered against whichever business was currently active.
 
 **v11 note:** Trademark is gone from Registrations, the data model, and every business's setup checklist — SCUML is now the featured "Also available" item, with copy explaining it's what unblocks a business bank account, positioned to be started right after TIN. Registration certificates in the Document Vault no longer claim a "Renews via Annual Returns" date for Business Name/LLC — see Section 3 for why that framing was wrong. There's also a second, separate file now: `sellerspoint-docs-admin.html` — a staff-only "Platform Admin" backend (cross-tenant business list, internal fulfillment queue, and Package & Pricing management), not linked from the customer dashboard, mirroring the core app's `backend.html` pattern. See Section 15.
 
 **v12 note:** the SCUML certificate no longer carries a renewal date anywhere in the file — it's a one-time, EFCC-issued certificate (see Section 3). The Compliance Calendar's two months are now always stacked with a divider and full month-name headers, deadline days highlight and show a detail tooltip on hover, and the Upcoming list is a fixed two-column grid so due-date badges never lose their right-alignment (see Section 13). Overview now shows a live Business Health Score with per-item "Fix" links, TIN verified in the Verification tab auto-fills into E-Invoicing and TIN-bearing Templates, and the Compliance Calendar's "File now" on CAC Annual Return opens a 3-step guided filing wizard instead of a single toast (see Section 13b).
+
+**v13 note:** the customer dashboard's business switcher is gone — the sidebar now shows a static, non-interactive business name/type readout, and the file holds one `BUSINESS` object instead of a `BUSINESSES` array (see Section 13a). "Registrations" is renamed **"Business Registration"** throughout, and `regType` now supports a third value, `"Partnership"`, alongside Business Name and Limited Liability Company. `sellerspoint-docs-admin.html` gained a **Partner Sub-Accounts** section — agency/consultant accounts each linked to a set of client businesses, with a "View businesses" action that filters the cross-tenant Businesses table (now showing a "Managed by" column) down to that partner's clients. This is where multi-business management now lives — see Section 13a and Section 15.

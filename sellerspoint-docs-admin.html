@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SellersPoint Docs — Platform Admin</title>
-<meta name="description" content="Internal staff-only admin backend for SellersPoint Docs: cross-tenant business monitoring, partner fulfillment queue, and package/pricing management.">
+<meta name="description" content="Internal staff-only admin backend for SellersPoint Docs: cross-tenant business monitoring, partner fulfillment queue, partner sub-accounts, and package/pricing management.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -93,6 +93,9 @@ td small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
 .pricing-note{font-size:12px;color:var(--muted);margin-top:10px}
 .save-row{display:flex;justify-content:flex-end;margin-top:14px}
 
+/* Partner sub-accounts */
+.filter-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f0faf6;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;font-weight:700;color:var(--dark)}
+
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:.25s ease;z-index:99}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -147,10 +150,24 @@ td small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
   </section>
 
   <section>
-    <div class="section-title">Businesses <small>Cross-tenant — every business on Docs, regardless of which seller login owns it</small></div>
+    <div class="section-title">Partner Sub-Accounts <small>Agencies/consultants who manage several client businesses — not the fulfillment Partner A / Partner B above</small></div>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>Seller</th><th>Business</th><th>Reg. type</th><th>Status</th><th>SCUML</th><th>Package</th><th>Last activity</th><th></th></tr></thead>
+        <thead><tr><th>Partner</th><th>Type</th><th>Contact</th><th>Businesses managed</th><th>Status</th><th></th></tr></thead>
+        <tbody id="partnerBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Businesses <small>Cross-tenant — every business on Docs, regardless of which seller login owns it</small></div>
+    <div class="filter-banner" id="bizFilterBanner" style="display:none">
+      <span id="bizFilterText"></span>
+      <button class="btn btn-ghost" onclick="clearPartnerFilter()">Clear filter — show all</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Seller</th><th>Business</th><th>Reg. type</th><th>Status</th><th>SCUML</th><th>Managed by</th><th>Package</th><th>Last activity</th><th></th></tr></thead>
         <tbody id="bizBody"></tbody>
       </table>
     </div>
@@ -193,17 +210,24 @@ const QUEUE = [
 ];
 
 const BUSINESSES_ADMIN = [
-  { seller:"Amina Yusuf", biz:"Amina Fashion Hub", regType:"Business Name", status:"approved", scuml:"approved", package:"New Business Bundle", lastActive:"Today" },
-  { seller:"Chidi Okafor", biz:"TechBuild Nigeria Ltd", regType:"Limited Liability Company", status:"approved", scuml:"not-started", package:"Tax Suite (paid)", lastActive:"Yesterday" },
-  { seller:"Funmi Adebayo", biz:"Coastal Traders", regType:"Business Name", status:"action-needed", scuml:"not-started", package:"Pay-as-you-go", lastActive:"3 days ago" },
-  { seller:"Tunde Bakare", biz:"Lagos Fresh Produce", regType:"Business Name", status:"review", scuml:"approved", package:"Pay-as-you-go", lastActive:"Today" },
-  { seller:"Ifeoma Nwosu", biz:"Naija Gadget Hub Ltd", regType:"Limited Liability Company", status:"review", scuml:"review", package:"New Business Bundle", lastActive:"2 days ago" },
-  { seller:"Aisha Bello", biz:"Kano Textiles", regType:"Business Name", status:"not-started", scuml:"not-started", package:"Pay-as-you-go", lastActive:"1 week ago" },
+  { seller:"Amina Yusuf", biz:"Amina Fashion Hub", regType:"Business Name", status:"approved", scuml:"approved", managedBy:null, package:"New Business Bundle", lastActive:"Today" },
+  { seller:"Chidi Okafor", biz:"TechBuild Nigeria Ltd", regType:"Limited Liability Company", status:"approved", scuml:"not-started", managedBy:null, package:"Tax Suite (paid)", lastActive:"Yesterday" },
+  { seller:"Funmi Adebayo", biz:"Coastal Traders", regType:"Business Name", status:"action-needed", scuml:"not-started", managedBy:null, package:"Pay-as-you-go", lastActive:"3 days ago" },
+  { seller:"Tunde Bakare", biz:"Lagos Fresh Produce", regType:"Business Name", status:"review", scuml:"approved", managedBy:"Adaeze & Co. Chartered Accountants", package:"Pay-as-you-go", lastActive:"Today" },
+  { seller:"Ifeoma Nwosu", biz:"Naija Gadget Hub Ltd", regType:"Limited Liability Company", status:"review", scuml:"review", managedBy:"Adaeze & Co. Chartered Accountants", package:"New Business Bundle", lastActive:"2 days ago" },
+  { seller:"Aisha Bello", biz:"Kano Textiles", regType:"Partnership", status:"not-started", scuml:"not-started", managedBy:"GrowFast Business Consultants", package:"Pay-as-you-go", lastActive:"1 week ago" },
 ];
+
+const PARTNER_ACCOUNTS = [
+  { name:"Adaeze & Co. Chartered Accountants", type:"Accounting firm", contact:"adaeze@adaezeandco.ng", status:"active" },
+  { name:"GrowFast Business Consultants", type:"Business consultancy", contact:"hello@growfastng.com", status:"active" },
+];
+let activePartnerFilter = null;
 
 const PRICING = [
   { service:"Business Name Registration", fulfillment:"Partner A", price:25000, cost:15000, status:"active" },
   { service:"LLC Incorporation", fulfillment:"Partner A", price:80000, cost:70000, status:"active" },
+  { service:"Partnership Registration", fulfillment:"Partner A", price:30000, cost:18000, status:"active" },
   { service:"SCUML Registration", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
   { service:"CAC Annual Returns Filing", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
   { service:"Tax Filing (VAT/CIT/PIT return)", fulfillment:"Partner B", price:15000, cost:9000, status:"active" },
@@ -247,7 +271,10 @@ function renderQueue(){
 }
 
 function renderBusinesses(){
-  $("bizBody").innerHTML = BUSINESSES_ADMIN.map(b=>{
+  const rows = activePartnerFilter ? BUSINESSES_ADMIN.filter(b=>b.managedBy===activePartnerFilter) : BUSINESSES_ADMIN;
+  $("bizFilterBanner").style.display = activePartnerFilter ? "flex" : "none";
+  if (activePartnerFilter) $("bizFilterText").textContent = `Showing businesses managed by ${activePartnerFilter} (${rows.length})`;
+  $("bizBody").innerHTML = rows.map(b=>{
     const p = STATUS_PILL[b.status];
     const s = STATUS_PILL[b.scuml];
     return `<tr class="${b.status==='action-needed'?'flag':''}">
@@ -256,11 +283,35 @@ function renderBusinesses(){
       <td><small>${b.regType}</small></td>
       <td><span class="pill ${p.cls}">${p.label}</span></td>
       <td><span class="pill ${s.cls}">${s.label}</span></td>
+      <td>${b.managedBy ? `<small>${b.managedBy}</small>` : `<small>— self-managed</small>`}</td>
       <td>${b.package}</td>
       <td>${b.lastActive}</td>
       <td><button class="btn btn-ghost" onclick="toast('Would open ${b.biz} admin detail')">View</button></td>
     </tr>`;
   }).join("");
+}
+
+function renderPartners(){
+  $("partnerBody").innerHTML = PARTNER_ACCOUNTS.map(p=>{
+    const managed = BUSINESSES_ADMIN.filter(b=>b.managedBy===p.name);
+    return `<tr>
+      <td><b>${p.name}</b></td>
+      <td><small>${p.type}</small></td>
+      <td><small>${p.contact}</small></td>
+      <td>${managed.length} business${managed.length===1?'':'es'}</td>
+      <td><span class="pill pill-success">Active</span></td>
+      <td><button class="btn btn-ghost" onclick="filterByPartner('${p.name.replace(/'/g,"\\'")}')">View businesses</button></td>
+    </tr>`;
+  }).join("");
+}
+function filterByPartner(name){
+  activePartnerFilter = name;
+  renderBusinesses();
+  document.getElementById("bizFilterBanner").scrollIntoView({ behavior:"smooth", block:"center" });
+}
+function clearPartnerFilter(){
+  activePartnerFilter = null;
+  renderBusinesses();
 }
 
 function renderPricing(){
@@ -280,6 +331,7 @@ function renderPricing(){
 
 renderMetrics();
 renderQueue();
+renderPartners();
 renderBusinesses();
 renderPricing();
 </script>
