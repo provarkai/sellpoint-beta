@@ -88,16 +88,87 @@
       </div>
 
       <div id="docs-overview" class="docs-subpage active">
-        <article>
-          <h2>Business Registration status</h2>
-          <p class="meta">Nigeria's business-formation and regulatory-compliance layer for SellersPoint sellers - incorporation, tax, and compliance in one place.</p>
-          <div id="docsRegStatusBox"></div>
-        </article>
+        <div class="view-header"><h1>Overview</h1><p>Everything about your business setup, in one place.</p></div>
+
+        <div class="congrats-banner hide" id="docsCongratsBanner">
+          <p id="docsCongratsText"></p>
+          <button type="button" class="dismiss" id="docsCongratsDismiss">&times;</button>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Your Business Setup</h3>
+            <div class="progress-track"><div class="progress-fill" id="docsSetupProgressFill" style="width:0%"></div></div>
+            <div class="step-labels" id="docsSetupSteps"></div>
+          </div>
+          <div class="card">
+            <h3>Quick actions</h3>
+            <div class="quick-actions" style="margin-top:14px">
+              <button type="button" class="btn btn-primary" onclick="showDocsView('calendar')">📅 View compliance calendar</button>
+              <button type="button" class="btn btn-ghost" onclick="showDocsView('verification')">Verify a TIN/BVN/NIN</button>
+              <button type="button" class="btn btn-ghost" onclick="showDocsView('tax')">Estimate my tax</button>
+              <button type="button" class="btn btn-ghost" onclick="showDocsView('templates')">New document</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="health-head">
+            <div>
+              <h3>Business Health Score</h3>
+              <p class="meta" style="margin-top:2px">How compliant and bank-ready this business is right now.</p>
+            </div>
+            <div class="health-score" id="docsHealthScoreFigure">–</div>
+          </div>
+          <div class="health-bar"><div class="health-bar-fill" id="docsHealthBarFill" style="width:0%"></div></div>
+          <div class="health-checklist" id="docsHealthChecklist"></div>
+        </div>
+
+        <div class="card bundle-card" style="margin-top:16px">
+          <div class="info">
+            <b>📅 Everything due, in one place</b>
+            <small>VAT, Annual Returns, Tax Clearance, and your own reminders - see what's coming up next.</small>
+          </div>
+          <button type="button" class="btn btn-accent btn-sm" onclick="showDocsView('calendar')">Open calendar</button>
+        </div>
+
+        <div class="card bundle-card" style="margin-top:16px">
+          <div class="info">
+            <b>💡 Save with the New Business Bundle</b>
+            <small>Business Name + TIN + 1 contract template + Tax Calculator access - bundled below individual pricing.</small>
+          </div>
+          <button type="button" class="btn btn-accent btn-sm" onclick="toast('Bundle pricing would open here')">View bundle</button>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card">
+            <h3>Needs your attention</h3>
+            <div id="docsOverviewAlerts"></div>
+          </div>
+          <div class="card">
+            <h3>Recently in your Vault</h3>
+            <div class="vault-mini" id="docsOverviewVaultMini" style="margin-top:12px"></div>
+          </div>
+        </div>
       </div>
 
       <div id="docs-registration" class="docs-subpage">
+        <div class="view-header"><h1>Business Registration</h1><p>Filed and tracked for you. Payment is held until delivery - never released upfront.</p></div>
+
+        <div class="card bundle-card" style="margin-bottom:18px">
+          <div class="info"><b>💡 Buying more than one?</b><small>Bundle pricing beats paying for each service separately.</small></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="toast('Bundle pricing would open here')">See bundle pricing</button>
+        </div>
+
+        <div class="cat-title">Business Registration status</div>
+        <div id="docsRegStatusCard"></div>
+
+        <div class="card" style="margin:18px 0;background:#f0faf6">
+          <p style="font-size:13px;font-weight:700;color:var(--dark)">🏦 Most Nigerian banks won't open a business account without your SCUML certificate - it's a one-time certificate issued by the EFCC, no renewal needed once approved.</p>
+        </div>
+
+        <div class="cat-title">1. Company details</div>
         <article>
-          <h2>1. Company details</h2>
           <form id="docsDetailsForm">
             <label>Registration type<select id="docsRegType" required><option value="">Choose...</option><option value="business_name">Business Name</option><option value="llc">Limited Liability Company</option><option value="partnership">Partnership</option></select></label>
             <label>Nature of business category<input id="docsNobCategory" placeholder="e.g. Retail Trade"></label>
@@ -108,8 +179,8 @@
             <button>Save Company Details</button>
           </form>
         </article>
+        <div class="cat-title">2. Shares</div>
         <article>
-          <h2>2. Shares</h2>
           <form id="docsSharesForm">
             <label>Ordinary issued shares<input id="docsOrdinaryShares" type="number" min="0" value="0"></label>
             <label>Preference issued shares<input id="docsPreferenceShares" type="number" min="0" value="0"></label>
@@ -117,8 +188,8 @@
             <button>Save Shares</button>
           </form>
         </article>
+        <div class="cat-title">3. Affiliates <small class="meta">(directors, secretary, shareholders, etc.)</small></div>
         <article>
-          <h2>3. Affiliates <small class="meta">(directors, secretary, shareholders, etc.)</small></h2>
           <form id="docsAffiliateForm">
             <label>Role(s) <span class="meta">(select all that apply)</span></label>
             <p class="actions">
@@ -139,8 +210,8 @@
           </form>
           <div id="docsAffiliateList" class="list"></div>
         </article>
+        <div class="cat-title">4. Persons with Significant Control (PSC)</div>
         <article>
-          <h2>4. Persons with Significant Control (PSC)</h2>
           <form id="docsPscForm">
             <label>Affiliate<select id="docsPscAffiliate" required></select></label>
             <label>Share percent<input id="docsPscSharePercent" type="number" min="0" max="100" step="0.01" value="0"></label>
@@ -151,76 +222,254 @@
           </form>
           <div id="docsPscList" class="list"></div>
         </article>
+        <div class="cat-title">5. Submit</div>
         <article>
-          <h2>5. Submit</h2>
           <p class="meta">Once submitted, our team files your registration with CAC and keeps you updated here as it progresses.</p>
-          <p class="actions"><button type="button" id="docsSubmitRegistration">Submit Registration</button></p>
+          <p class="actions"><button type="button" class="btn btn-primary" id="docsSubmitRegistration">Submit Registration</button></p>
         </article>
       </div>
 
-      <div id="docs-verification" class="docs-subpage docs-coming-soon"><article><h2>Verification</h2><p class="meta">TIN, BVN, NIN, and CAC lookups - coming soon.</p></article></div>
+      <div id="docs-verification" class="docs-subpage">
+        <div class="view-header"><h1>Verification</h1><p>Submit a check and we'll confirm it - most results within 24 hours while this runs manually.</p></div>
+        <div class="card">
+          <div id="docsVerifyList"></div>
+          <div class="verify-panel" id="docsVerifyPanel">
+            <label id="docsVerifyLabel">Enter the number to check</label>
+            <input id="docsVerifyInput" placeholder="e.g. 12345678901">
+            <button type="button" class="btn btn-primary" id="docsVerifyRun">Submit check</button>
+            <div class="verify-result" id="docsVerifyResult"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>Recent lookups</h3>
+          <div id="docsLookupHistory" style="margin-top:10px"></div>
+        </div>
+      </div>
       <div id="docs-calendar" class="docs-subpage">
-        <article>
-          <h2>Next deadline</h2>
-          <div id="docsNextDeadline"></div>
-        </article>
-        <article>
-          <h2>Upcoming</h2>
-          <div id="docsCalendarList" class="list"></div>
-        </article>
+        <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view - this month and next.</p></div>
+        <div class="cal-layout">
+          <div>
+            <div class="card next-deadline">
+              <div>
+                <h3>Next deadline</h3>
+                <div class="figure" id="docsNextDeadlineFigure">–</div>
+                <small class="meta" id="docsNextDeadlineName">Loading…</small>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="showDocsView('tax')">Go to Tax Tools →</button>
+            </div>
+            <div class="cal-months" style="margin-top:16px">
+              <div class="card">
+                <h3 id="docsCalMonthLabel0">This month</h3>
+                <div class="cal-grid" id="docsCalGrid0"></div>
+              </div>
+              <div class="card">
+                <h3 id="docsCalMonthLabel1">Next month</h3>
+                <div class="cal-grid" id="docsCalGrid1"></div>
+              </div>
+            </div>
+            <div class="cal-legend" style="margin:12px 2px 0">
+              <span><span class="sw" style="background:var(--danger)"></span> Deadline</span>
+              <span><span class="sw" style="background:var(--primary)"></span> Today</span>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h3>Upcoming</h3>
+              <div id="docsCalendarList" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="docs-tax" class="docs-subpage">
-        <article>
-          <h2>PAYE Calculator <small class="meta">(Nigeria Tax Act 2025)</small></h2>
-          <p class="meta">Free - estimate an employee's tax and net pay under the current PAYE bands.</p>
-          <form id="docsPayeForm">
-            <label>Period<select id="docsPayePeriod"><option value="monthly">Monthly</option><option value="annual">Annual</option></select></label>
-            <label>Gross income<input id="docsPayeGross" type="number" min="0" required></label>
-            <label>Annual rent paid <span class="meta">(optional - 20% relief, capped at NGN 500,000/yr)</span><input id="docsPayeRent" type="number" min="0" value="0"></label>
-            <label>Pension (optional)<input id="docsPayePension" type="number" min="0" value="0"></label>
-            <label>NHF (optional)<input id="docsPayeNHF" type="number" min="0" value="0"></label>
-            <label>NHIS (optional)<input id="docsPayeNHIS" type="number" min="0" value="0"></label>
-            <button type="button" id="docsPayeCalc">Calculate</button>
-          </form>
-          <div id="docsPayeResult"></div>
-        </article>
+        <div class="view-header"><h1>Tax Tools</h1><p>PAYE, payroll, payslips and FIRS/NRS e-invoicing - built on the Nigeria Tax Act 2025. Estimates only - not a filed position.</p></div>
+
+        <div class="tax-subnav">
+          <button type="button" class="tax-tab active" data-tax="calculator">🧮 Tax Calculator</button>
+          <button type="button" class="tax-tab" data-tax="vat">🧾 VAT</button>
+          <button type="button" class="tax-tab" data-tax="payroll">👥 Payroll</button>
+          <button type="button" class="tax-tab" data-tax="payslip">📄 Payslip</button>
+          <button type="button" class="tax-tab" data-tax="certificate">🏅 Annual Certificate</button>
+          <button type="button" class="tax-tab" data-tax="einvoice">🧾 E-Invoicing</button>
+        </div>
+
+        <div class="tax-panel active" id="tax-calculator">
+          <article>
+            <h3>PAYE Calculator</h3>
+            <p class="meta" style="margin-top:4px">Under the Nigeria Tax Act 2025, this uses the current itemized deductions and Fourth Schedule bands.</p>
+            <form id="docsPayeForm">
+              <label>Period<select id="docsPayePeriod"><option value="monthly">Monthly</option><option value="annual">Annual</option></select></label>
+              <label>Gross income<input id="docsPayeGross" type="number" min="0" required></label>
+              <label>Annual rent paid <span class="meta">(optional - 20% relief, capped at NGN 500,000/yr)</span><input id="docsPayeRent" type="number" min="0" value="0"></label>
+              <label>Pension (optional)<input id="docsPayePension" type="number" min="0" value="0"></label>
+              <label>NHF (optional)<input id="docsPayeNHF" type="number" min="0" value="0"></label>
+              <label>NHIS (optional)<input id="docsPayeNHIS" type="number" min="0" value="0"></label>
+              <button type="button" class="btn btn-primary" id="docsPayeCalc">Calculate →</button>
+            </form>
+            <div id="docsPayeResult"></div>
+          </article>
+        </div>
+
+        <div class="tax-panel" id="tax-vat">
+          <article>
+            <h3>VAT Estimator</h3>
+            <p class="meta" style="margin-top:4px">Pulled from this month's paid sales. Estimate only - not a filed position.</p>
+            <div class="calc-figure" id="docsVatFigure">NGN 0</div>
+            <small class="meta">Estimated VAT this month (7.5%)</small>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <button type="button" class="btn btn-primary" id="docsVatFileNow">File this now →</button>
+            </div>
+          </article>
+          <article style="margin-top:16px">
+            <h3>Filing history</h3>
+            <div id="docsFilingHistory" style="margin-top:10px"></div>
+          </article>
+        </div>
+
+        <div class="tax-panel" id="tax-payroll">
+          <article>
+            <h3>Mini Payroll</h3>
+            <p class="meta" style="margin-top:4px">Add your staff once - net pay recalculates automatically under the current PAYE bands.</p>
+            <form id="docsEmployeeForm">
+              <div class="field-grid cols-3" style="margin-top:14px">
+                <div class="field">Employee name<input id="docsEmpName" placeholder="e.g. Amaka Obi"></div>
+                <div class="field">Gross salary (NGN/yr)<input id="docsEmpGross" type="number" placeholder="e.g. 4800000"></div>
+                <div class="field">Annual rent paid (NGN)<input id="docsEmpRent" type="number" placeholder="e.g. 1000000"></div>
+              </div>
+              <p class="actions" style="margin-top:12px"><button type="submit" class="btn btn-primary btn-sm">+ Add Employee</button></p>
+            </form>
+            <table class="emp-table"><thead>
+              <tr><th>Name</th><th>Gross (yr)</th><th>Tax (yr)</th><th>Net (yr)</th><th></th></tr>
+            </thead><tbody id="docsEmpTableBody"></tbody></table>
+            <div class="breakdown-card" id="docsPayrollSummary" style="display:none"></div>
+          </article>
+        </div>
+
+        <div class="tax-panel" id="tax-payslip">
+          <article>
+            <h3>Payslip Generator</h3>
+            <p class="meta" style="margin-top:4px">Pick a staff member from Payroll to preview their payslip.</p>
+            <div class="field-grid" style="margin-top:14px">
+              <div class="field">Employee<select id="docsPayslipEmpSelect"></select></div>
+              <div class="field">Company name<input id="docsPayslipCompany"></div>
+            </div>
+            <div id="docsPayslipPreviewWrap"></div>
+          </article>
+        </div>
+
+        <div class="tax-panel" id="tax-certificate">
+          <article>
+            <h3>Annual Tax Certificate</h3>
+            <p class="meta" style="margin-top:4px">Aggregates your Payroll data into a yearly summary - useful for loan, mortgage, or visa applications.</p>
+            <div id="docsCertSummary" class="breakdown-card" style="margin-top:14px"></div>
+          </article>
+        </div>
+
+        <div class="tax-panel" id="tax-einvoice">
+          <article>
+            <h3>NRS/FIRS E-Invoicing</h3>
+            <p class="meta" style="margin-top:4px">Every compliant invoice gets an IRN, a Cryptographic Stamp (CSID), and a QR code before it reaches the buyer.</p>
+            <form id="docsInvoiceForm">
+              <div class="field-grid cols-3" style="margin-top:14px">
+                <div class="field">Buyer name<input id="docsInvBuyerName" placeholder="e.g. Zenith Bank PLC"></div>
+                <div class="field">Buyer TIN<input id="docsInvBuyerTin" placeholder="e.g. 98765432-0001"></div>
+                <div class="field">Amount (NGN, excl. VAT)<input id="docsInvAmount" type="number" placeholder="e.g. 500000"></div>
+                <div class="field span2">Description of goods/services<input id="docsInvDesc" placeholder="e.g. Consulting services"></div>
+              </div>
+              <p class="actions" style="margin-top:14px"><button type="submit" class="btn btn-primary">Generate &amp; Submit →</button></p>
+            </form>
+            <div id="docsInvoiceHistory" style="margin-top:18px"></div>
+          </article>
+        </div>
       </div>
 
       <div id="docs-trackers" class="docs-subpage">
+        <div class="view-header"><h1>Trackers</h1><p>Anything with a due or renewal date - we'll remind you. Licences &amp; Documents can be filed straight from here; everything else is just a nudge.</p></div>
         <article>
-          <h2>Add a tracker</h2>
-          <form id="docsTrackerForm">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3>Your trackers</h3>
+          </div>
+          <form id="docsTrackerForm" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:14px">
             <label>Name<input id="docsTrackerName" required placeholder="e.g. Shop Rent Renewal"></label>
             <label>Category<select id="docsTrackerCategory"><option>Rent/Lease</option><option>Insurance</option><option>Payroll</option><option>Supplier/Vendor</option><option>Licences &amp; Documents</option><option>Other</option></select></label>
             <label>Due date<input id="docsTrackerDue" type="date" required></label>
             <label>Recurrence<select id="docsTrackerRecurrence"><option value="none">One-off</option><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label>
             <label>Note (optional)<input id="docsTrackerNote"></label>
-            <button>Add Tracker</button>
+            <button class="btn btn-primary btn-sm">+ Add tracker</button>
           </form>
         </article>
+        <div id="docsTrackerList" style="margin-top:16px"></div>
+      </div>
+
+      <div id="docs-templates" class="docs-subpage">
+        <div class="view-header"><h1>Templates</h1><p>Fill it, download it, print it. No status tracking - these are yours the moment they're generated.</p></div>
         <article>
-          <h2>Trackers</h2>
-          <div id="docsTrackerList" class="list"></div>
+          <h3>Create a document</h3>
+          <div class="tpl-picker" style="margin-top:14px" id="docsTplPicker">
+            <button type="button" class="tpl-btn" data-tpl="business">Business Agreement</button>
+            <button type="button" class="tpl-btn" data-tpl="tenancy">Tenancy Agreement</button>
+            <button type="button" class="tpl-btn" data-tpl="freelance">Freelance / Service</button>
+            <button type="button" class="tpl-btn" data-tpl="loan">Loan Agreement</button>
+            <button type="button" class="tpl-btn" data-tpl="sales">Sales / Supplier</button>
+            <button type="button" class="tpl-btn" data-tpl="proposal">Proposal / Quote</button>
+          </div>
+          <div style="display:none;margin-top:18px;border-top:1px dashed var(--line);padding-top:16px" id="docsBasicDoc">
+            <b id="docsBasicDocLabel" style="font-size:15px;font-weight:800"></b>
+            <p class="meta" style="margin-top:4px">The standard version - fill it in and it's ready to use as-is.</p>
+            <div id="docsBasicDocFields" style="margin-top:10px;display:grid;gap:6px;font-size:13px;font-weight:700"></div>
+            <p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" id="docsDownloadBasic">Fill in &amp; download</button></p>
+            <div class="ai-box" style="margin-top:22px;border-top:1px dashed var(--line);padding-top:16px">
+              <label>Anything specific about your situation?</label>
+              <textarea id="docsAiInput" placeholder="e.g. There's a guarantor, and repayment is quarterly, not monthly" style="margin-top:8px"></textarea>
+              <p class="actions" style="margin-top:10px"><button type="button" class="btn btn-accent" id="docsSuggestFields">Improve it →</button></p>
+              <div class="suggest-list" id="docsSuggestList"></div>
+              <p class="ai-note">AI adds or adjusts clauses from a pre-vetted clause library based on what you tell it - it never drafts new legal language. (Demo preview - canned suggestions per template type, not a live AI call.)</p>
+            </div>
+          </div>
+        </article>
+        <article style="margin-top:16px">
+          <h3>Your documents</h3>
+          <div id="docsTemplateList" style="margin-top:10px"></div>
         </article>
       </div>
 
       <div id="docs-vault" class="docs-subpage">
+        <div class="view-header"><h1>Document Vault</h1><p>Everything from Business Registration, Tax, Verification, and Templates - searchable in one place.</p></div>
+        <div class="card bundle-card" style="margin-bottom:16px">
+          <div class="info"><b>🧾 Need a contract, tenancy agreement, or proposal?</b><small>Create a basic document instantly, no status tracking.</small></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="showDocsView('templates')">Create a document</button>
+        </div>
         <article>
-          <h2>Upload a document</h2>
+          <h3>Upload a document</h3>
           <form id="docsVaultForm">
             <label>Name<input id="docsVaultName" required placeholder="e.g. Tenancy Agreement"></label>
             <label>Type<select id="docsVaultType"><option>Other</option><option>Legal</option><option>Financial</option><option>Insurance</option></select></label>
             <label>File<input id="docsVaultFile" type="file" required></label>
-            <button>Upload</button>
+            <button class="btn btn-primary btn-sm">Upload</button>
           </form>
         </article>
-        <article>
-          <h2>Documents</h2>
-          <div id="docsVaultList" class="list"></div>
+        <article style="margin-top:16px">
+          <div class="vault-toolbar">
+            <input id="docsVaultSearch" placeholder="Search documents…">
+            <button type="button" class="filter-btn active" data-filter="all">All</button>
+            <button type="button" class="filter-btn" data-filter="Registration">Registration</button>
+            <button type="button" class="filter-btn" data-filter="Tax">Tax</button>
+            <button type="button" class="filter-btn" data-filter="Verification">Verification</button>
+            <button type="button" class="filter-btn" data-filter="Template">Template</button>
+          </div>
+          <div id="docsVaultList"></div>
         </article>
       </div>
     </section>
+
+    <div class="docs-modal-overlay" id="docsCacWizardOverlay">
+      <div class="docs-modal-box">
+        <button type="button" class="docs-modal-x" id="docsCacWizardClose">&times;</button>
+        <h2>Guided CAC Annual Return Filing</h2>
+        <div class="docs-modal-step-dots" id="docsCacStepDots"></div>
+        <div id="docsCacWizardBody"></div>
+      </div>
+    </div>
 
     <section id="settings" class="page"><article id="installAppCard" style="display:none"><h2>Install App</h2><p class="meta">Add SellersPoint to your home screen for one-tap access, like a native app.</p><button type="button" id="installAppBtn">Install App</button></article><div class="grid"><form id="settingsForm"><h2>Business Profile</h2><label>Business logo<input id="sLogo" type="file" accept="image/*"></label><label>Business name<input id="sBusiness" required></label><label>Phone<input id="sPhone" placeholder="2348012345678"></label><label>Address<input id="sAddress" placeholder="123 Market Street, Lagos"></label><label>Payment details <span class="meta">(sent to customers with pending-payment orders)</span><textarea id="sPayment" rows="4" placeholder="Bank: Example Bank
 Account: 1234567890

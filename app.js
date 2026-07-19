@@ -37,7 +37,7 @@ const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings",docs:"Docs"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos();if(tab==="docs")loadDocsRegistration()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings",docs:"My Docs"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos();if(tab==="docs")loadAllDocsData()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -988,17 +988,49 @@ if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
 // advanceBusinessRegistration comment) - this UI captures the same data
 // the CAC API itself needs, so nothing here changes once accreditation
 // lets us automate the actual filing.
-let docsData=null;
-const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved"};
-const DOCS_STATUS_PILL={not_started:"docs-pill-neutral",submitted:"docs-pill-progress",in_review:"docs-pill-progress",action_needed:"docs-pill-alert",approved:"docs-pill-success"};
-const docsPill=(status,label)=>`<span class="docs-pill ${DOCS_STATUS_PILL[status]||"docs-pill-neutral"}">${clean(label)}</span>`;
+let docsData=null,docsTrackers=[],docsVaultItems=[],docsEmployees=[],docsInvoices=[],docsVerifications=[],docsFilings=[];
+let docsSelectedTpl=null,docsActiveCheck=null,docsActiveVaultFilter="all",docsCacWizardStep=1;
+const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved",verified:"Verified",failed:"Failed",filed:"Filed"};
+const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",verified:"pill-success",failed:"pill-alert",filed:"pill-success"};
+const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view));if(view==="trackers"||view==="calendar")loadDocsTrackers();if(view==="vault")loadDocsVault()}
-async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs()}catch(err){toast(err.message)}}
+function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view))}
+async function loadAllDocsData(){
+  try{
+    const [reg,trackers,vault,employees,invoices,verifications,filings]=await Promise.all([
+      api("GET","/api/docs/registration"),api("GET","/api/docs/trackers"),api("GET","/api/docs/vault"),
+      api("GET","/api/docs/employees"),api("GET","/api/docs/invoices"),api("GET","/api/docs/verifications"),api("GET","/api/docs/filings"),
+    ]);
+    docsData=reg;docsTrackers=trackers;docsVaultItems=vault;docsEmployees=employees;docsInvoices=invoices;docsVerifications=verifications;docsFilings=filings;
+    renderAllDocs();
+  }catch(err){toast(err.message)}
+}
+function renderAllDocs(){
+  if(!docsData)return;
+  renderDocs();
+  renderDocsOverview();
+  renderDocsHealthScore();
+  renderDocsTrackers();
+  renderDocsCalendar();
+  renderDocsVault();
+  renderDocsVerifyList();
+  renderDocsLookupHistory();
+  renderDocsPayroll();
+  renderDocsFilingHistory();
+  renderDocsInvoices();
+  renderDocsCertificate();
+  if($("docsVatFigure"))$("docsVatFigure").textContent=naira(docsEstimateVat());
+}
+async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs();renderDocsOverview();renderDocsHealthScore()}catch(err){toast(err.message)}}
+function docsRegCardHtml(name,status,note){
+  return `<div class="card reg-card"><div class="info"><b>${clean(name)}</b><small>${clean(note)}</small></div><div style="display:flex;gap:10px;align-items:center">${docsPill(status,DOCS_STATUS_LABELS[status]||status)}</div></div>`;
+}
 function renderDocs(){
   if(!docsData)return;
   const b=docsData.business;
-  $("docsRegStatusBox").innerHTML=`<div class="row"><span>Registration type</span><b>${b.regType?clean(b.regType.replace(/_/g," ")):"Not chosen yet"}</b></div><div class="row"><span>Status</span><b>${docsPill(b.regStatus,DOCS_STATUS_LABELS[b.regStatus]||b.regStatus)}</b></div>${b.regNote?`<div class="row"><span>Note from our team</span><b>${clean(b.regNote)}</b></div>`:""}<div class="row"><span>TIN</span><b>${b.tin?clean(b.tin):"Not issued yet"}</b></div><div class="row"><span>SCUML</span><b>${docsPill(b.scumlStatus,DOCS_STATUS_LABELS[b.scumlStatus]||b.scumlStatus)}</b></div>`;
+  $("docsRegStatusCard").innerHTML=
+    docsRegCardHtml(b.regType?clean(b.regType.replace(/_/g," "))+" Registration":"Business Registration",b.regStatus,b.regNote||(b.regType?"":"Choose a registration type below to get started"))+
+    docsRegCardHtml("SCUML Registration",b.scumlStatus,b.scumlStatus==="approved"?"Certificate ready":"Recommended right after your TIN - most banks require it to open a business account");
   $("docsRegType").value=b.regType||"";
   $("docsNobCategory").value=b.regNatureOfBusinessCategory||"";
   $("docsNob").value=b.regNatureOfBusiness||"";
@@ -1018,6 +1050,60 @@ if($("docsAffiliateForm"))$("docsAffiliateForm").onsubmit=async e=>{e.preventDef
 async function deleteDocsAffiliate(id){try{await api("DELETE","/api/docs/registration/affiliates/"+id);await loadDocsRegistration();toast("Affiliate removed")}catch(err){toast(err.message)}}
 if($("docsPscForm"))$("docsPscForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/registration/psc",{affiliateId:$("docsPscAffiliate").value,sharePercent:+$("docsPscSharePercent").value,ownsDirectShares:$("docsPscOwnsDirectShares").checked,hasSignificantControl:$("docsPscHasControl").checked,isPep:$("docsPscIsPep").checked});e.target.reset();await loadDocsRegistration();toast("PSC entry added")}catch(err){toast(err.message)}};
 if($("docsSubmitRegistration"))$("docsSubmitRegistration").onclick=async()=>{try{docsData=await api("POST","/api/docs/registration/submit");renderDocs();showDocsView("overview");toast("Registration submitted - our team will review it shortly")}catch(err){toast(err.message)}};
+
+// --- Docs Overview: setup progress, congrats banner, health score, alerts, vault-mini
+function docsStepLabel(name,status){const suffix=status==="approved"?" ✓":status==="submitted"||status==="in_review"?" (in review)":status==="action_needed"?" (action needed)":" —";return name+suffix}
+function docsIsOnboardingComplete(){const b=docsData?.business;return !!b&&b.regStatus==="approved"&&b.scumlStatus==="approved"}
+function renderDocsOverview(){
+  if(!docsData)return;
+  const b=docsData.business;
+  const steps=[
+    {text:docsStepLabel(b.regType?clean(b.regType.replace(/_/g," ")):"Business Registration",b.regStatus),done:b.regStatus==="approved"},
+    {text:docsStepLabel("TIN",b.tin?"approved":"not_started"),done:!!b.tin},
+    {text:docsStepLabel("SCUML",b.scumlStatus),done:b.scumlStatus==="approved"},
+  ];
+  const progress=Math.round((steps.filter(s=>s.done).length/steps.length)*100);
+  $("docsSetupProgressFill").style.width=progress+"%";
+  $("docsSetupSteps").innerHTML=steps.map(s=>`<span class="${s.done?"done":""}">${s.text}</span>`).join("");
+  const banner=$("docsCongratsBanner");
+  const dismissed=localStorage.getItem("sp_docs_congrats_dismissed")==="1";
+  if(docsIsOnboardingComplete()&&!dismissed){
+    $("docsCongratsText").textContent="\u{1F389} Congratulations! Your SCUML registration was approved — you can now open your business bank account, and Tax Tools, Trackers, and the Document Vault are ready to use.";
+    banner.classList.remove("hide");
+  }else banner.classList.add("hide");
+  const alerts=[];
+  if(b.regStatus==="action_needed")alerts.push({title:"Action needed",text:b.regNote||"Your business registration needs attention",action:"Fix",view:"registration"});
+  const overdueTracker=docsTrackers.find(t=>t.status!=="done"&&daysUntil(t.dueDate)<0);
+  if(overdueTracker)alerts.push({title:"Overdue",text:overdueTracker.name+" is overdue",action:"View",view:"trackers"});
+  $("docsOverviewAlerts").innerHTML=alerts.length?alerts.map(a=>`<div class="alert-row"><div class="txt"><b>${clean(a.title)}</b>${clean(a.text)}</div><button type="button" class="btn btn-ghost btn-sm" onclick="showDocsView('${a.view}')">${a.action}</button></div>`).join(""):'<p class="meta" style="padding:14px 0">Nothing needs your attention right now.</p>';
+  const recent=docsVaultItems.slice(0,3);
+  const typeIcon={Registration:"\u{1F4C4}",Tax:"\u{1F4B0}",Verification:"\u{1F50D}",Template:"\u{1F9FE}",Tracker:"\u{1F4CC}",Other:"\u{1F4C4}"};
+  $("docsOverviewVaultMini").innerHTML=recent.length?recent.map(i=>`<div class="vault-mini-row"><span>${typeIcon[i.docType]||"\u{1F4C4}"} ${clean(i.name)}</span><span class="tag">${clean(i.docType)} · ${date(i.createdAt)}</span></div>`).join(""):'<p class="meta" style="padding:8px 0">Nothing here yet.</p>';
+}
+if($("docsCongratsDismiss"))$("docsCongratsDismiss").onclick=()=>{localStorage.setItem("sp_docs_congrats_dismissed","1");$("docsCongratsBanner").classList.add("hide")};
+function docsComputeHealthChecks(){
+  const b=docsData.business;
+  return [
+    {label:"Registration approved",pass:b.regStatus==="approved",view:"registration"},
+    {label:"SCUML certificate (bank-ready)",pass:b.scumlStatus==="approved",view:"registration"},
+    {label:"TIN verified",pass:!!b.tin,view:"verification"},
+    {label:"No overdue trackers",pass:!docsTrackers.some(t=>t.status!=="done"&&daysUntil(t.dueDate)<0),view:"trackers"},
+    {label:"VAT filings up to date",pass:docsFilings.some(f=>f.filingType==="vat"),view:"tax"},
+  ];
+}
+function renderDocsHealthScore(){
+  if(!docsData)return;
+  const checks=docsComputeHealthChecks();
+  const passed=checks.filter(c=>c.pass).length;
+  const score=Math.round((passed/checks.length)*100);
+  const cls=score>=80?"":score>=50?"score-mid":"score-low";
+  const fillCls=score>=80?"":score>=50?"fill-mid":"fill-low";
+  $("docsHealthScoreFigure").innerHTML=`${score}<small>/100</small>`;
+  $("docsHealthScoreFigure").className="health-score "+cls;
+  $("docsHealthBarFill").style.width=score+"%";
+  $("docsHealthBarFill").className="health-bar-fill "+fillCls;
+  $("docsHealthChecklist").innerHTML=checks.map(c=>`<div class="health-item ${c.pass?"pass":"fail"}"><span class="lbl"><span class="ic">${c.pass?"✓":"○"}</span> ${clean(c.label)}</span>${c.pass?"":`<button type="button" class="btn btn-ghost btn-sm" onclick="showDocsView('${c.view}')">Fix</button>`}</div>`).join("");
+}
 
 // --- SellersPoint Docs Phase 2: Trackers, Compliance Calendar, Tax Tools, Vault
 // calcPAYE/buildStatutoryDeadlines/date-math ported verbatim from
@@ -1063,32 +1149,337 @@ function buildStatutoryDeadlines(){return[
   {name:"Personal Income Tax Return",note:"Individual annual return + Tax Clearance renewal",due:nextAnnualDate(2,31)},
 ]}
 
-let docsTrackers=[];
-async function loadDocsTrackers(){try{docsTrackers=await api("GET","/api/docs/trackers");renderDocsTrackers();renderDocsCalendar()}catch(err){toast(err.message)}}
-const TRACKER_STATUS_PILL=t=>{if(t.status==="done")return docsPill("approved","Done");const n=daysUntil(t.dueDate);return n<0?docsPill("action_needed","Overdue"):n<=7?docsPill("submitted",`Due in ${daysLabel(n)}`):docsPill("not_started","Upcoming")};
+// --- Docs Trackers ------------------------------------------------------
+async function loadDocsTrackers(){try{docsTrackers=await api("GET","/api/docs/trackers");renderDocsTrackers();renderDocsCalendar();renderDocsHealthScore()}catch(err){toast(err.message)}}
+const DOCS_TRACKER_ICON={"Licences & Documents":"\u{1F4CB}","Rent/Lease":"\u{1F3E0}",Insurance:"\u{1F6E1}️",Payroll:"\u{1F465}","Supplier/Vendor":"\u{1F4E6}",Other:"\u{1F4CC}"};
+function docsTrackerStatusPill(t){if(t.status==="done")return docsPill("approved","Marked Done");const n=daysUntil(t.dueDate);return n<0?docsPill("action_needed","Overdue"):n<=7?docsPill("submitted",`Due in ${daysLabel(n)}`):docsPill("not_started","Upcoming")}
 function renderDocsTrackers(){
-  $("docsTrackerList").innerHTML=docsTrackers.map(t=>`<div class="item"><div class="item-top"><strong>${clean(t.name)}</strong><span>${TRACKER_STATUS_PILL(t)}</span></div><div class="meta">${clean(t.category)} - due ${date(t.dueDate)}${t.recurrence!=="none"?" - recurs "+t.recurrence:""}${t.note?" - "+clean(t.note):""}</div><div class="item-actions">${t.status!=="done"?`<button onclick="markDocsTrackerDone('${t.id}')">Mark done</button>`:""}<button onclick="deleteDocsTracker('${t.id}')">Delete</button></div></div>`).join("");
+  $("docsTrackerList").innerHTML=docsTrackers.length?docsTrackers.map(t=>`<div class="card tracker-card"><div class="info"><b>${DOCS_TRACKER_ICON[t.category]||"\u{1F4CC}"} ${clean(t.name)}</b><small>${clean(t.category)} · due ${date(t.dueDate)}${t.recurrence!=="none"?" · recurs "+t.recurrence:""}${t.note?" · "+clean(t.note):""}</small></div><div style="display:flex;gap:10px;align-items:center">${docsTrackerStatusPill(t)}${t.status!=="done"?`<button type="button" class="btn btn-ghost btn-sm" onclick="markDocsTrackerDone('${t.id}')">Mark done</button>`:""}<button type="button" class="btn btn-ghost btn-sm" onclick="deleteDocsTracker('${t.id}')">Delete</button></div></div>`).join(""):'<p class="meta" style="padding:20px 0;text-align:center">No trackers yet for this business.</p>';
 }
 if($("docsTrackerForm"))$("docsTrackerForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/trackers",{name:$("docsTrackerName").value.trim(),category:$("docsTrackerCategory").value,dueDate:$("docsTrackerDue").value,recurrence:$("docsTrackerRecurrence").value,note:$("docsTrackerNote").value.trim()});e.target.reset();await loadDocsTrackers();toast("Tracker added")}catch(err){toast(err.message)}};
-async function markDocsTrackerDone(id){try{await api("PUT","/api/docs/trackers/"+id,{status:"done"});await loadDocsTrackers();toast("Marked done")}catch(err){toast(err.message)}}
+async function markDocsTrackerDone(id){try{await api("PUT","/api/docs/trackers/"+id,{status:"done"});await loadDocsTrackers();toast("Marked done - saved to your Vault");await loadDocsVault()}catch(err){toast(err.message)}}
 async function deleteDocsTracker(id){try{await api("DELETE","/api/docs/trackers/"+id);await loadDocsTrackers();toast("Tracker deleted")}catch(err){toast(err.message)}}
 
-const docsDaysBadge=n=>`<span class="docs-days ${n<=7?"docs-days-soon":n<=30?"docs-days-mid":"docs-days-far"}">${daysLabel(n)}</span>`;
+// --- Docs Compliance Calendar (two-month grid + tooltips, ported verbatim) --
+let docsCalActionRefs=[];
+function docsDaysBadgeClass(n){return n<=7?"days-soon":n<=30?"days-mid":"days-far"}
+function renderDocsMonthGrid(gridEl,labelEl,monthOffset,statutory){
+  const now=new Date();
+  const year=now.getFullYear(),month=now.getMonth()+monthOffset;
+  const view=new Date(year,month,1);
+  const viewYear=view.getFullYear(),viewMonth=view.getMonth();
+  const firstDow=new Date(viewYear,viewMonth,1).getDay();
+  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  const deadlinesByDay={};
+  statutory.forEach(s=>{if(s.due.getFullYear()===viewYear&&s.due.getMonth()===viewMonth){(deadlinesByDay[s.due.getDate()]??=[]).push(s)}});
+  labelEl.textContent=view.toLocaleDateString("en-NG",{month:"long",year:"numeric"});
+  const dow=["S","M","T","W","T","F","S"].map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  let cells="";
+  for(let i=0;i<firstDow;i++)cells+='<div class="cal-cell empty"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const isToday=monthOffset===0&&d===now.getDate();
+    const items=deadlinesByDay[d];
+    const tip=items?`<div class="cal-tip">${items.map(it=>`<div class="tip-item"><b>${clean(it.name)}</b>${clean(it.note)}</div>`).join("")}</div>`:"";
+    cells+=`<div class="cal-cell ${isToday?"today":""} ${items?"has-deadline":""}">${d}${items?'<span class="dot"></span>':""}${tip}</div>`;
+  }
+  gridEl.innerHTML=dow+cells;
+}
 function renderDocsCalendar(){
-  const statutory=buildStatutoryDeadlines().map(s=>({name:s.name,note:s.note,days:daysUntil(s.due),source:"statutory"}));
-  const trackerItems=docsTrackers.filter(t=>t.status!=="done").map(t=>({name:t.name,note:clean(t.category)+" - Tracker",days:daysUntil(t.dueDate),source:"tracker"}));
-  const merged=statutory.concat(trackerItems).sort((a,b)=>a.days-b.days);
-  const soonest=merged[0];
-  $("docsNextDeadline").innerHTML=soonest?`<div class="row"><span>${clean(soonest.name)}</span><b>${docsDaysBadge(soonest.days)}</b></div>`:'<p class="meta">Nothing due yet.</p>';
-  $("docsCalendarList").innerHTML=merged.map(item=>`<div class="item"><div class="item-top"><strong>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</strong>${docsDaysBadge(item.days)}</div><div class="meta">${clean(item.note)}</div></div>`).join("");
+  docsCalActionRefs=[];
+  const statutory=buildStatutoryDeadlines();
+  const soonest=statutory.slice().sort((a,b)=>a.due-b.due)[0];
+  const n=daysUntil(soonest.due);
+  $("docsNextDeadlineFigure").innerHTML=`${daysLabel(n)} <small>${soonest.due.toLocaleDateString("en-NG",{day:"numeric",month:"short"})}</small>`;
+  $("docsNextDeadlineName").textContent=soonest.name;
+  if($("docsCalGrid0"))renderDocsMonthGrid($("docsCalGrid0"),$("docsCalMonthLabel0"),0,statutory);
+  if($("docsCalGrid1"))renderDocsMonthGrid($("docsCalGrid1"),$("docsCalMonthLabel1"),1,statutory);
+  const trackerItems=docsTrackers.filter(t=>t.status!=="done").map(t=>({name:t.name,note:"Your Tracker · "+t.category,days:daysUntil(t.dueDate),source:"tracker",action:t.category==="Licences & Documents"?"File now":"View tracker",onAction:()=>showDocsView("trackers")}));
+  const statutoryItems=statutory.map(s=>({name:s.name,note:s.note,days:daysUntil(s.due),source:"statutory",action:s.name==="CAC Annual Return"?"File now":"Go to Tax Tools",onAction:s.name==="CAC Annual Return"?openDocsCacWizard:()=>showDocsView("tax")}));
+  const merged=statutoryItems.concat(trackerItems).sort((a,b)=>a.days-b.days);
+  $("docsCalendarList").innerHTML=merged.map(item=>{
+    const idx=docsCalActionRefs.push(item.onAction)-1;
+    return `<div class="deadline-row"><div class="info"><b>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</b><small>${clean(item.note)}</small></div><div class="action-col"><span class="days ${docsDaysBadgeClass(item.days)}">${daysLabel(item.days)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="docsCalActionRefs[${idx}]()">${item.action}</button></div></div>`;
+  }).join("");
 }
 
-const DOCS_VAULT_TYPE_CLASS={Registration:"docs-type-registration",Tracker:"docs-type-tracker"};
-let docsVaultItems=[];
-async function loadDocsVault(){try{docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault()}catch(err){toast(err.message)}}
-function renderDocsVault(){
-  $("docsVaultList").innerHTML=docsVaultItems.map(v=>`<div class="item"><div class="item-top"><strong>${clean(v.name)}</strong><span class="docs-type ${DOCS_VAULT_TYPE_CLASS[v.docType]||""}">${clean(v.docType)}</span></div><div class="meta">${date(v.createdAt)}</div><div class="item-actions"><a class="button-link" href="${v.file}" download="${clean(v.name)}">Download</a></div></div>`).join("");
+// --- Docs Verification (manual until a KYC vendor is wired in) -------------
+const DOCS_CHECKS=[
+  {id:"tin",label:"TIN Verification",price:"NGN 1,000",placeholder:"e.g. 12345678-0001"},
+  {id:"bvn",label:"BVN Verification",price:"NGN 1,000",placeholder:"11-digit BVN"},
+  {id:"nin",label:"NIN Verification",price:"NGN 1,000",placeholder:"11-digit NIN"},
+  {id:"cac_name",label:"Business Name Availability",price:"NGN 1,000",placeholder:"e.g. Amina Fashion Hub"},
+  {id:"cac_status",label:"Business Status Check",price:"NGN 1,000",placeholder:"CAC/RC number"},
+  {id:"authenticity",label:"Document Authenticity Check",price:"NGN 2,000",placeholder:"Certificate/reference number"},
+];
+function renderDocsVerifyList(){
+  $("docsVerifyList").innerHTML=DOCS_CHECKS.map(c=>`<div class="verify-item ${docsActiveCheck===c.id?"active":""}"><div class="info"><b>\u{1F50D} ${clean(c.label)}</b></div><div style="display:flex;align-items:center;gap:14px"><span class="price">${c.price}</span><button type="button" class="btn btn-primary btn-sm" onclick="selectDocsCheck('${c.id}')">Verify →</button></div></div>`).join("");
 }
-if($("docsVaultForm"))$("docsVaultForm").onsubmit=async e=>{e.preventDefault();try{const file=$("docsVaultFile").files?.[0];if(!file)return toast("Choose a file first");const dataUrl=await readFileAsDataUrl(file);await api("POST","/api/docs/vault",{name:$("docsVaultName").value.trim(),docType:$("docsVaultType").value,file:dataUrl});e.target.reset();await loadDocsVault();toast("Document uploaded")}catch(err){toast(err.message)}};
+function selectDocsCheck(id){
+  docsActiveCheck=id;
+  renderDocsVerifyList();
+  const c=DOCS_CHECKS.find(x=>x.id===id);
+  $("docsVerifyLabel").textContent=`Enter the ${c.label.replace(" Verification","").replace(" Check","").replace(" Availability","")} to check`;
+  $("docsVerifyInput").placeholder=c.placeholder;
+  $("docsVerifyInput").value="";
+  $("docsVerifyResult").classList.remove("show");
+  $("docsVerifyPanel").classList.add("show");
+  $("docsVerifyPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+if($("docsVerifyRun"))$("docsVerifyRun").onclick=async()=>{
+  const c=DOCS_CHECKS.find(x=>x.id===docsActiveCheck);
+  if(!c)return;
+  const val=$("docsVerifyInput").value.trim();
+  if(!val)return toast("Enter a number first");
+  try{
+    await api("POST","/api/docs/verifications",{checkType:c.id,inputValue:val});
+    $("docsVerifyResult").textContent="Submitted - we'll confirm this within 24 hours";
+    $("docsVerifyResult").classList.add("show");
+    docsVerifications=await api("GET","/api/docs/verifications");
+    renderDocsLookupHistory();
+    docsVaultItems=await api("GET","/api/docs/vault");
+    renderDocsVault();renderDocsOverview();
+    toast("Verification submitted");
+  }catch(err){toast(err.message)}
+};
+function renderDocsLookupHistory(){
+  $("docsLookupHistory").innerHTML=docsVerifications.map(v=>{
+    const c=DOCS_CHECKS.find(x=>x.id===v.checkType);
+    return `<div class="lookup-row"><span>${clean(c?c.label:v.checkType)} - ${docsPill(v.status,DOCS_STATUS_LABELS[v.status]||v.status)}</span><small>${dateTime(v.createdAt)}</small></div>`;
+  }).join("");
+}
+
+// --- Docs Tax Suite: VAT / Payroll / Payslip / Annual Certificate / E-Invoicing
+document.querySelectorAll(".tax-tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tax-tab").forEach(x=>x.classList.toggle("active",x===t));
+  document.querySelectorAll(".tax-panel").forEach(p=>p.classList.toggle("active",p.id==="tax-"+t.dataset.tax));
+}));
+function docsEstimateVat(){
+  const now=new Date();
+  const paidThisMonth=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)&&(()=>{const d=new Date(o.createdAt);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()})());
+  return paidThisMonth.reduce((s,o)=>s+total(o),0)*0.075;
+}
+if($("docsVatFileNow"))$("docsVatFileNow").onclick=async()=>{
+  try{
+    await api("POST","/api/docs/filings",{filingType:"vat",period:new Date().toLocaleDateString("en-NG",{month:"long",year:"numeric"}),amount:docsEstimateVat()});
+    docsFilings=await api("GET","/api/docs/filings");
+    renderDocsFilingHistory();renderDocsHealthScore();
+    docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault();
+    toast("Sent for filing");
+  }catch(err){toast(err.message)}
+};
+function renderDocsFilingHistory(){
+  const rows=docsFilings.filter(f=>f.filingType==="vat");
+  $("docsFilingHistory").innerHTML=rows.length?rows.map(f=>`<div class="filing-row"><span>VAT - ${clean(f.period)}</span>${docsPill(f.status,DOCS_STATUS_LABELS[f.status]||f.status)}</div>`).join(""):'<p class="meta" style="padding:10px 0">No filings yet for this business.</p>';
+}
+
+if($("docsEmployeeForm"))$("docsEmployeeForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    await api("POST","/api/docs/employees",{name:$("docsEmpName").value.trim(),grossAnnual:+$("docsEmpGross").value,annualRent:+$("docsEmpRent").value||0});
+    $("docsEmployeeForm").reset();
+    docsEmployees=await api("GET","/api/docs/employees");
+    renderDocsPayroll();
+    toast("Employee added to payroll");
+  }catch(err){toast(err.message)}
+};
+async function deleteDocsEmployee(id){try{await api("DELETE","/api/docs/employees/"+id);docsEmployees=await api("GET","/api/docs/employees");renderDocsPayroll()}catch(err){toast(err.message)}}
+function renderDocsPayroll(){
+  const rows=docsEmployees.map(e=>({...e,...calcPAYE({gross:e.grossAnnual,annualRent:e.annualRent})}));
+  $("docsEmpTableBody").innerHTML=rows.length?rows.map(e=>`<tr><td>${clean(e.name)}</td><td>${naira(e.gross)}</td><td>${e.exempt?"Exempt":naira(e.tax)}</td><td>${naira(e.net)}</td><td><button type="button" class="btn btn-ghost btn-sm" onclick="deleteDocsEmployee('${e.id}')">Remove</button></td></tr>`).join(""):'<tr><td colspan="5" class="muted">No employees added yet.</td></tr>';
+  const sum=$("docsPayrollSummary");
+  if(rows.length){
+    const totGross=rows.reduce((s,e)=>s+e.gross,0),totTax=rows.reduce((s,e)=>s+(e.tax||0),0),totNet=rows.reduce((s,e)=>s+e.net,0);
+    sum.style.display="block";
+    sum.innerHTML=`<div class="breakdown-row"><span>Total employees</span><span>${rows.length}</span></div><div class="breakdown-row"><span>Total gross payroll (yr)</span><span>${naira(totGross)}</span></div><div class="breakdown-row"><span>Total tax remitted (yr)</span><span>${naira(totTax)}</span></div><div class="breakdown-row total"><span>Total net payroll (yr)</span><span>${naira(totNet)}</span></div>`;
+  }else sum.style.display="none";
+  renderDocsPayslipSelect();
+}
+function renderDocsPayslipSelect(){
+  const sel=$("docsPayslipEmpSelect");
+  if(!sel)return;
+  sel.innerHTML=docsEmployees.length?docsEmployees.map((e,i)=>`<option value="${i}">${clean(e.name)}</option>`).join(""):'<option value="">Add an employee in Payroll first</option>';
+  if($("docsPayslipCompany")&&!$("docsPayslipCompany").value)$("docsPayslipCompany").value=state.businessName||"";
+  renderDocsPayslip();
+}
+if($("docsPayslipEmpSelect"))$("docsPayslipEmpSelect").onchange=renderDocsPayslip;
+if($("docsPayslipCompany"))$("docsPayslipCompany").oninput=renderDocsPayslip;
+function renderDocsPayslip(){
+  const wrap=$("docsPayslipPreviewWrap");
+  if(!wrap)return;
+  const idx=$("docsPayslipEmpSelect")?.value;
+  if(idx===""||idx===undefined||!docsEmployees[idx]){wrap.innerHTML="";return}
+  const e=docsEmployees[idx];
+  const r=calcPAYE({gross:e.grossAnnual,annualRent:e.annualRent});
+  const company=$("docsPayslipCompany").value||state.businessName||"";
+  const bandLabels=["0% band","15% band","18% band","21% band","23% band","25% band"];
+  const bandRows=(r.breakdown||[]).map((b,i)=>`<div class="breakdown-row"><span class="lbl">${bandLabels[i]}<small>${naira(b.amt)} x ${(b.rate*100).toFixed(0)}%</small></span><span>${naira(b.bandTax)}</span></div>`).join("");
+  const breakdown=r.exempt?'<div class="exempt-banner">No tax due - income is at or below the National Minimum Wage.</div>':`<div class="breakdown-card"><div class="breakdown-row"><span>Gross income (yr)</span><span>${naira(r.gross)}</span></div><div class="breakdown-row"><span>Rent relief</span><span>-${naira(r.rentRelief)}</span></div>${bandRows}<div class="breakdown-row total"><span>Annual tax</span><span>${naira(r.tax)}</span></div><div class="breakdown-row total"><span>Net pay (yr)</span><span>${naira(r.net)}</span></div></div>`;
+  wrap.innerHTML=`<div class="payslip-preview"><div class="ps-head"><div><b>${clean(company)}</b><small>Payslip - ${new Date().toLocaleString("en-NG",{month:"long",year:"numeric"})}</small></div><div style="text-align:right"><b>${clean(e.name)}</b><small>Pay period: Monthly</small></div></div>${breakdown}</div>`;
+}
+
+function renderDocsCertificate(){
+  const box=$("docsCertSummary");
+  if(!box)return;
+  if(!docsEmployees.length){box.innerHTML='<p class="meta">Add at least one employee in Payroll to generate a certificate.</p>';return}
+  const rows=docsEmployees.map(e=>calcPAYE({gross:e.grossAnnual,annualRent:e.annualRent}));
+  const totGross=rows.reduce((s,e)=>s+e.gross,0),totTax=rows.reduce((s,e)=>s+(e.tax||0),0);
+  box.innerHTML=`<div class="breakdown-row"><span>Total gross income (yr)</span><span>${naira(totGross)}</span></div><div class="breakdown-row"><span>Total tax paid (yr)</span><span>${naira(totTax)}</span></div><div class="breakdown-row total"><span>Employees covered</span><span>${docsEmployees.length}</span></div>`;
+}
+
+if($("docsInvoiceForm"))$("docsInvoiceForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    await api("POST","/api/docs/invoices",{buyerName:$("docsInvBuyerName").value.trim(),buyerTin:$("docsInvBuyerTin").value.trim(),description:$("docsInvDesc").value.trim(),amount:+$("docsInvAmount").value});
+    $("docsInvoiceForm").reset();
+    docsInvoices=await api("GET","/api/docs/invoices");
+    renderDocsInvoices();
+    toast("Invoice validated - IRN and QR code issued");
+  }catch(err){toast(err.message)}
+};
+function renderDocsInvoices(){
+  $("docsInvoiceHistory").innerHTML=docsInvoices.map(inv=>`<div class="invoice-row"><div class="info"><b>${clean(inv.buyerName)} - ${naira(inv.amount+inv.vat)} (incl. VAT)</b><small>${clean(inv.irn)} · ${clean(inv.csid)} · ${date(inv.createdAt)}</small></div><span class="pill pill-success">✓ Validated by NRS</span></div>`).join("");
+}
+
+// --- Docs Templates ----------------------------------------------------
+const DOCS_TPL_LABELS={business:"Business Agreement",tenancy:"Tenancy Agreement",freelance:"Freelance / Service Contract",loan:"Loan Agreement",sales:"Sales / Supplier Agreement",proposal:"Proposal / Quote"};
+const DOCS_BASIC_FIELDS={
+  loan:["Borrower & Lender names","Loan amount & currency","Repayment schedule","Signatures & date"],
+  tenancy:["Landlord & Tenant names","Property address","Rent amount & payment schedule","Lease duration","Signatures & date"],
+  freelance:["Client & Freelancer names","Scope of work","Payment terms","Signatures & date"],
+  business:["Partner names","Business purpose","Capital contribution","Signatures & date"],
+  sales:["Buyer & Seller names","Goods/services description","Price & payment terms","Seller's TIN","Signatures & date"],
+  proposal:["Client & project summary","Scope of work","Pricing","Your business TIN","Validity period"],
+};
+const DOCS_TPL_SUGGESTIONS={
+  loan:["Interest rate (optional - leave blank if none)","Collateral / security clause","Late payment penalty clause","Guarantor / co-signer details","Governing state / jurisdiction"],
+  tenancy:["Renewal terms","Security deposit","Maintenance responsibilities","Termination conditions"],
+  freelance:["Deliverable deadlines","Revision policy","Confidentiality clause","Termination conditions"],
+  business:["Profit/loss sharing","Roles & responsibilities","Decision-making process","Exit/dissolution terms"],
+  sales:["Delivery timeline","Warranty/returns policy","Late delivery penalty"],
+  proposal:["Timeline","Optional add-ons"],
+};
+document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tpl-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  docsSelectedTpl=b.dataset.tpl;
+  $("docsBasicDocLabel").textContent="Standard "+DOCS_TPL_LABELS[docsSelectedTpl];
+  $("docsBasicDocFields").innerHTML=(DOCS_BASIC_FIELDS[docsSelectedTpl]||DOCS_BASIC_FIELDS.business).map(f=>{
+    if(/TIN/i.test(f)){
+      const tin=docsData?.business?.tin;
+      return tin?`<div>☐ ${f} <span style="color:var(--primary)">— auto-filled: ${clean(tin)}</span></div>`:`<div>☐ ${f} <span class="meta">— verify your TIN to auto-fill this</span></div>`;
+    }
+    return `<div>☐ ${f}</div>`;
+  }).join("");
+  $("docsBasicDoc").style.display="block";
+  $("docsSuggestList").classList.remove("show");
+  $("docsAiInput").value="";
+}));
+function docsDownloadTextFile(filename,text){
+  const blob=new Blob([text],{type:"text/plain"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+}
+async function docsSaveTemplateToVault(name,text,warn){
+  try{
+    const file="data:text/plain;base64,"+btoa(unescape(encodeURIComponent(text)));
+    await api("POST","/api/docs/vault",{name,docType:"Template",file});
+    docsVaultItems=await api("GET","/api/docs/vault");
+    renderDocsTemplateList();renderDocsVault();renderDocsOverview();
+  }catch(err){toast(err.message)}
+}
+if($("docsDownloadBasic"))$("docsDownloadBasic").onclick=async()=>{
+  if(!docsSelectedTpl)return;
+  const label=DOCS_TPL_LABELS[docsSelectedTpl];
+  const name=`${label} - draft ${new Date().toLocaleDateString()}`;
+  const text=`SellersPoint Docs - ${label} (Standard)\n\nFill in the blanks and it's ready to use.\nThis is a template for common situations, not a substitute for personalized legal advice.`;
+  docsDownloadTextFile(`${docsSelectedTpl}.txt`,text);
+  await docsSaveTemplateToVault(name,text,docsSelectedTpl==="loan");
+  toast("Standard document downloaded - saved to your Vault");
+};
+if($("docsSuggestFields"))$("docsSuggestFields").onclick=()=>{
+  if(!docsSelectedTpl)return;
+  const input=$("docsAiInput").value.trim();
+  if(!input)return toast("Tell us what's specific about your situation first");
+  const fields=DOCS_TPL_SUGGESTIONS[docsSelectedTpl]||DOCS_TPL_SUGGESTIONS.business;
+  $("docsSuggestList").innerHTML=fields.map(f=>`<label class="suggest-item"><input type="checkbox" checked> ${clean(f)}</label>`).join("")+'<p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" id="docsGenerateImproved">Generate improved document →</button></p>';
+  $("docsSuggestList").classList.add("show");
+  $("docsGenerateImproved").onclick=async()=>{
+    const label=DOCS_TPL_LABELS[docsSelectedTpl];
+    const isHighValue=docsSelectedTpl==="loan";
+    const name=`${label} (Improved) - draft ${new Date().toLocaleDateString()}`;
+    const text=`SellersPoint Docs - ${label} (Improved)\n\nStandard document, adjusted for what you told us.\nThis is a template for common situations, not a substitute for personalized legal advice.`;
+    docsDownloadTextFile(`${docsSelectedTpl}-improved.txt`,text);
+    await docsSaveTemplateToVault(name,text,isHighValue);
+    toast("Improved document generated - saved to your Vault");
+  };
+  toast("Matched to clauses from the vetted template library (demo)");
+};
+function renderDocsTemplateList(){
+  const docs=docsVaultItems.filter(v=>v.docType==="Template");
+  $("docsTemplateList").innerHTML=docs.length?docs.map(d=>`<div class="doc-row"><div class="info"><b>\u{1F9FE} ${clean(d.name)}</b><small>${date(d.createdAt)}</small></div><div class="doc-actions"><a class="btn btn-ghost btn-sm" href="${d.file}" download="${clean(d.name)}">Download</a></div></div>`).join(""):'<p class="meta" style="padding:20px 0;text-align:center">No documents yet for this business.</p>';
+}
+
+// --- Docs Vault (search + filter) ---------------------------------------
+document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".filter-btn").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  docsActiveVaultFilter=b.dataset.filter;
+  renderDocsVault();
+}));
+if($("docsVaultSearch"))$("docsVaultSearch").oninput=renderDocsVault;
+async function loadDocsVault(){try{docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault();renderDocsTemplateList()}catch(err){toast(err.message)}}
+const DOCS_VAULT_TYPE_CLASS={Registration:"vt-registration",Tax:"vt-tax",Verification:"vt-verification",Template:"vt-template",Tracker:"vt-tracker"};
+function renderDocsVault(){
+  const q=($("docsVaultSearch")?.value||"").toLowerCase();
+  const items=docsVaultItems.filter(v=>(docsActiveVaultFilter==="all"||v.docType===docsActiveVaultFilter)&&v.name.toLowerCase().includes(q));
+  $("docsVaultList").innerHTML=items.length?items.map(v=>`<div class="vault-row"><div class="info"><b>${clean(v.name)}</b><small>${date(v.createdAt)}</small></div><div style="display:flex;gap:10px;align-items:center"><span class="vault-type ${DOCS_VAULT_TYPE_CLASS[v.docType]||""}">${clean(v.docType)}</span>${v.file?`<a class="btn btn-ghost btn-sm" href="${v.file}" download="${clean(v.name)}">Download</a>`:""}</div></div>`).join(""):'<p class="meta" style="padding:20px 0;text-align:center">No documents match.</p>';
+}
+if($("docsVaultForm"))$("docsVaultForm").onsubmit=async e=>{e.preventDefault();try{const file=$("docsVaultFile").files?.[0];if(!file)return toast("Choose a file first");const dataUrl=await readFileAsDataUrl(file);await api("POST","/api/docs/vault",{name:$("docsVaultName").value.trim(),docType:$("docsVaultType").value,file:dataUrl});e.target.reset();await loadDocsVault();renderDocsOverview();toast("Document uploaded")}catch(err){toast(err.message)}};
+
+// --- Guided CAC Annual Return filing wizard ---------------------------
+const DOCS_CAC_WIZARD_STEPS=3;
+function openDocsCacWizard(){docsCacWizardStep=1;$("docsCacWizardOverlay").classList.add("show");renderDocsCacWizard()}
+function closeDocsCacWizard(){$("docsCacWizardOverlay").classList.remove("show")}
+function docsCacWizardGo(step){docsCacWizardStep=step;renderDocsCacWizard()}
+if($("docsCacWizardClose"))$("docsCacWizardClose").onclick=closeDocsCacWizard;
+if($("docsCacWizardOverlay"))$("docsCacWizardOverlay").onclick=e=>{if(e.target.id==="docsCacWizardOverlay")closeDocsCacWizard()};
+function renderDocsCacWizard(){
+  const b=docsData?.business||{};
+  $("docsCacStepDots").innerHTML=Array.from({length:DOCS_CAC_WIZARD_STEPS}).map((_,i)=>`<span class="${i<docsCacWizardStep?"done":""}"></span>`).join("");
+  let body="";
+  if(docsCacWizardStep===1){
+    body=`<p class="meta">Step 1 of 3 - confirm your business details. We've pre-filled what we already have on file.</p>
+      <div class="docs-modal-review-row"><span>Business name</span><b>${clean(state.businessName||"")}</b></div>
+      <div class="docs-modal-review-row"><span>Registration type</span><b>${clean(b.regType?b.regType.replace(/_/g," "):"Not chosen yet")}</b></div>
+      <div class="docs-modal-review-row"><span>TIN</span><b>${b.tin?clean(b.tin):"⚠ Not verified yet"}</b></div>
+      ${!b.tin?`<p style="font-size:12px;color:var(--accent);font-weight:700;margin-top:10px">Verifying your TIN first makes this faster - <a href="#" onclick="closeDocsCacWizard();showDocsView('verification');return false" style="color:var(--accent)">do that now</a>, or continue anyway.</p>`:""}
+      <div class="docs-modal-actions"><span></span><button type="button" class="btn btn-primary" onclick="docsCacWizardGo(2)">Continue →</button></div>`;
+  }else if(docsCacWizardStep===2){
+    body=`<p class="meta">Step 2 of 3 - has anything changed since your last filing?</p>
+      <label class="docs-modal-radio"><input type="radio" name="docsCacChange" checked> No changes to directors, shareholders, or business address</label>
+      <label class="docs-modal-radio"><input type="radio" name="docsCacChange"> Something has changed - I'll need to update it first</label>
+      <div class="docs-modal-actions"><button type="button" class="btn btn-ghost" onclick="docsCacWizardGo(1)">← Back</button><button type="button" class="btn btn-primary" onclick="docsCacWizardGo(3)">Continue →</button></div>`;
+  }else{
+    body=`<p class="meta">Step 3 of 3 - review and submit.</p>
+      <div class="docs-modal-review-row"><span>Service</span><b>CAC Annual Return Filing</b></div>
+      <div class="docs-modal-review-row"><span>Fee</span><b>NGN 20,000</b></div>
+      <div class="docs-modal-review-row"><span>Payment</span><b>💳 Held in escrow - released only once filed</b></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">We file this on your behalf and update you here as it progresses.</p>
+      <div class="docs-modal-actions"><button type="button" class="btn btn-ghost" onclick="docsCacWizardGo(2)">← Back</button><button type="button" class="btn btn-primary" id="docsCacWizardSubmit">Submit filing →</button></div>`;
+  }
+  $("docsCacWizardBody").innerHTML=body;
+  if($("docsCacWizardSubmit"))$("docsCacWizardSubmit").onclick=async()=>{
+    try{
+      await api("POST","/api/docs/filings",{filingType:"cac_annual_return",period:new Date().getFullYear().toString(),amount:20000});
+      closeDocsCacWizard();
+      docsFilings=await api("GET","/api/docs/filings");
+      docsVaultItems=await api("GET","/api/docs/vault");
+      renderDocsFilingHistory();renderDocsVault();renderDocsHealthScore();
+      toast("CAC Annual Return submitted - payment held, we'll update you here");
+    }catch(err){toast(err.message)}
+  };
+}
 
 (async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));
