@@ -38,6 +38,7 @@ aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-d
 .nav-item:hover{background:#12281f}
 .nav-item.active{background:var(--primary);color:#fff}
 .nav-item .ic{font-size:15px}
+.nav-group-label{font-size:10.5px;font-weight:800;color:#7fa393;text-transform:uppercase;letter-spacing:.06em;padding:14px 14px 4px}
 .back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
 .back-link:hover{color:#fff}
 
@@ -270,7 +271,9 @@ main{padding:32px 36px;overflow:auto}
 .modal-radio{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;margin-top:10px}
 
 /* Compliance Calendar */
-.next-deadline{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.cal-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;margin-top:16px}
+@media(max-width:980px){.cal-layout{grid-template-columns:1fr}}
+.next-deadline{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
 .next-deadline .figure{font-size:34px;font-weight:800;color:var(--accent);margin:6px 0 2px}
 .next-deadline .figure small{font-size:14px;font-weight:700;color:var(--muted);margin-left:6px}
 .cal-months{display:flex;flex-direction:column;gap:22px}
@@ -342,8 +345,10 @@ main{padding:32px 36px;overflow:auto}
   <nav>
     <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
     <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar</button>
+    <div class="nav-group-label">Onboarding</div>
     <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
     <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
+    <div class="nav-group-label">Manage</div>
     <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
     <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
     <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault</button>
@@ -425,33 +430,39 @@ main{padding:32px 36px;overflow:auto}
   <section class="view" id="view-calendar">
     <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view — this month and next.</p></div>
 
-    <div class="card next-deadline">
-      <div>
-        <h3 style="font-size:15px;font-weight:800">Next deadline</h3>
-        <div class="figure" id="nextDeadlineFigure">—</div>
-        <small style="color:var(--muted)" id="nextDeadlineName">Loading…</small>
-      </div>
-      <button class="btn btn-primary" onclick="goto('tax')">Go to Tax Tools →</button>
-    </div>
+    <div class="cal-layout">
+      <div class="cal-col-left">
+        <div class="card next-deadline">
+          <div>
+            <h3 style="font-size:15px;font-weight:800">Next deadline</h3>
+            <div class="figure" id="nextDeadlineFigure">—</div>
+            <small style="color:var(--muted)" id="nextDeadlineName">Loading…</small>
+          </div>
+          <button class="btn btn-primary" onclick="goto('tax')">Go to Tax Tools →</button>
+        </div>
 
-    <div class="cal-months" style="margin-top:16px">
-      <div class="card">
-        <h3 style="font-size:15px;font-weight:800" id="calMonthLabel0">This month</h3>
-        <div class="cal-grid" id="calGrid0"></div>
+        <div class="cal-months" style="margin-top:16px">
+          <div class="card">
+            <h3 style="font-size:15px;font-weight:800" id="calMonthLabel0">This month</h3>
+            <div class="cal-grid" id="calGrid0"></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size:15px;font-weight:800" id="calMonthLabel1">Next month</h3>
+            <div class="cal-grid" id="calGrid1"></div>
+          </div>
+        </div>
+        <div class="cal-legend" style="margin:12px 2px 0">
+          <span><span class="sw" style="background:var(--danger)"></span> Deadline</span>
+          <span><span class="sw" style="background:var(--primary)"></span> Today</span>
+        </div>
       </div>
-      <div class="card">
-        <h3 style="font-size:15px;font-weight:800" id="calMonthLabel1">Next month</h3>
-        <div class="cal-grid" id="calGrid1"></div>
-      </div>
-    </div>
-    <div class="cal-legend" style="margin:12px 2px 0">
-      <span><span class="sw" style="background:var(--danger)"></span> Deadline</span>
-      <span><span class="sw" style="background:var(--primary)"></span> Today</span>
-    </div>
 
-    <div class="card" style="margin-top:16px">
-      <h3 style="font-size:15px;font-weight:800">Upcoming</h3>
-      <div id="calUpcoming" style="margin-top:8px"></div>
+      <div class="cal-col-right">
+        <div class="card">
+          <h3 style="font-size:15px;font-weight:800">Upcoming</h3>
+          <div id="calUpcoming" style="margin-top:8px"></div>
+        </div>
+      </div>
     </div>
   </section>
 
