@@ -38,6 +38,10 @@ aside{background:var(--dark);color:#eef8f1;padding:22px 16px;display:flex;flex-d
 .nav-item:hover{background:#12281f}
 .nav-item.active{background:var(--primary);color:#fff}
 .nav-item .ic{font-size:15px}
+.nav-item .lock{display:none;margin-left:auto;font-size:11px;opacity:.75}
+.nav-item.nav-locked{opacity:.55}
+.nav-item.nav-locked .lock{display:inline}
+.nav-item.nav-locked:hover{background:transparent;cursor:not-allowed}
 .nav-group-label{font-size:10.5px;font-weight:800;color:#7fa393;text-transform:uppercase;letter-spacing:.06em;padding:14px 14px 4px}
 .back-link{margin-top:auto;color:#9fc3b3;font-size:13px;font-weight:700;padding:11px 14px}
 .back-link:hover{color:#fff}
@@ -349,9 +353,9 @@ main{padding:32px 36px;overflow:auto}
     <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
     <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
     <div class="nav-group-label">Manage</div>
-    <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools</button>
-    <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers</button>
-    <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault</button>
+    <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools <span class="lock">🔒</span></button>
+    <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers <span class="lock">🔒</span></button>
+    <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault <span class="lock">🔒</span></button>
   </nav>
   <a class="wa-link" href="https://wa.me/?text=Hi%20SellersPoint%2C%20I%27d%20like%20to%20start%20a%20new%20order." target="_blank" rel="noopener">💬 Order via WhatsApp</a>
   <a class="back-link" href="#">← Back to main app</a>
@@ -370,7 +374,8 @@ main{padding:32px 36px;overflow:auto}
 
     <div class="grid grid-2">
       <div class="card">
-        <h3 style="font-size:15px;font-weight:800">Your Business Setup</h3>
+        <h3 style="font-size:15px;font-weight:800">Onboarding</h3>
+        <p style="color:var(--muted);font-size:12.5px;margin-top:2px">A one-time process — Business Registration through SCUML. Unlocks Tax Tools, Trackers, and Document Vault when done.</p>
         <div class="progress-track"><div class="progress-fill" id="setupProgressFill" style="width:0%"></div></div>
         <div class="step-labels" id="setupSteps"></div>
       </div>
@@ -758,8 +763,29 @@ main{padding:32px 36px;overflow:auto}
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2400); }
 
-/* ---------- nav ---------- */
+/* ---------- nav ----------
+   Business Registration is a one-time process that ends at SCUML — until
+   that's done, the "Manage" views (Tax Tools, Trackers, Document Vault)
+   don't have anything real to operate on (no TIN to file tax against, no
+   certificates to store), so they stay locked and redirect back to
+   Business Registration instead of opening. */
+const LOCKED_VIEWS = ["tax", "trackers", "vault"];
+function isOnboardingComplete(){
+  const b = biz();
+  return b.regStatus === "approved" && b.scuml.status === "approved";
+}
+function renderNavLocks(){
+  const complete = isOnboardingComplete();
+  LOCKED_VIEWS.forEach(v=>{
+    const btn = document.querySelector('.nav-item[data-view="'+v+'"]');
+    if (btn) btn.classList.toggle("nav-locked", !complete);
+  });
+}
 function goto(view){
+  if (LOCKED_VIEWS.includes(view) && !isOnboardingComplete()){
+    toast("Finish Business Registration through SCUML to unlock this");
+    view = "registrations";
+  }
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.view===view));
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id==="view-"+view));
 }
@@ -868,14 +894,8 @@ function renderBreakdown(r){
 const BUSINESS = {
   name: "Amina Fashion Hub", regType: "Business Name",
   regStatus: "approved", regNote: "Certificate ready",
-  tin: null,
-  scuml: { status: "approved", celebrate: true },
-  setupSteps: [
-    { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
-    { text:"SCUML ✓", done:true },
-  ],
-  setupProgress: 100,
-  congrats: "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account. You've earned the Verified Business badge.",
+  tinIssued: true, tin: null,
+  scuml: { status: "approved" },
   alerts: [
     { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
     { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
@@ -917,6 +937,7 @@ function renderBizInfo(){
 }
 function renderAll(){
   renderBizInfo();
+  renderNavLocks();
   renderOverview();
   renderHealthScore();
   renderRegistrations();
@@ -940,12 +961,27 @@ function applyTinAutofill(){
 }
 
 /* ---------- Overview (per business) ---------- */
+function stepLabel(name, status){
+  const suffix = status==="approved" ? " ✓" : status==="review" ? " (in review)" : status==="action-needed" ? " (action needed)" : " —";
+  return name + suffix;
+}
+function computeOnboardingSteps(b){
+  const steps = [
+    { text: stepLabel(b.regType, b.regStatus), done: b.regStatus==="approved" },
+    { text: stepLabel("TIN", b.tinIssued ? "approved" : "not-started"), done: !!b.tinIssued },
+    { text: stepLabel("SCUML", b.scuml.status), done: b.scuml.status==="approved" },
+  ];
+  const progress = Math.round((steps.filter(s=>s.done).length/steps.length)*100);
+  return { steps, progress };
+}
 function renderOverview(){
   const b = biz();
-  $("setupProgressFill").style.width = b.setupProgress + "%";
-  $("setupSteps").innerHTML = b.setupSteps.map(s=>`<span class="${s.done?'done':''}">${s.text}</span>`).join("");
+  const { steps, progress } = computeOnboardingSteps(b);
+  $("setupProgressFill").style.width = progress + "%";
+  $("setupSteps").innerHTML = steps.map(s=>`<span class="${s.done?'done':''}">${s.text}</span>`).join("");
   const banner = $("congratsBanner");
-  if (b.congrats){ $("congratsText").textContent = b.congrats; banner.classList.remove("hide"); }
+  const congrats = isOnboardingComplete() ? "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account, your onboarding is complete, and Tax Tools, Trackers, and Document Vault are now unlocked. You've earned the Verified Business badge." : "";
+  if (congrats){ $("congratsText").textContent = congrats; banner.classList.remove("hide"); }
   else { banner.classList.add("hide"); }
   $("overviewAlerts").innerHTML = b.alerts.length ? b.alerts.map(a=>`
     <div class="alert-row">
@@ -1012,7 +1048,7 @@ function regCardHtml(name, status, note, opts){
 function renderRegistrations(){
   const b = biz();
   $("regPrimary").innerHTML = regCardHtml(b.regType + " Registration", b.regStatus, b.regNote);
-  $("regScuml").innerHTML = regCardHtml("SCUML Registration", b.scuml.status, b.scuml.status==="approved" ? "Certificate ready" : b.scuml.status==="not-started" ? "Not started" : (b.scuml.note || "In progress"), { celebrate: b.scuml.celebrate });
+  $("regScuml").innerHTML = regCardHtml("SCUML Registration", b.scuml.status, b.scuml.status==="approved" ? "Certificate ready" : b.scuml.status==="not-started" ? "Not started" : (b.scuml.note || "In progress"), { celebrate: b.scuml.status==="approved" });
 }
 
 /* ---------- Payroll panel (business-scoped) ---------- */
