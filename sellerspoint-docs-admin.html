@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellersPoint Docs — Platform Admin</title>
+<meta name="description" content="Internal staff-only admin backend for SellersPoint Docs: cross-tenant business monitoring, partner fulfillment queue, and package/pricing management.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#147D64;
+  --accent:#D36B2C;
+  --dark:#062E26;
+  --ink:#0e1f19;
+  --muted:#5b6a63;
+  --bg:#f6f8f6;
+  --surface:#ffffff;
+  --line:#e1e9e3;
+  --danger:#b42318;
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:8px}
+h1,h2,h3,p{margin:0}
+a{color:inherit;text-decoration:none}
+main{max-width:1180px;margin:0 auto;padding:28px 24px 64px}
+
+/* Header */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--dark);color:#eef8f1;padding:16px 24px;flex-wrap:wrap}
+.brandmark{display:flex;align-items:center;gap:10px}
+.brand-icon{width:26px;height:29px;flex:0 0 auto}
+.brand-word{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.brand-word .w-point{color:var(--accent)}
+.topbar .meta{font-size:12px;color:#9fc3b3;font-weight:700;margin-left:10px}
+.top-actions{display:flex;align-items:center;gap:10px}
+.top-actions a,.top-actions button{font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:8px}
+.top-actions a{background:rgba(255,255,255,.08);color:#fff}
+.top-actions a:hover{background:rgba(255,255,255,.16)}
+.top-actions button{background:transparent;color:#9fc3b3;border:1.5px solid rgba(255,255,255,.2)}
+.top-actions button:hover{color:#fff;border-color:#fff}
+.admin-banner{background:#3a1f0d;color:#ffd9b3;font-size:12.5px;font-weight:700;text-align:center;padding:8px 16px}
+
+.view-header{margin:26px 0 20px}
+.view-header h1{font-size:24px;font-weight:800;letter-spacing:-.01em}
+.view-header p{color:var(--muted);margin-top:4px;font-size:13.5px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 6px 18px rgba(6,46,38,.04)}
+section{margin-bottom:28px}
+.section-title{font-size:15px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.section-title small{font-weight:700;color:var(--muted);font-size:12px}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}}
+.metric b{display:block;font-size:24px;font-weight:800;color:var(--primary)}
+.metric small{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.metric.warn b{color:var(--accent)}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill-success{background:#e7f7ef;color:var(--primary)}
+.pill-progress{background:#fff4e8;color:var(--accent)}
+.pill-alert{background:#fff1f0;color:var(--danger)}
+.pill-neutral{background:#eef1ef;color:var(--muted)}
+.pill-partnera{background:#eaf1ff;color:#1d4ed8}
+.pill-partnerb{background:#f3eaff;color:#7c3aed}
+
+/* Tables */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:0 10px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.flag td{background:#fff8f3}
+td.wrap{white-space:normal}
+td b{font-weight:800}
+td small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;height:30px;border-radius:7px;font-weight:800;font-size:11.5px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#116a54}
+.btn-ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-accent{background:var(--accent);color:#fff}
+
+/* Pricing table */
+.price-input{width:100px;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;font-weight:700;font-size:12.5px}
+.price-input:focus{outline:2px solid var(--primary);border-color:var(--primary)}
+.margin-pos{color:var(--primary);font-weight:800}
+.pricing-note{font-size:12px;color:var(--muted);margin-top:10px}
+.save-row{display:flex;justify-content:flex-end;margin-top:14px}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:.25s ease;z-index:99}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" aria-hidden="true">
+  <symbol id="spIcon" viewBox="0 0 64 72">
+    <path d="M32 2C48.5 2 62 15 62 31c0 12-8 20-18 28.5L34 70c-1 1.3-3 1.3-4 0l-10-10.5C10 51 2 43 2 31 2 15 15.5 2 32 2Z" fill="#0c3b2d"/>
+    <path d="M62 31c0 12-8 20-18 28.5L34 70c-.6.8-1.5 1.1-2.4 1V2.1C48.2 2.6 62 15.5 62 31Z" fill="#1c9c7e" opacity=".55"/>
+    <path d="M18 54 32 70 22 58Z" fill="#D36B2C"/>
+    <text x="31" y="41" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-weight="800" font-size="30" fill="#ffffff">S</text>
+  </symbol>
+</svg>
+
+<div class="admin-banner">🔒 Internal staff tool — never shown or linked to sellers. Partner names appear here only.</div>
+<div class="topbar">
+  <div class="brandmark">
+    <svg class="brand-icon" viewBox="0 0 64 72"><use href="#spIcon"/></svg>
+    <span class="brand-word">Sellers<span class="w-point">Point</span> Docs</span>
+    <span class="meta">Platform Admin · cross-tenant view — every business, every seller, not just one login</span>
+  </div>
+  <div class="top-actions">
+    <a href="sellerspoint-docs-dashboard.html">Open Customer Dashboard</a>
+    <button onclick="toast('Would log out here')">Log Out</button>
+  </div>
+</div>
+
+<main>
+  <div class="view-header">
+    <h1>Overview</h1>
+    <p>Everything a SellersPoint Docs staff member needs to keep fulfillment moving and pricing current. Sellers never see this page.</p>
+  </div>
+
+  <section>
+    <div class="metrics">
+      <div class="card metric"><small>Total businesses</small><b id="mBusinesses">0</b></div>
+      <div class="card metric warn"><small>Action needed</small><b id="mAction">0</b></div>
+      <div class="card metric"><small>Verification checks (30d)</small><b id="mVerify">0</b></div>
+      <div class="card metric"><small>Revenue collected (30d)</small><b id="mRevenue">₦0</b></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Fulfillment Queue <small>Routed internally to Partner A (Corporate &amp; Legal) or Partner B (Tax &amp; Regulatory) — sellers see only "In review," never a partner name</small></div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Business</th><th>Seller</th><th>Item</th><th>Routed to</th><th>Stage</th><th>Days in queue</th><th>Payment</th><th></th></tr></thead>
+        <tbody id="queueBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Businesses <small>Cross-tenant — every business on Docs, regardless of which seller login owns it</small></div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Seller</th><th>Business</th><th>Reg. type</th><th>Status</th><th>SCUML</th><th>Package</th><th>Last activity</th><th></th></tr></thead>
+        <tbody id="bizBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Package &amp; Pricing <small>Seller-facing prices, editable here only — never on the customer dashboard</small></div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Service</th><th>Fulfillment</th><th>Seller price</th><th>Partner/vendor cost</th><th>Margin</th><th>Status</th></tr></thead>
+        <tbody id="priceBody"></tbody>
+      </table>
+      <p class="pricing-note">Partner/vendor cost is internal-only and never appears in seller-facing copy. Figures shown are current working examples for planning, not final published rates.</p>
+      <div class="save-row"><button class="btn btn-primary" onclick="toast('Pricing changes saved — would sync to the live dashboard')">Save pricing changes</button></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script>
+function $(id){ return document.getElementById(id); }
+function naira(n){ return "₦" + Math.round(n).toLocaleString(); }
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ============================================================
+   MOCK DATA — cross-tenant. Unlike the customer dashboard, this
+   admin view is the one place Partner A / Partner B legitimately
+   appear, since it's staff-only and never seen by sellers.
+   ============================================================ */
+const QUEUE = [
+  { biz:"Amina Fashion Hub", seller:"Amina Yusuf", item:"SCUML Registration", partner:"a", stage:"Awaiting partner review", days:2, payment:"held" },
+  { biz:"Coastal Traders", seller:"Funmi Adebayo", item:"Business Name Registration", partner:"a", stage:"Blocked — awaiting seller ID upload", days:5, payment:"held" },
+  { biz:"Lagos Fresh Produce", seller:"Tunde Bakare", item:"Tax Clearance Certificate", partner:"b", stage:"Filed, awaiting FIRS confirmation", days:3, payment:"held" },
+  { biz:"Naija Gadget Hub Ltd", seller:"Ifeoma Nwosu", item:"CAC Annual Returns Filing", partner:"a", stage:"Awaiting partner review", days:1, payment:"held" },
+  { biz:"Kano Textiles", seller:"Aisha Bello", item:"LLC Incorporation", partner:"a", stage:"Ready to file", days:7, payment:"held" },
+];
+
+const BUSINESSES_ADMIN = [
+  { seller:"Amina Yusuf", biz:"Amina Fashion Hub", regType:"Business Name", status:"approved", scuml:"approved", package:"New Business Bundle", lastActive:"Today" },
+  { seller:"Chidi Okafor", biz:"TechBuild Nigeria Ltd", regType:"Limited Liability Company", status:"approved", scuml:"not-started", package:"Tax Suite (paid)", lastActive:"Yesterday" },
+  { seller:"Funmi Adebayo", biz:"Coastal Traders", regType:"Business Name", status:"action-needed", scuml:"not-started", package:"Pay-as-you-go", lastActive:"3 days ago" },
+  { seller:"Tunde Bakare", biz:"Lagos Fresh Produce", regType:"Business Name", status:"review", scuml:"approved", package:"Pay-as-you-go", lastActive:"Today" },
+  { seller:"Ifeoma Nwosu", biz:"Naija Gadget Hub Ltd", regType:"Limited Liability Company", status:"review", scuml:"review", package:"New Business Bundle", lastActive:"2 days ago" },
+  { seller:"Aisha Bello", biz:"Kano Textiles", regType:"Business Name", status:"not-started", scuml:"not-started", package:"Pay-as-you-go", lastActive:"1 week ago" },
+];
+
+const PRICING = [
+  { service:"Business Name Registration", fulfillment:"Partner A", price:25000, cost:15000, status:"active" },
+  { service:"LLC Incorporation", fulfillment:"Partner A", price:80000, cost:70000, status:"active" },
+  { service:"SCUML Registration", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
+  { service:"CAC Annual Returns Filing", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
+  { service:"Tax Filing (VAT/CIT/PIT return)", fulfillment:"Partner B", price:15000, cost:9000, status:"active" },
+  { service:"Tax Clearance Certificate", fulfillment:"Partner B", price:25000, cost:15000, status:"active" },
+  { service:"TIN / BVN / NIN / CAC Verification", fulfillment:"Automated (vendor API)", price:1000, cost:400, status:"active" },
+  { service:"Document Authenticity Check", fulfillment:"Automated, Partner A fallback", price:2000, cost:1200, status:"active" },
+  { service:"New Business Bundle", fulfillment:"Partner A + in-house", price:90000, cost:73000, status:"active" },
+  { service:"Tax Suite paid tier (Payroll/Payslip/Certificate/E-Invoicing)", fulfillment:"In-house, subscription", price:5000, cost:0, status:"active" },
+];
+
+const STATUS_PILL = {
+  approved: { cls:"pill-success", label:"● Approved" },
+  review: { cls:"pill-progress", label:"◐ Review" },
+  "action-needed": { cls:"pill-alert", label:"⚠ Action Needed" },
+  "not-started": { cls:"pill-neutral", label:"○ Not Started" },
+};
+
+function renderMetrics(){
+  $("mBusinesses").textContent = BUSINESSES_ADMIN.length;
+  $("mAction").textContent = BUSINESSES_ADMIN.filter(b=>b.status==="action-needed").length + QUEUE.filter(q=>q.stage.startsWith("Blocked")).length;
+  $("mVerify").textContent = "214";
+  const revenue = PRICING.reduce((s,p)=>s + p.price, 0) * 3;
+  $("mRevenue").textContent = naira(revenue);
+}
+
+function renderQueue(){
+  $("queueBody").innerHTML = QUEUE.map(q=>{
+    const partnerPill = q.partner==="a" ? `<span class="pill pill-partnera">Partner A</span>` : `<span class="pill pill-partnerb">Partner B</span>`;
+    const blocked = q.stage.startsWith("Blocked");
+    return `<tr class="${blocked?'flag':''}">
+      <td><b>${q.biz}</b></td>
+      <td>${q.seller}</td>
+      <td class="wrap">${q.item}</td>
+      <td>${partnerPill}</td>
+      <td class="wrap">${q.stage}</td>
+      <td>${q.days}d</td>
+      <td>${q.payment==="held" ? '💳 Held' : q.payment}</td>
+      <td><button class="btn btn-ghost" onclick="toast('Would open ${q.biz} — ${q.item}')">Open</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderBusinesses(){
+  $("bizBody").innerHTML = BUSINESSES_ADMIN.map(b=>{
+    const p = STATUS_PILL[b.status];
+    const s = STATUS_PILL[b.scuml];
+    return `<tr class="${b.status==='action-needed'?'flag':''}">
+      <td>${b.seller}</td>
+      <td><b>${b.biz}</b></td>
+      <td><small>${b.regType}</small></td>
+      <td><span class="pill ${p.cls}">${p.label}</span></td>
+      <td><span class="pill ${s.cls}">${s.label}</span></td>
+      <td>${b.package}</td>
+      <td>${b.lastActive}</td>
+      <td><button class="btn btn-ghost" onclick="toast('Would open ${b.biz} admin detail')">View</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function renderPricing(){
+  $("priceBody").innerHTML = PRICING.map((p,i)=>{
+    const margin = p.price - p.cost;
+    const marginPct = p.price ? Math.round((margin/p.price)*100) : 0;
+    return `<tr>
+      <td class="wrap"><b>${p.service}</b></td>
+      <td><small>${p.fulfillment}</small></td>
+      <td>₦<input class="price-input" type="number" value="${p.price}" onchange="PRICING[${i}].price=Number(this.value)||0; renderPricing()"></td>
+      <td>${p.cost ? naira(p.cost) : '—'}</td>
+      <td class="margin-pos">${p.cost ? naira(margin) + ' (' + marginPct + '%)' : '—'}</td>
+      <td><span class="pill pill-success">Active</span></td>
+    </tr>`;
+  }).join("");
+}
+
+renderMetrics();
+renderQueue();
+renderBusinesses();
+renderPricing();
+</script>
+</body>
+</html>

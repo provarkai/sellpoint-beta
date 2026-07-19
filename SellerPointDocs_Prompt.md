@@ -1,4 +1,4 @@
-# SellersPoint Docs — Product & Automation Brief (v10)
+# SellersPoint Docs — Product & Automation Brief (v11)
 
 ## 1. Product Overview
 
@@ -10,13 +10,15 @@
 
 | Category | Services | Fulfillment |
 |---|---|---|
-| **Corporate & Legal** | CAC Business Name registration, full LLC incorporation, Trademark registration, **CAC Annual Returns filing** (recurring), **SCUML registration** | Partner A |
+| **Corporate & Legal** | CAC Business Name registration, full LLC incorporation, **SCUML registration** (recommended right after TIN — most banks won't open a business account without it), **CAC Annual Returns filing** (recurring) | Partner A |
 | **Tax & Regulatory** | TIN generation/verification, state-specific permits (LASAA, local govt), **Tax Filing** (VAT, CIT, PIT returns), **Tax Clearance Certificate (TCC)** | Partner B |
 | **Verification & Lookup** | TIN verification, **BVN verification**, NIN verification, CAC Business Name availability check, CAC business status lookup — all automated via a KYC/verification API vendor, no partner involved for the routine checks; document authenticity verification (checking a specific certificate is genuine) gets an automated first pass with a manual cross-check available for high-stakes cases | Automated (vendor API), with Partner A as an internal fallback only for document authenticity on high-stakes documents |
 | **Tax Suite** *(expanded in v8)* | PAYE Calculator, VAT Estimator (free); Mini Payroll, Payslip Generator, Annual Tax Certificate, NRS/FIRS E-Invoicing (paid tier) — see Section 12 | SellersPoint, no partner |
 | **Self-Serve Documents & Tools** *(demoted from primary nav in v9 — see note below)* | Contract/Agreement Templates (basic document immediately, AI-assisted improvement from a pre-vetted clause library for peculiar situations), Proposal/Quote Generator | SellersPoint, no partner |
 | **Trackers** | Seller-defined lifecycle reminders — rent, insurance, payroll, supplier payments, any other renewal — plus a **"Licences & Documents" category** for recurring compliance items the built-in Compliance Calendar doesn't already cover (e.g. a state-specific permit), filed directly from the tracker when due | SellersPoint, seller-managed (Licences & Documents items route to fulfillment when actioned) |
 | **Compliance Calendar** *(upgraded in v9)* | Real statutory deadline dates (not estimates) for VAT, PAYE, WHT, CAC Annual Return, CIT, and PIT/Tax Clearance, merged with open Trackers into one sorted view — see Section 13 | SellersPoint, connective (not a fulfillment category) |
+
+**Trademark registration — removed in v11.** It's no longer part of the catalog, the data model, or the dashboard. **SCUML moves up to be the priority registration right after TIN** — in practice it's the item that unblocks a business bank account, so the product now nudges sellers to start it early rather than treating it as a same-tier "also available" option alongside a dropped service.
 
 **Templates positioning decision (v9):** kept, not removed — free doesn't mean unfocused, and it was one of the three founding pillars of this product (business creation, regulatory compliance, *and documentation*). The "looks unfocused" concern was real but about prominence, not existence: Templates no longer has its own sidebar tab. It's reachable from an Overview quick action ("New document") and from a "Create a document" prompt inside the Document Vault, so it stays available as a trust-building, retention-driving free tool without visually competing with the paid, higher-stakes services in primary navigation.
 
@@ -26,8 +28,10 @@ Government filings require a licensed party of record, so two specialist partner
 
 | Partner slot | Owns | Likely partner type |
 |---|---|---|
-| **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, Trademark, SCUML registration — plus CAC Annual Returns filing | Law firm or CAC-accredited agent |
+| **Partner A — Corporate & Legal** | Everything about company formation — Business Name, LLC incorporation, SCUML registration — plus CAC Annual Returns filing | Law firm or CAC-accredited agent |
 | **Partner B — Tax & Regulatory** | Everything about tax — TIN, Tax Filing, and Tax Clearance Certificate — plus state-specific permits | Chartered accountant (ICAN) or licensed tax/regulatory-filing agent |
+
+**CAC Annual Returns filing does not renew the underlying Business Name or LLC registration.** It's a separate, recurring compliance obligation that keeps a business in good standing with CAC — the registration certificate itself doesn't expire or get reissued through it. Product copy treats these as two distinct things: the registration certificate (issued once, shown in Registrations/Vault) and the Annual Returns filing (recurring, shown in the Compliance Calendar and, if overdue, the "Licences & Documents" Tracker category). SCUML is the exception — it does carry its own independent renewal cycle, unrelated to Annual Returns.
 
 **Verification & Lookup is almost entirely automated, not partner-routed.** Verification API vendors exist that cover TIN, BVN, NIN, and CAC lookups under one integration — QoreID's public docs confirm all four — so this whole tier can run on SellersPoint's own infrastructure with near-instant turnaround, instead of the ~12 hours a manual agent needs. Only document authenticity verification on a high-stakes document might still warrant a manual cross-check as a fallback.
 
@@ -57,7 +61,7 @@ Every document from every fulfillment line lands here, organized by type and ren
 
 - **Pre-registration sellers** (primary/volume) — start at Business Name + TIN.
 - **Existing SellersPoint core users** — cross-sell target for the Tax Suite (pulls their existing revenue data) and Proposal/Quote Generator.
-- **Graduating sellers** — Business Name → LLC upgrade, Trademark, SCUML, and recurring compliance as the anchor once registered.
+- **Graduating sellers** — Business Name → LLC upgrade, SCUML (the door to a business bank account), and recurring compliance as the anchor once registered.
 - **Any seller, registered or not** — Trackers isn't gated behind registration; rent/insurance/payroll renewals apply regardless.
 - **Consultants/accountants managing multiple SMEs, and sellers who simply run more than one business** — now served as of v10 via multi-business support (see Section 13a).
 
@@ -92,7 +96,7 @@ Registration/filing completion rate per category, submission rejection/rework ra
 
 ## 10. Ready-to-paste prompt block
 
-> Design the product and automation architecture for **SellersPoint Docs**: (1) company formation — CAC Business Name, LLC incorporation, Trademark, SCUML, and recurring CAC Annual Returns filing — fulfilled behind the scenes by a licensed corporate partner; (2) tax — TIN, periodic Tax Filing, Tax Clearance Certificates, and state-specific permits — fulfilled behind the scenes by a licensed tax partner; (3) **Verification & Lookup** — TIN/BVN/NIN/CAC checks fully automated via a KYC vendor API with near-instant turnaround, functioning as a low-friction entry point; (4) a **Tax Suite** — a free PAYE Calculator and VAT Estimator, plus a paid tier (Mini Payroll, Payslip Generator, Annual Tax Certificate, NRS/FIRS E-Invoicing) built on Nigeria's current tax law; (5) self-serve Templates that show a **basic, ready-to-use document immediately**, with AI-assisted improvement as an optional second step, constrained to a pre-vetted clause library — AI must never draft novel legal clauses; (6) seller-managed **Trackers**, including a **Licences & Documents** category for recurring compliance items that can be actioned into real fulfillment; (7) a **Compliance Calendar** unifying every deadline from Trackers, the Tax Suite, and Registrations into one sorted view. **No partner name may ever appear in seller-facing copy** — all fulfillment partners are invisible backend infrastructure; the seller only ever deals with SellersPoint. Payment for backend-fulfilled work is held in escrow-style and released on delivery milestones, not upfront. Every document produced or uploaded lands in one unified, NDPR-compliant Document Vault.
+> Design the product and automation architecture for **SellersPoint Docs**: (1) company formation — CAC Business Name, LLC incorporation, SCUML (positioned right after TIN as the registration a business bank account depends on), and recurring CAC Annual Returns filing (a separate obligation that keeps the business compliant, not a renewal of the registration itself) — fulfilled behind the scenes by a licensed corporate partner; (2) tax — TIN, periodic Tax Filing, Tax Clearance Certificates, and state-specific permits — fulfilled behind the scenes by a licensed tax partner; (3) **Verification & Lookup** — TIN/BVN/NIN/CAC checks fully automated via a KYC vendor API with near-instant turnaround, functioning as a low-friction entry point; (4) a **Tax Suite** — a free PAYE Calculator and VAT Estimator, plus a paid tier (Mini Payroll, Payslip Generator, Annual Tax Certificate, NRS/FIRS E-Invoicing) built on Nigeria's current tax law; (5) self-serve Templates that show a **basic, ready-to-use document immediately**, with AI-assisted improvement as an optional second step, constrained to a pre-vetted clause library — AI must never draft novel legal clauses; (6) seller-managed **Trackers**, including a **Licences & Documents** category for recurring compliance items that can be actioned into real fulfillment; (7) a **Compliance Calendar** unifying every deadline from Trackers, the Tax Suite, and Registrations into one sorted view. **No partner name may ever appear in seller-facing copy** — all fulfillment partners are invisible backend infrastructure; the seller only ever deals with SellersPoint. Payment for backend-fulfilled work is held in escrow-style and released on delivery milestones, not upfront. Every document produced or uploaded lands in one unified, NDPR-compliant Document Vault.
 
 ## 11. Additional Product Features
 
@@ -161,7 +165,7 @@ Each of these now computes its *actual next occurrence* from today's date (rolli
 **Hard constraint carried through the whole data model:** a business's company registration is **one field, not two** — `regType` is either `"Business Name"` or `"Limited Liability Company"`, never both at once, and never rendered as two parallel registration cards. Registrations always renders exactly one Company Registration card per business, whose label follows that business's actual `regType`.
 
 **Architecture:**
-- Each business is a fully independent state bundle — registration status, Trademark status, SCUML status, setup progress/steps, alerts, Trackers, Templates/documents, Verification & Lookup history, Payroll employees, Invoices, current VAT figure, filing history, and Vault contents all live *inside* that business's record, not in a shared global store filtered by an "active business" flag. This was a deliberate choice over a shared-store-plus-filter model: it's what the core app's own migration proved is worth avoiding.
+- Each business is a fully independent state bundle — registration status, SCUML status, setup progress/steps, alerts, Trackers, Templates/documents, Verification & Lookup history, Payroll employees, Invoices, current VAT figure, filing history, and Vault contents all live *inside* that business's record, not in a shared global store filtered by an "active business" flag. This was a deliberate choice over a shared-store-plus-filter model: it's what the core app's own migration proved is worth avoiding.
 - A sidebar business switcher lets the seller (or consultant) move between businesses at any time; switching re-renders every view against the newly active business and resets any mid-flow UI state (an in-progress Verification check, a Template selection) so nothing bleeds across businesses.
 - **What stays shared across all businesses, deliberately:** the Compliance Calendar's statutory deadline dates (VAT/PAYE/WHT/CAC/CIT/PIT recurrence rules) are Nigerian tax law, not business-specific data — they compute the same way regardless of which business is active. Only the *merged* Tracker rows inside the Calendar's upcoming list are per-business.
 - Adding a business is a first-class action from the switcher, not a settings-page afterthought — this is what makes the feature usable for a consultant onboarding a new client mid-session, not just for a seller who happens to run two shops.
@@ -177,6 +181,18 @@ Three further suggestions surfaced in review, not built in this pass:
 - **CAC Annual Return reminder + guided filing** — already partially addressed by the Licences & Documents tracker category and the Compliance Calendar's "File now" action; a fuller guided-filing wizard specifically for this flow is still open, and worth prioritizing since missed CAC annual returns is one of the most common ways small Nigerian businesses accidentally lapse into non-compliance.
 
 **Multi-business/multi-entity support — built in v10, see Section 13a.**
+
+## 15. Customer Dashboard vs. Platform Admin Backend (built in v11)
+
+**Why this split exists from day one:** the core SellersPoint app already draws this line — `index.html` is the seller-facing app, `backend.html` is a separate, staff-only "Platform Admin" page giving a cross-tenant view across every business on the platform. Docs follows the same precedent instead of bolting on an admin surface later.
+
+- **`sellerspoint-docs-dashboard.html`** — the seller/customer-facing product covered by everything above. One seller login, its businesses (via the Section 13a switcher), and never a partner name anywhere in it (Section 8).
+- **`sellerspoint-docs-admin.html`** — a new, separate, internal-only file. Not linked from the customer dashboard, the same way `backend.html` isn't linked from `index.html` — staff navigate to it directly. It's the one surface in the whole product where Partner A / Partner B legitimately appear by name, because the audience is SellersPoint staff, not sellers.
+
+**What the admin backend shows that the customer dashboard structurally cannot:**
+- **Fulfillment queue** — every item currently routed to Partner A or Partner B (the seller-invisible side of Workflow A, stages 6–7), tagged by partner, stage, days in queue, and escrow payment status, so staff can chase a stalled filing before a seller has to ask.
+- **Cross-tenant business list** — every business across every seller login, not one login's switcher — status, registration type, SCUML status, package, and last activity, with action-needed rows flagged for follow-up.
+- **Package & Pricing management** — every priced service (Business Name Registration, LLC Incorporation, SCUML Registration, CAC Annual Returns Filing, Tax Filing, Tax Clearance Certificate, TIN/BVN/NIN/CAC Verification, Document Authenticity Check, the New Business Bundle, and the Tax Suite paid tier) as an editable table: seller-facing price, internal partner/vendor cost, and computed margin. This is where "See bundle pricing" and "Bundle pricing would open here" on the customer dashboard actually get their numbers from — pricing is set once, here, never exposed as an editable surface to sellers. Figures shown in the mockup are current working examples for planning, not published rates.
 
 ---
 
@@ -196,7 +212,7 @@ Three further suggestions surfaced in review, not built in this pass:
 | **7. Partner review & filing** | Final legal/professional review and filing. Payment held escrow-style up to this point, not released upfront. | **Partner (required, internal only)** | Routed package | Filing reference |
 | **8. Status tracking** | Per-service WhatsApp/email updates — SellersPoint-branded, no partner mention | SellersPoint (automated) | Filing references | Status updates |
 | **9. Delivery & storage** | Certificates/filed returns delivered digitally into the Document Vault; payment releases to the partner internally; approval triggers a congratulatory notification/badge moment | SellersPoint (automated) | Government-issued documents | Stored, retrievable per service |
-| **10. Ongoing compliance** | Registration renewals, Tax Filing, and CAC Annual Returns all surface as Compliance Calendar entries; Licences & Documents trackers can be actioned straight back into this pipeline | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
+| **10. Ongoing compliance** | SCUML renewal, Tax Filing, and CAC Annual Returns all surface as Compliance Calendar entries (the Business Name/LLC registration certificate itself doesn't recur); Licences & Documents trackers can be actioned straight back into this pipeline | SellersPoint (automated) → repeats stages 3–9 | Stored data + Calculator output | Renewal/filing reminders |
 
 ### B. Self-Serve Documents & Tools
 
@@ -252,3 +268,5 @@ As of v8, the dashboard is no longer sketched in ASCII here — the product has 
 **v9 note:** Templates no longer has a sidebar entry in the live file (see the positioning decision in Section 2) — find it via Overview's "New document" quick action or the Document Vault's "Create a document" prompt. The Compliance Calendar tab now uses real statutory recurrence math and a two-month grid instead of estimated day-counts.
 
 **v10 note:** the sidebar now opens with a business switcher above the nav. Every view (Overview, Registrations, Verification, Tax Suite, Trackers, Templates, Vault) renders against whichever business is currently active, and Registrations always shows a single Company Registration card matching that business's actual registration type — see Section 13a for the full data-model rationale.
+
+**v11 note:** Trademark is gone from Registrations, the data model, and every business's setup checklist — SCUML is now the featured "Also available" item, with copy explaining it's what unblocks a business bank account, positioned to be started right after TIN. Registration certificates in the Document Vault no longer claim a "Renews via Annual Returns" date for Business Name/LLC — see Section 3 for why that framing was wrong. There's also a second, separate file now: `sellerspoint-docs-admin.html` — a staff-only "Platform Admin" backend (cross-tenant business list, internal fulfillment queue, and Package & Pricing management), not linked from the customer dashboard, mirroring the core app's `backend.html` pattern. See Section 15.

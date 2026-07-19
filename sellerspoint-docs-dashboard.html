@@ -432,11 +432,13 @@ main{padding:32px 36px;overflow:auto}
     <div id="regPrimary"></div>
 
     <div class="cat-title">Also available</div>
-    <div id="regTrademark"></div>
+    <div class="card" style="margin-bottom:10px;background:#f0faf6">
+      <p style="font-size:13px;font-weight:700;color:var(--dark)">🏦 Get this early — most Nigerian banks won't open a business account without your SCUML certificate. We recommend starting it right after your TIN.</p>
+    </div>
     <div id="regScuml"></div>
 
     <div class="card" style="margin-top:18px;background:#f0faf6;border-style:dashed">
-      <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those recur every year with real due dates — see the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
+      <p style="font-size:13px;font-weight:700;color:var(--muted)">📅 Looking for CAC Annual Returns or your Tax Clearance Certificate? Those recur every year with real due dates — filing them keeps your business in good standing, but doesn't renew your registration certificate itself. See the <a href="#" onclick="goto('calendar');return false" style="color:var(--primary);font-weight:800">Compliance Calendar</a>.</p>
     </div>
   </section>
 
@@ -798,19 +800,22 @@ function renderBreakdown(r){
    registration choice is a single field (regType), never two parallel
    fields, so "Business Name OR Limited Liability Company" is enforced
    by the data model itself, not just the UI.
+   SCUML is ordered right after TIN in setupSteps since it's usually the
+   blocker for opening a business bank account. CAC Annual Returns is a
+   recurring compliance filing (see Compliance Calendar) - it does not
+   renew the Business Name / LLC registration certificate itself.
    ============================================================ */
 const BUSINESSES = [
   {
     id: "biz1", name: "Amina Fashion Hub", regType: "Business Name",
     regStatus: "approved", regNote: "Certificate ready",
-    trademark: { status: "not-started" },
     scuml: { status: "approved", celebrate: true },
     setupSteps: [
       { text:"Business Name ✓", done:true }, { text:"TIN ✓", done:true },
-      { text:"SCUML ✓", done:true }, { text:"Trademark —", done:false },
+      { text:"SCUML ✓", done:true },
     ],
-    setupProgress: 75,
-    congrats: "🎉 Congratulations! Your SCUML registration was approved. You've earned the Verified Business badge.",
+    setupProgress: 100,
+    congrats: "🎉 Congratulations! Your SCUML registration was approved — you can now open your business bank account. You've earned the Verified Business badge.",
     alerts: [
       { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
       { title:"Reminder", text:"Staff salary run due in 2 days", action:"View", view:"trackers" },
@@ -838,23 +843,23 @@ const BUSINESSES = [
       { label:"VAT — May 2026", status:"filed", date:"Filed Jun 15" },
     ],
     vaultExtra: [
-      { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12 · Renews Jun 2027" },
+      { name:"Business Name Certificate", type:"Registration", date:"Issued Jun 12" },
       { name:"SCUML Certificate", type:"Registration", date:"Issued Jul 16 · Renews Jul 2027" },
     ],
   },
   {
     id: "biz2", name: "TechBuild Nigeria Ltd", regType: "Limited Liability Company",
     regStatus: "approved", regNote: "Certificate ready",
-    trademark: { status: "review", note:"Submitted 3 days ago" },
     scuml: { status: "not-started" },
     setupSteps: [
       { text:"LLC ✓", done:true }, { text:"TIN ✓", done:true },
-      { text:"Trademark (in review)", done:false }, { text:"SCUML —", done:false },
+      { text:"SCUML —", done:false },
     ],
-    setupProgress: 50,
+    setupProgress: 67,
     congrats: "",
     alerts: [
       { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
+      { title:"Reminder", text:"You'll need SCUML to open your business bank account — start it now", action:"Start", view:"registrations" },
     ],
     trackers: [
       { name:"Office Lease Renewal", cat:"Rent/Lease", status:"due-soon", statusLabel:"Due in 25 days", note:"Recurs annually" },
@@ -879,17 +884,16 @@ const BUSINESSES = [
       { label:"VAT — May 2026", status:"filed", date:"Filed Jun 13" },
     ],
     vaultExtra: [
-      { name:"LLC Incorporation Certificate", type:"Registration", date:"Issued May 2 · Renews annually (Annual Returns)" },
+      { name:"LLC Incorporation Certificate", type:"Registration", date:"Issued May 2" },
     ],
   },
   {
     id: "biz3", name: "Coastal Traders", regType: "Business Name",
     regStatus: "action-needed", regNote: "We need a certified copy of your means of ID",
-    trademark: { status: "not-started" },
     scuml: { status: "not-started" },
     setupSteps: [
       { text:"Business Name (action needed)", done:false }, { text:"TIN —", done:false },
-      { text:"SCUML —", done:false }, { text:"Trademark —", done:false },
+      { text:"SCUML —", done:false },
     ],
     setupProgress: 0,
     congrats: "",
@@ -993,7 +997,6 @@ function regCardHtml(name, status, note, opts){
 function renderRegistrations(){
   const b = biz();
   $("regPrimary").innerHTML = regCardHtml(b.regType + " Registration", b.regStatus, b.regNote);
-  $("regTrademark").innerHTML = regCardHtml("Trademark Registration", b.trademark.status, b.trademark.status==="not-started" ? "Not started" : (b.trademark.note || "In progress"));
   $("regScuml").innerHTML = regCardHtml("SCUML Registration", b.scuml.status, b.scuml.status==="approved" ? "Certificate ready" : b.scuml.status==="not-started" ? "Not started" : (b.scuml.note || "In progress"), { celebrate: b.scuml.celebrate });
 }
 
