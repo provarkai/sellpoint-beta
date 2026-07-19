@@ -91,6 +91,7 @@ td small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
 .price-input:focus{outline:2px solid var(--primary);border-color:var(--primary)}
 .margin-pos{color:var(--primary);font-weight:800}
 .pricing-note{font-size:12px;color:var(--muted);margin-top:10px}
+tr.pillar-row td{background:#f0faf6;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--primary);padding:9px 10px;white-space:nowrap}
 .save-row{display:flex;justify-content:flex-end;margin-top:14px}
 
 /* Partner sub-accounts */
@@ -180,7 +181,7 @@ td small{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
         <thead><tr><th>Service</th><th>Fulfillment</th><th>Seller price</th><th>Partner/vendor cost</th><th>Margin</th><th>Status</th></tr></thead>
         <tbody id="priceBody"></tbody>
       </table>
-      <p class="pricing-note">Partner/vendor cost is internal-only and never appears in seller-facing copy. Figures shown are current working examples for planning, not final published rates.</p>
+      <p class="pricing-note">Three pillars: <b>Business Registration</b> (one-time, TIN included in every package — never billed or verified separately), <b>Business Maintenance &amp; Compliance</b> (recurring, keeps a registered business compliant), and <b>Verification</b> (standalone — for a third party's details or a business that registered elsewhere, not a required onboarding step). Partner/vendor cost is internal-only and never appears in seller-facing copy. Figures shown are current working examples for planning, not final published rates.</p>
       <div class="save-row"><button class="btn btn-primary" onclick="toast('Pricing changes saved — would sync to the live dashboard')">Save pricing changes</button></div>
     </div>
   </section>
@@ -225,17 +226,17 @@ const PARTNER_ACCOUNTS = [
 let activePartnerFilter = null;
 
 const PRICING = [
-  { service:"Business Name Registration", fulfillment:"Partner A", price:25000, cost:15000, status:"active" },
-  { service:"LLC Incorporation", fulfillment:"Partner A", price:80000, cost:70000, status:"active" },
-  { service:"Partnership Registration", fulfillment:"Partner A", price:30000, cost:18000, status:"active" },
-  { service:"SCUML Registration", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
-  { service:"CAC Annual Returns Filing", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
-  { service:"Tax Filing (VAT/CIT/PIT return)", fulfillment:"Partner B", price:15000, cost:9000, status:"active" },
-  { service:"Tax Clearance Certificate", fulfillment:"Partner B", price:25000, cost:15000, status:"active" },
-  { service:"TIN / BVN / NIN / CAC Verification", fulfillment:"Automated (vendor API)", price:1000, cost:400, status:"active" },
-  { service:"Document Authenticity Check", fulfillment:"Automated, Partner A fallback", price:2000, cost:1200, status:"active" },
-  { service:"New Business Bundle", fulfillment:"Partner A + in-house", price:90000, cost:73000, status:"active" },
-  { service:"Tax Suite paid tier (Payroll/Payslip/Certificate/E-Invoicing)", fulfillment:"In-house, subscription", price:5000, cost:0, status:"active" },
+  { pillar:"Business Registration", service:"Business Name Registration (TIN included)", fulfillment:"Partner A", price:25000, cost:15000, status:"active" },
+  { pillar:"Business Registration", service:"LLC Incorporation (TIN included)", fulfillment:"Partner A", price:80000, cost:70000, status:"active" },
+  { pillar:"Business Registration", service:"Partnership Registration (TIN included)", fulfillment:"Partner A", price:30000, cost:18000, status:"active" },
+  { pillar:"Business Registration", service:"SCUML Registration", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
+  { pillar:"Business Registration", service:"New Business Bundle", fulfillment:"Partner A + in-house", price:90000, cost:73000, status:"active" },
+  { pillar:"Business Maintenance & Compliance", service:"CAC Annual Returns Filing", fulfillment:"Partner A", price:20000, cost:12000, status:"active" },
+  { pillar:"Business Maintenance & Compliance", service:"Tax Filing (VAT/CIT/PIT return)", fulfillment:"Partner B", price:15000, cost:9000, status:"active" },
+  { pillar:"Business Maintenance & Compliance", service:"Tax Clearance Certificate", fulfillment:"Partner B", price:25000, cost:15000, status:"active" },
+  { pillar:"Business Maintenance & Compliance", service:"Tax Suite paid tier (Payroll/Payslip/Certificate/E-Invoicing)", fulfillment:"In-house, subscription", price:5000, cost:0, status:"active" },
+  { pillar:"Verification (standalone)", service:"TIN / BVN / NIN / CAC Verification", fulfillment:"Automated (vendor API)", price:1000, cost:400, status:"active" },
+  { pillar:"Verification (standalone)", service:"Document Authenticity Check", fulfillment:"Automated, Partner A fallback", price:2000, cost:1200, status:"active" },
 ];
 
 const STATUS_PILL = {
@@ -315,10 +316,16 @@ function clearPartnerFilter(){
 }
 
 function renderPricing(){
+  let lastPillar = null;
   $("priceBody").innerHTML = PRICING.map((p,i)=>{
     const margin = p.price - p.cost;
     const marginPct = p.price ? Math.round((margin/p.price)*100) : 0;
-    return `<tr>
+    let header = "";
+    if (p.pillar !== lastPillar){
+      lastPillar = p.pillar;
+      header = `<tr class="pillar-row"><td colspan="6">${p.pillar}</td></tr>`;
+    }
+    return header + `<tr>
       <td class="wrap"><b>${p.service}</b></td>
       <td><small>${p.fulfillment}</small></td>
       <td>₦<input class="price-input" type="number" value="${p.price}" onchange="PRICING[${i}].price=Number(this.value)||0; renderPricing()"></td>

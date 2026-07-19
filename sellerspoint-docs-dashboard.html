@@ -348,11 +348,10 @@ main{padding:32px 36px;overflow:auto}
 
   <nav>
     <button class="nav-item active" data-view="overview"><span class="ic">🏠</span> Overview</button>
-    <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar</button>
-    <div class="nav-group-label">Onboarding</div>
-    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
     <button class="nav-item" data-view="verification"><span class="ic">🔍</span> Verification</button>
-    <div class="nav-group-label">Manage</div>
+    <button class="nav-item" data-view="registrations"><span class="ic">📋</span> Business Registration</button>
+    <div class="nav-group-label">Maintenance &amp; Compliance</div>
+    <button class="nav-item" data-view="calendar"><span class="ic">📅</span> Compliance Calendar <span class="lock">🔒</span></button>
     <button class="nav-item" data-view="tax"><span class="ic">💰</span> Tax Tools <span class="lock">🔒</span></button>
     <button class="nav-item" data-view="trackers"><span class="ic">⏰</span> Trackers <span class="lock">🔒</span></button>
     <button class="nav-item" data-view="vault"><span class="ic">🗂️</span> Document Vault <span class="lock">🔒</span></button>
@@ -414,7 +413,7 @@ main{padding:32px 36px;overflow:auto}
     <div class="card bundle-card" style="margin-top:16px">
       <div class="info">
         <b>💡 Save with the New Business Bundle</b>
-        <small>Business Name + TIN + 1 contract template + Tax Calculator access — bundled below individual pricing.</small>
+        <small>Business Registration (TIN included) + SCUML + 1 contract template + Tax Calculator access — bundled below individual pricing.</small>
       </div>
       <button class="btn btn-accent btn-sm" onclick="toast('Bundle pricing would open here')">View bundle</button>
     </div>
@@ -765,11 +764,16 @@ function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("sho
 
 /* ---------- nav ----------
    Business Registration is a one-time process that ends at SCUML — until
-   that's done, the "Manage" views (Tax Tools, Trackers, Document Vault)
-   don't have anything real to operate on (no TIN to file tax against, no
-   certificates to store), so they stay locked and redirect back to
-   Business Registration instead of opening. */
-const LOCKED_VIEWS = ["tax", "trackers", "vault"];
+   that's done, the "Maintenance & Compliance" views (Compliance Calendar,
+   Tax Tools, Trackers, Document Vault) don't have anything real to operate
+   on (no TIN to file tax against, no certificates to store), so they stay
+   locked and redirect back to Business Registration instead of opening.
+   Verification is deliberately NOT gated here — it's a standalone service,
+   not an onboarding step: TIN already comes bundled with Business
+   Registration (see Section 2/3), so there's nothing to verify again on
+   the way in. Verification exists for other cases (a third party's TIN, a
+   business that registered elsewhere) and is usable any time. */
+const LOCKED_VIEWS = ["calendar", "tax", "trackers", "vault"];
 function isOnboardingComplete(){
   const b = biz();
   return b.regStatus === "approved" && b.scuml.status === "approved";
@@ -894,7 +898,7 @@ function renderBreakdown(r){
 const BUSINESS = {
   name: "Amina Fashion Hub", regType: "Business Name",
   regStatus: "approved", regNote: "Certificate ready",
-  tinIssued: true, tin: null,
+  tinIssued: true, tin: "20304050-0002",
   scuml: { status: "approved" },
   alerts: [
     { title:"Deadline", text:"VAT filing due in 12 days", action:"Estimate", view:"tax" },
