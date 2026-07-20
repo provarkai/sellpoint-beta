@@ -51,6 +51,7 @@ async function addToAudience({ email, firstName }) {
 function welcomeEmailHtml(businessName) {
   const name = String(businessName || "Seller").replace(/[<>&]/g, "");
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<div style="text-align:center;margin-bottom:28px"><img src="https://sellerspoint.app/assets/branding/logo/logo_1_main-real.png" alt="SellersPoint" style="max-width:180px;height:auto"></div>
 <p style="margin:0 0 4px">Hi ${name},</p>
 <h1 style="color:#147d64;font-size:22px;margin:0 0 16px">Welcome to SellersPoint!</h1>
 <p>We're excited to have you on board. Run your entire business from one intelligent platform. Manage inventory, customers, orders, invoices, receipts, WhatsApp, AI and reports — all from one beautifully simple app built for African entrepreneurs.</p>
