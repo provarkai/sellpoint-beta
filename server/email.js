@@ -121,4 +121,93 @@ ${pendingCount > 0 ? `<p style="margin:16px 0 0;padding:12px 16px;background:#ff
 </div>`;
 }
 
-module.exports = { isConfigured, sendEmail, addToAudience, welcomeEmailHtml, feedbackEmailHtml, dailyDigestEmailHtml, FEEDBACK_NOTIFY_EMAIL };
+// Shared by newOrderEmailHtml/paymentReceivedEmailHtml/orderConfirmationEmailHtml
+// so the three order-related emails render line items identically.
+function orderItemsTableHtml(items, currency) {
+  const money = (n) => `${currency || "NGN"} ${Number(n || 0).toLocaleString("en-NG")}`;
+  const rows = (items || [])
+    .map(
+      (i) =>
+        `<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${String(i.productName || "").replace(/[<>&]/g, "")} × ${i.qty}</td><td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right">${money(i.unitPrice * i.qty)}</td></tr>`
+    )
+    .join("");
+  return `<table style="width:100%;border-collapse:collapse;margin:12px 0">${rows}</table>`;
+}
+
+// Seller-facing - fires on every new order (dashboard, POS, or storefront),
+// regardless of its starting payment status. See db.notifyNewOrder.
+function newOrderEmailHtml({ businessName, currency, customerName, items, total, orderId, source }) {
+  const biz = String(businessName || "there").replace(/[<>&]/g, "");
+  const cust = String(customerName || "A customer").replace(/[<>&]/g, "");
+  const sourceLabel = { storefront: "your storefront", pos: "POS", dashboard: "the dashboard" }[source] || "SellersPoint";
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">🛒 New order from ${cust}</h1>
+<p style="margin:0 0 16px;color:#647067">Placed via ${sourceLabel}.</p>
+${orderItemsTableHtml(items, currency)}
+<p style="margin:0;font-weight:700;font-size:16px">Total: ${currency || "NGN"} ${Number(total || 0).toLocaleString("en-NG")}</p>
+<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
+<p style="margin-top:20px;color:#8fa89b;font-size:12px">Order ${orderId} · ${biz}</p>
+</div>`;
+}
+
+// Seller-facing - fires once, the first time an order transitions to Paid
+// (see db.notifySellerPaymentReceived's atomic dedup via paid_email_sent).
+function paymentReceivedEmailHtml({ businessName, currency, customerName, items, total, orderId }) {
+  const cust = String(customerName || "A customer").replace(/[<>&]/g, "");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">💰 Payment received from ${cust}</h1>
+${orderItemsTableHtml(items, currency)}
+<p style="margin:0;font-weight:700;font-size:16px">Total: ${currency || "NGN"} ${Number(total || 0).toLocaleString("en-NG")}</p>
+<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
+<p style="margin-top:20px;color:#8fa89b;font-size:12px">Order ${orderId} · ${String(businessName || "").replace(/[<>&]/g, "")}</p>
+</div>`;
+}
+
+// Customer-facing - fires the moment a storefront order is placed (before
+// payment completes), so it reads as "we got your order", not "you paid".
+// See db.notifyCustomerOrderConfirmation.
+function orderConfirmationEmailHtml({ businessName, currency, customerName, items, total, orderId }) {
+  const biz = String(businessName || "the seller").replace(/[<>&]/g, "");
+  const cust = String(customerName || "there").replace(/[<>&]/g, "");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<p style="margin:0 0 4px">Hi ${cust},</p>
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">Thanks for your order from ${biz}!</h1>
+<p style="margin:0 0 12px;color:#647067">Here's what you ordered:</p>
+${orderItemsTableHtml(items, currency)}
+<p style="margin:0;font-weight:700;font-size:16px">Total: ${currency || "NGN"} ${Number(total || 0).toLocaleString("en-NG")}</p>
+<p style="margin-top:20px;color:#647067">${biz} will be in touch once your order is confirmed and on its way.</p>
+<p style="margin-top:20px;color:#8fa89b;font-size:12px">Order reference: ${orderId}</p>
+</div>`;
+}
+
+// Invitee-facing - fires when an owner/manager invites someone to join
+// their business's team. Acceptance today only works by signing up fresh
+// with this exact email at sellerspoint.app (see db.createBusiness's
+// pending-invite check) - it doesn't yet cover someone who already owns a
+// different SellersPoint business, which is a real gap but a separate one
+// from just getting the invite email out.
+function staffInviteEmailHtml({ businessName, role }) {
+  const biz = String(businessName || "A business").replace(/[<>&]/g, "");
+  const roleLabel = { manager: "Manager", sales_staff: "Sales Staff", accountant: "Accountant" }[role] || "team member";
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">You've been invited to join ${biz}</h1>
+<p>You've been invited to join <strong>${biz}</strong> on SellersPoint as a <strong>${roleLabel}</strong>.</p>
+<p>Sign up with this same email address and you'll be added to their team automatically.</p>
+<p style="margin-top:24px"><a href="https://sellerspoint.app/signup.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Accept invite →</a></p>
+<p style="margin-top:20px;color:#647067;font-size:13px">Already have a SellersPoint account under this email? Just log in and you'll be added.</p>
+</div>`;
+}
+
+module.exports = {
+  isConfigured,
+  sendEmail,
+  addToAudience,
+  welcomeEmailHtml,
+  feedbackEmailHtml,
+  dailyDigestEmailHtml,
+  newOrderEmailHtml,
+  paymentReceivedEmailHtml,
+  orderConfirmationEmailHtml,
+  staffInviteEmailHtml,
+  FEEDBACK_NOTIFY_EMAIL,
+};

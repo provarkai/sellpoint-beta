@@ -544,6 +544,10 @@ app.post(
     if (!payments.isConfigured()) return res.status(400).json({ error: "Online payment is not available right now" });
     const { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode, deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost } = req.body || {};
     const result = await db.checkoutStorefront(req.params.slug, { items, buyerName, buyerPhone, buyerEmail, buyerLocation, couponCode, deliveryMethod, shipbubbleRequestToken, shipbubbleServiceCode, shipbubbleCourierId, shipbubbleQuotedCost });
+    result.orderIds.forEach((orderId) => {
+      db.notifyNewOrder(result.businessId, orderId, email);
+      db.notifyCustomerOrderConfirmation(orderId, result.email, email);
+    });
     const reference = `spord_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/store/${req.params.slug}?reference=${reference}`;
     const initialized = await payments.initializeStorefrontCheckout({
@@ -810,7 +814,10 @@ app.post(
   handle(async (req, res) => {
     const orders = await db.posCheckout(req.businessId, req.body || {});
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    orders.forEach((o) => db.sendPaidConfirmationIfNeeded(req.businessId, o, whatsapp, baseUrl));
+    orders.forEach((o) => {
+      db.sendPaidConfirmationIfNeeded(req.businessId, o, whatsapp, baseUrl);
+      db.notifyNewOrder(req.businessId, o.id, email);
+    });
     res.status(201).json(orders);
   })
 );
@@ -938,6 +945,7 @@ app.post(
   handle(async (req, res) => {
     const order = await db.createOrder(req.businessId, req.body || {});
     db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
+    db.notifyNewOrder(req.businessId, order.id, email);
     res.status(201).json(order);
   })
 );
@@ -948,6 +956,7 @@ app.patch(
   handle(async (req, res) => {
     const order = await db.updateOrder(req.businessId, req.params.id, req.body || {});
     db.sendPaidConfirmationIfNeeded(req.businessId, order, whatsapp, `${req.protocol}://${req.get("host")}`);
+    db.notifySellerPaymentReceived(req.businessId, order.id, email);
     res.json(order);
   })
 );
@@ -955,7 +964,11 @@ app.post(
   "/api/orders/:id/convert",
   requireAuth,
   requirePermission("orders.write"),
-  handle(async (req, res) => res.json(await db.convertQuoteToOrder(req.businessId, req.params.id)))
+  handle(async (req, res) => {
+    const order = await db.convertQuoteToOrder(req.businessId, req.params.id);
+    db.notifyNewOrder(req.businessId, order.id, email);
+    res.json(order);
+  })
 );
 app.delete(
   "/api/orders/:id",
@@ -1010,8 +1023,9 @@ app.post(
   requireAuth,
   requirePermission("staff.manage"),
   handle(async (req, res) => {
-    const { email, role } = req.body || {};
-    const roster = await db.inviteStaff(req.businessId, email, role);
+    const { email: inviteEmail, role } = req.body || {};
+    const roster = await db.inviteStaff(req.businessId, inviteEmail, role);
+    db.notifyStaffInvite(req.businessId, inviteEmail, role, email);
     res.status(201).json(roster);
   })
 );

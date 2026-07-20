@@ -326,6 +326,16 @@ alter table order_items add column if not exists cost_price numeric not null def
 alter table businesses add column if not exists daily_digest_enabled boolean not null default true;
 alter table businesses add column if not exists last_digest_sent_date date;
 
+-- "Payment received" seller email dedup - claimed atomically (UPDATE ...
+-- WHERE paid_email_sent = false) so a Paid order only ever notifies once,
+-- no matter how many times it's subsequently updated. See
+-- db.notifySellerPaymentReceived.
+alter table orders add column if not exists paid_email_sent boolean not null default false;
+-- Backfill: orders already Paid before this feature shipped should never
+-- fire "Payment received" just because a seller later edits something
+-- unrelated (e.g. delivery method) on an old order.
+update orders set paid_email_sent = true where status = 'Paid' and paid_email_sent = false;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying

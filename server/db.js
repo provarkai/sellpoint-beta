@@ -2972,7 +2972,87 @@ async function getOrderReceiptInfo(orderId) {
     customerName: row.customer_name,
     orderId: row.id,
     date: new Date(row.created_at).toISOString().slice(0, 10),
+    businessId: row.business_id,
+    source: row.source,
   };
+}
+
+// --- Email notifications (server/index.js wires these to the actual
+// order/invite routes) - each is self-contained (fetch what it needs,
+// send, swallow its own errors) so a route can fire-and-forget it exactly
+// like sendPaidConfirmationIfNeeded above, no .catch() needed at the call
+// site. emailClient is injected (not required directly) for the same
+// "keep db.js provider-agnostic" reason whatsapp/shipbubble already are.
+
+async function notifyNewOrder(businessId, orderId, emailClient) {
+  if (!emailClient.isConfigured()) return;
+  try {
+    const ownerEmail = await getBusinessOwnerEmail(businessId);
+    if (!ownerEmail) return;
+    const info = await getOrderReceiptInfo(orderId);
+    await emailClient.sendEmail({
+      to: ownerEmail,
+      subject: `New order from ${info.customerName || "a customer"} - ${info.currency} ${info.total.toLocaleString()}`,
+      html: emailClient.newOrderEmailHtml(info),
+    });
+  } catch (err) {
+    console.error("New order notification email failed:", err.message);
+  }
+}
+
+// Fires once, the first time an order transitions to Paid - claimed
+// atomically via paid_email_sent so re-saving an already-Paid order (e.g.
+// just changing its delivery method) never re-sends this.
+async function notifySellerPaymentReceived(businessId, orderId, emailClient) {
+  if (!emailClient.isConfigured()) return;
+  try {
+    const { rows: claimed } = await query(
+      "UPDATE orders SET paid_email_sent = true WHERE id = $1 AND status = 'Paid' AND paid_email_sent = false RETURNING id",
+      [orderId]
+    );
+    if (!claimed.length) return;
+    const ownerEmail = await getBusinessOwnerEmail(businessId);
+    if (!ownerEmail) return;
+    const info = await getOrderReceiptInfo(orderId);
+    await emailClient.sendEmail({
+      to: ownerEmail,
+      subject: `Payment received - ${info.currency} ${info.total.toLocaleString()}`,
+      html: emailClient.paymentReceivedEmailHtml(info),
+    });
+  } catch (err) {
+    console.error("Payment received notification email failed:", err.message);
+  }
+}
+
+// Customer-facing - fires the moment a storefront order is placed (buyer
+// email is required at checkout, see checkoutStorefront, so this never
+// has to skip for a missing address the way seller-side notifications do).
+async function notifyCustomerOrderConfirmation(orderId, buyerEmail, emailClient) {
+  if (!emailClient.isConfigured() || !buyerEmail) return;
+  try {
+    const info = await getOrderReceiptInfo(orderId);
+    await emailClient.sendEmail({
+      to: buyerEmail,
+      subject: `Your order from ${info.businessName}`,
+      html: emailClient.orderConfirmationEmailHtml(info),
+    });
+  } catch (err) {
+    console.error("Order confirmation email failed:", err.message);
+  }
+}
+
+async function notifyStaffInvite(businessId, inviteEmail, role, emailClient) {
+  if (!emailClient.isConfigured()) return;
+  try {
+    const business = await getBusiness(businessId);
+    await emailClient.sendEmail({
+      to: inviteEmail,
+      subject: `You've been invited to join ${business?.businessName || "a business"} on SellersPoint`,
+      html: emailClient.staffInviteEmailHtml({ businessName: business?.businessName, role }),
+    });
+  } catch (err) {
+    console.error("Staff invite email failed:", err.message);
+  }
 }
 
 // Bulk-sends reminders for every Pending-payment order over 24h old with a
@@ -3443,6 +3523,10 @@ module.exports = {
   bookShipbubbleShipment,
   refreshShipbubbleTracking,
   getOrderReceiptInfo,
+  notifyNewOrder,
+  notifySellerPaymentReceived,
+  notifyCustomerOrderConfirmation,
+  notifyStaffInvite,
   EXPENSE_CATEGORIES,
   createExpense,
   listExpenses,
