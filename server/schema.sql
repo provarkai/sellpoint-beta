@@ -492,6 +492,13 @@ alter table businesses add column if not exists google_analytics_id text not nul
 alter table platform_settings add column if not exists logistics_settings jsonb not null default '{}'::jsonb;
 alter table orders add column if not exists delivery_fee numeric not null default 0;
 
+-- Which payment gateway is active platform-wide (Paystack/Flutterwave/
+-- Stripe - see server/payments/) and each provider's API credentials, so a
+-- buyer of this codebase can switch gateways from Settings instead of
+-- editing code. Same masking rule as logistics_settings.api_key above -
+-- secrets are never returned to the admin UI in full once set.
+alter table platform_settings add column if not exists payment_config jsonb not null default '{}'::jsonb;
+
 -- Populated once a seller books a real shipment via ShipBubble for an
 -- order (delivery_method = 'sellerspoint'). Null until booked. tracking_url
 -- is an external ShipBubble link shown to the seller/customer - no in-app

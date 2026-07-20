@@ -186,7 +186,7 @@ async function finalizeIfSuccessful(txData) {
   if (metadata?.addonType) {
     const isNew = await db.recordPayment({
       businessId,
-      provider: "paystack",
+      provider: payments.activeProviderName(),
       reference,
       plan: `addon:${metadata.addonType}`,
       billingCycle: "onetime",
@@ -209,7 +209,7 @@ async function finalizeIfSuccessful(txData) {
   if (metadata?.orderId) {
     const isNew = await db.recordPayment({
       businessId,
-      provider: "paystack",
+      provider: payments.activeProviderName(),
       reference,
       plan: "storefront_order",
       billingCycle: "onetime",
@@ -230,7 +230,7 @@ async function finalizeIfSuccessful(txData) {
   const billingCycle = metadata?.billingCycle === "yearly" ? "yearly" : "monthly";
   const isNew = await db.recordPayment({
     businessId,
-    provider: "paystack",
+    provider: payments.activeProviderName(),
     reference,
     plan,
     billingCycle,
@@ -403,11 +403,17 @@ app.get(
 // --- Seller online payments (optional - manual bank transfer stays the ------
 // --- default and always available) ------------------------------------------
 
+// Route paths keep the "paystack" name for backward compatibility with the
+// existing frontend, even though they now go through whichever gateway is
+// active (see server/payments/) - only Paystack/Flutterwave support this
+// direct-seller-payout feature (payments.supportsSplitPayments()); Stripe
+// needs Connect onboarding, not built in this edition.
 app.get(
   "/api/paystack/banks",
   requireAuth,
   handle(async (req, res) => {
-    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    if (!payments.isConfigured()) return res.status(400).json({ error: "No payment gateway is configured on this server" });
+    if (!payments.supportsSplitPayments()) return res.status(400).json({ error: "Direct seller payouts aren't supported by the active payment gateway" });
     res.json(await payments.listBanks());
   })
 );
@@ -417,7 +423,8 @@ app.post(
   requireAuth,
   requirePermission("payments.manage"),
   handle(async (req, res) => {
-    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    if (!payments.isConfigured()) return res.status(400).json({ error: "No payment gateway is configured on this server" });
+    if (!payments.supportsSplitPayments()) return res.status(400).json({ error: "Direct seller payouts aren't supported by the active payment gateway" });
     const { accountNumber, bankCode } = req.body || {};
     if (!accountNumber || !bankCode) return res.status(400).json({ error: "Account number and bank are required" });
     res.json(await payments.resolveAccount(accountNumber, bankCode));
@@ -429,7 +436,8 @@ app.post(
   requireAuth,
   requirePermission("payments.manage"),
   handle(async (req, res) => {
-    if (!payments.isConfigured()) return res.status(400).json({ error: "Paystack is not configured on this server" });
+    if (!payments.isConfigured()) return res.status(400).json({ error: "No payment gateway is configured on this server" });
+    if (!payments.supportsSplitPayments()) return res.status(400).json({ error: "Direct seller payouts aren't supported by the active payment gateway" });
     const { bankCode, bankName, accountNumber } = req.body || {};
     if (!bankCode || !bankName || !accountNumber) return res.status(400).json({ error: "Bank, account number, and bank name are required" });
     const business = await db.getBusiness(req.businessId);
@@ -1653,7 +1661,7 @@ app.post(
     const { type } = req.body || {};
     if (!ADDON_TYPES.includes(type)) return res.status(400).json({ error: "Unknown add-on" });
     if (!payments.isConfigured()) {
-      return res.status(400).json({ error: "Paystack is not configured on this server" });
+      return res.status(400).json({ error: "No payment gateway is configured on this server" });
     }
     const reference = `spaddon_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     // Either registration package is bought from inside My Docs, so it
@@ -1697,7 +1705,7 @@ app.post(
     if (!tiers[plan] || plan === "starter") return res.status(400).json({ error: "Invalid plan" });
     if (tiers[plan].monthly == null) return res.status(400).json({ error: "This plan requires contacting sales" });
     if (!payments.isConfigured()) {
-      return res.status(400).json({ error: "Paystack is not configured on this server" });
+      return res.status(400).json({ error: "No payment gateway is configured on this server" });
     }
     const business = await db.getBusiness(req.businessId);
     const reference = `sp_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
@@ -1735,12 +1743,12 @@ app.get(
 app.post(
   "/api/payments/webhook",
   handle(async (req, res) => {
-    const signature = req.headers["x-paystack-signature"];
+    const signature = req.headers[payments.webhookSignatureHeader()];
     if (!payments.verifyWebhookSignature(req.rawBody, signature)) {
       return res.status(401).json({ error: "Invalid signature" });
     }
-    const event = req.body || {};
-    if (event.event === "charge.success") await finalizeIfSuccessful(event.data);
+    const txData = payments.extractWebhookEvent(req.body || {});
+    if (txData) await finalizeIfSuccessful(txData);
     res.status(200).json({ received: true });
   })
 );
@@ -1908,6 +1916,21 @@ app.get(
   handle(async (req, res) => res.json(await db.getPublicLogisticsInfo()))
 );
 
+app.get(
+  "/api/admin/payment-config",
+  requirePlatformAdmin,
+  handle(async (req, res) => res.json({ ...(await db.getPaymentConfigForAdmin()), providerNames: payments.providerNames }))
+);
+app.put(
+  "/api/admin/payment-config",
+  requirePlatformAdmin,
+  handle(async (req, res) => {
+    const result = await db.updatePaymentConfig(req.body || {});
+    await payments.reloadPaymentConfig();
+    res.json({ ...result, providerNames: payments.providerNames });
+  })
+);
+
 app.put(
   "/api/admin/pricing",
   requirePlatformAdmin,
@@ -1922,6 +1945,8 @@ app.put(
     res.json(pricing.applyPricingOverrides(settings.pricingOverrides));
   })
 );
+
+payments.reloadPaymentConfig().catch((err) => console.error("Payment config load failed, falling back to env vars:", err.message));
 
 app.listen(PORT, HOST, () => {
   console.log(`SellersPoint running at http://${HOST}:${PORT}`);

@@ -8,6 +8,12 @@ let analytics = { totals: [] };
 let waitlistStats = { total: 0, countries: 0, categories: 0 };
 let auditLog = [];
 let logisticsSettings = { enabled: false, flatFee: 0, percentFee: 0, apiBase: "", apiKeySet: false, apiKeyMasked: "" };
+let paymentConfig = { activeProvider: "paystack", providers: {}, providerNames: ["paystack", "flutterwave", "stripe"] };
+const PAYMENT_GATEWAY_FIELDS = {
+  paystack: [["secretKey", "Secret Key"], ["publicKey", "Public Key"]],
+  flutterwave: [["secretKey", "Secret Key"], ["publicKey", "Public Key"], ["secretHash", "Webhook Secret Hash"]],
+  stripe: [["secretKey", "Secret Key"], ["publicKey", "Publishable Key"], ["webhookSecret", "Webhook Signing Secret"]],
+};
 let platformAdmins = [];
 let registrationQueue = [];
 let authToken = null;
@@ -27,7 +33,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, platformAdminsRes, registrationQueueRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, paymentConfigRes, platformAdminsRes, registrationQueueRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -37,6 +43,7 @@ async function loadAll() {
     api("GET", "/api/waitlist/stats"),
     api("GET", "/api/admin/audit-log"),
     api("GET", "/api/admin/logistics-settings"),
+    api("GET", "/api/admin/payment-config"),
     api("GET", "/api/admin/platform-admins"),
     api("GET", "/api/admin/registration-queue"),
   ]);
@@ -49,9 +56,35 @@ async function loadAll() {
   waitlistStats = waitlistRes;
   auditLog = auditRes;
   logisticsSettings = logisticsRes;
+  paymentConfig = paymentConfigRes;
   platformAdmins = platformAdminsRes;
   registrationQueue = registrationQueueRes;
 }
+
+function renderPaymentGatewayFields() {
+  const provider = $("pgActiveProvider").value;
+  const stored = paymentConfig.providers?.[provider] || {};
+  $("pgProviderFields").innerHTML = PAYMENT_GATEWAY_FIELDS[provider].map(([key, label]) => {
+    const status = stored[key + "Set"] ? `(set - ${stored[key + "Masked"]})` : "(not set)";
+    return `<label>${label} <span class="meta">${status}</span><input data-pgfield="${key}" type="password" placeholder="Leave blank to keep the current value"></label>`;
+  }).join("");
+}
+if ($("pgActiveProvider")) $("pgActiveProvider").onchange = renderPaymentGatewayFields;
+if ($("paymentGatewayForm")) $("paymentGatewayForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const provider = $("pgActiveProvider").value;
+    const fields = {};
+    document.querySelectorAll("#pgProviderFields [data-pgfield]").forEach((input) => {
+      if (input.value.trim()) fields[input.dataset.pgfield] = input.value.trim();
+    });
+    paymentConfig = await api("PUT", "/api/admin/payment-config", { activeProvider: provider, providers: { [provider]: fields } });
+    renderPaymentGatewayFields();
+    toast("Payment gateway settings saved");
+  } catch (err) {
+    toast(err.message);
+  }
+};
 
 // Comprehensive per-business panel shown under "View Details" - business
 // info, staff/team, payment history, and recent activity, all fetched from
@@ -186,6 +219,7 @@ function render() {
   $("logPercentFee").value = logisticsSettings.percentFee ?? 0;
   $("logApiBase").value = logisticsSettings.apiBase || "";
   $("logApiKeyStatus").textContent = logisticsSettings.apiKeySet ? `(set - ${logisticsSettings.apiKeyMasked})` : "(not set)";
+  if ($("pgActiveProvider")) { $("pgActiveProvider").value = paymentConfig.activeProvider || "paystack"; renderPaymentGatewayFields(); }
   $("registrationQueueCount").textContent = `(${registrationQueue.length})`;
   $("registrationQueueList").innerHTML = registrationQueue.map((r) => {
     const expanded = expandedRegId === r.id;

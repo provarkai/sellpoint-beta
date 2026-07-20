@@ -1192,6 +1192,70 @@ function computeLogisticsFee(subtotal, settings) {
   return Math.round(Number(subtotal) * (Number(settings.percentFee) / 100) + Number(settings.flatFee));
 }
 
+// --- Payment gateway config (server/payments/) ------------------------------
+// Lets a buyer of this codebase pick Paystack/Flutterwave/Stripe and enter
+// each one's API keys from Settings instead of editing env vars/code -
+// same "admin-editable jsonb blob on platform_settings, secrets masked on
+// read" shape as logistics_settings above.
+
+const PAYMENT_PROVIDER_FIELDS = {
+  paystack: ["secretKey", "publicKey"],
+  flutterwave: ["secretKey", "publicKey", "secretHash"],
+  stripe: ["secretKey", "publicKey", "webhookSecret"],
+};
+
+async function getRawPaymentConfig() {
+  const { rows } = await query("SELECT payment_config FROM platform_settings WHERE id = 1");
+  const raw = rows[0]?.payment_config || {};
+  return { activeProvider: raw.activeProvider || "paystack", providers: raw.providers || {} };
+}
+
+// Used by server/payments/index.js at startup and on reload - full secret
+// values, never sent to the frontend. Keep this the only caller of
+// getRawPaymentConfig() outside this file.
+async function getPaymentConfigForProvider() {
+  return getRawPaymentConfig();
+}
+
+// Admin-facing: every credential field is masked the same way
+// logistics_settings.apiKey already is - never round-tripped in full once set.
+async function getPaymentConfigForAdmin() {
+  const raw = await getRawPaymentConfig();
+  const providers = {};
+  for (const [name, fields] of Object.entries(PAYMENT_PROVIDER_FIELDS)) {
+    const stored = raw.providers[name] || {};
+    const entry = {};
+    for (const field of fields) {
+      const value = stored[field] || "";
+      entry[field + "Set"] = !!value;
+      entry[field + "Masked"] = value ? "•••• " + value.slice(-4) : "";
+    }
+    providers[name] = entry;
+  }
+  return { activeProvider: raw.activeProvider, providers };
+}
+
+async function updatePaymentConfig(fields) {
+  const raw = await getRawPaymentConfig();
+  const activeProvider = fields.activeProvider && PAYMENT_PROVIDER_FIELDS[fields.activeProvider] ? fields.activeProvider : raw.activeProvider;
+  const providers = { ...raw.providers };
+  if (fields.providers && typeof fields.providers === "object") {
+    for (const [name, incoming] of Object.entries(fields.providers)) {
+      if (!PAYMENT_PROVIDER_FIELDS[name] || !incoming || typeof incoming !== "object") continue;
+      const next = { ...(providers[name] || {}) };
+      for (const field of PAYMENT_PROVIDER_FIELDS[name]) {
+        // Same "blank means keep the existing value" rule as
+        // logistics_settings.apiKey - the admin UI never receives the real
+        // secret back, so an empty field on save must mean "unchanged."
+        if (incoming[field]) next[field] = String(incoming[field]).trim();
+      }
+      providers[name] = next;
+    }
+  }
+  await query("UPDATE platform_settings SET payment_config = $1 WHERE id = 1", [JSON.stringify({ activeProvider, providers })]);
+  return getPaymentConfigForAdmin();
+}
+
 async function updatePricingOverrides(overrides) {
   const current = await getPlatformSettings();
   const merged = { ...current.pricingOverrides, ...overrides };
@@ -3559,6 +3623,9 @@ module.exports = {
   getLogisticsSettingsForAdmin,
   updateLogisticsSettings,
   getPublicLogisticsInfo,
+  getPaymentConfigForProvider,
+  getPaymentConfigForAdmin,
+  updatePaymentConfig,
   createProduct,
   updateProduct,
   deleteProduct,
