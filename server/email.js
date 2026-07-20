@@ -91,4 +91,34 @@ function feedbackEmailHtml({ businessName, sellerEmail, message, rating }) {
 </div>`;
 }
 
-module.exports = { isConfigured, sendEmail, addToAudience, welcomeEmailHtml, feedbackEmailHtml, FEEDBACK_NOTIFY_EMAIL };
+// Personalized daily business summary - real numbers only, built from
+// db.getDailyDigestData (today's sales/orders/new customers, low stock,
+// this month's P&L, pending payments). See server/scheduler.js#runDailyDigestScan
+// for how/when this actually gets sent, and the /api/digest/unsubscribe
+// route in server/index.js for the one-click opt-out this links to.
+function dailyDigestEmailHtml({ businessName, currency, todayRevenue, todayOrders, todayNewCustomers, lowStock, pendingCount, pl, unsubscribeUrl }) {
+  const biz = String(businessName || "there").replace(/[<>&]/g, "");
+  const money = (n) => `${currency || "NGN"} ${Number(n || 0).toLocaleString("en-NG")}`;
+  const dateLabel = new Date().toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long" });
+  const lowStockHtml = lowStock.length
+    ? `<ul style="margin:0;padding-left:20px">${lowStock.map((p) => `<li>${String(p.name).replace(/[<>&]/g, "")} - ${p.stock} left</li>`).join("")}</ul>`
+    : `<p style="margin:0;color:#647067">Nothing running low today.</p>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<p style="margin:0 0 4px">Hi ${biz},</p>
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">Your SellersPoint digest - ${dateLabel}</h1>
+<div style="display:flex;gap:12px;margin-bottom:20px">
+<div style="flex:1;background:#f5f7f4;border-radius:8px;padding:12px"><small style="color:#647067;font-size:12px">Revenue today</small><br><b style="font-size:18px">${money(todayRevenue)}</b></div>
+<div style="flex:1;background:#f5f7f4;border-radius:8px;padding:12px"><small style="color:#647067;font-size:12px">Orders today</small><br><b style="font-size:18px">${todayOrders}</b></div>
+<div style="flex:1;background:#f5f7f4;border-radius:8px;padding:12px"><small style="color:#647067;font-size:12px">New customers</small><br><b style="font-size:18px">${todayNewCustomers}</b></div>
+</div>
+<p style="margin:0 0 6px;font-weight:700">⚠️ Restock alerts</p>
+${lowStockHtml}
+<p style="margin:20px 0 6px;font-weight:700">This month so far</p>
+<p style="margin:0;color:#17211c">Revenue ${money(pl.revenue)} · Expenses ${money(pl.expensesTotal)} · Net profit ${money(pl.netProfit)}</p>
+${pendingCount > 0 ? `<p style="margin:16px 0 0;padding:12px 16px;background:#fff4e8;border-radius:8px;color:#d36b2c;font-weight:700">${pendingCount} order${pendingCount === 1 ? "" : "s"} still pending payment - a nudge on WhatsApp might help.</p>` : ""}
+<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
+<p style="margin-top:28px;color:#8fa89b;font-size:12px"><a href="${unsubscribeUrl}" style="color:#8fa89b">Unsubscribe from daily digests</a></p>
+</div>`;
+}
+
+module.exports = { isConfigured, sendEmail, addToAudience, welcomeEmailHtml, feedbackEmailHtml, dailyDigestEmailHtml, FEEDBACK_NOTIFY_EMAIL };

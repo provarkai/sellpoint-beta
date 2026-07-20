@@ -6,10 +6,12 @@
 // explicit "kept dependency-free" comment).
 const db = require("./db");
 const whatsapp = require("./whatsapp");
+const email = require("./email");
 
 const SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // 4x/day; isOrderDueForAutoReminder's
 // own date math (not wall-clock alignment) is what prevents duplicate sends,
 // so polling more often than once/day is safe.
+const APP_BASE_URL = process.env.APP_BASE_URL || "https://sellerspoint.app";
 
 async function runAutoReminderScan() {
   if (!whatsapp.isConfigured()) return;
@@ -46,9 +48,49 @@ async function runRecurringCampaignScan() {
   }
 }
 
+// Personalized daily business summary - see db.getDailyDigestData for what
+// goes in it and email.dailyDigestEmailHtml for the template. Runs on the
+// same poll interval as everything else in this file; it's
+// listBusinessesDueForDigest's own last_digest_sent_date check (not the
+// interval) that keeps this to once per calendar day per business, same
+// "date math, not wall-clock alignment" pattern as the auto-reminder scan.
+async function runDailyDigestScan() {
+  if (!email.isConfigured()) return;
+  const businesses = await db.listBusinessesDueForDigest();
+  for (const b of businesses) {
+    try {
+      const ownerEmail = await db.getBusinessOwnerEmail(b.id);
+      if (!ownerEmail) {
+        await db.markDigestSent(b.id); // nothing to send to - don't retry every scan forever
+        continue;
+      }
+      const data = await db.getDailyDigestData(b.id);
+      await email.sendEmail({
+        to: ownerEmail,
+        subject: `Your SellersPoint digest - ${data.business.businessName}`,
+        html: email.dailyDigestEmailHtml({
+          businessName: data.business.businessName,
+          currency: data.business.currency,
+          todayRevenue: data.todayRevenue,
+          todayOrders: data.todayOrders,
+          todayNewCustomers: data.todayNewCustomers,
+          lowStock: data.lowStock,
+          pendingCount: data.pendingCount,
+          pl: data.pl,
+          unsubscribeUrl: `${APP_BASE_URL}/api/digest/unsubscribe/${b.id}`,
+        }),
+      });
+      await db.markDigestSent(b.id);
+    } catch (err) {
+      console.error(`[scheduler] daily digest failed for business ${b.id}:`, err.message);
+    }
+  }
+}
+
 async function runScheduledJobs() {
   await runAutoReminderScan();
   await runRecurringCampaignScan();
+  await runDailyDigestScan();
 }
 
 function startScheduler() {
@@ -57,4 +99,4 @@ function startScheduler() {
   setInterval(() => runScheduledJobs().catch((err) => console.error("[scheduler] scan failed:", err.message)), SCAN_INTERVAL_MS);
 }
 
-module.exports = { startScheduler, runAutoReminderScan, runRecurringCampaignScan };
+module.exports = { startScheduler, runAutoReminderScan, runRecurringCampaignScan, runDailyDigestScan };

@@ -1569,6 +1569,21 @@ app.post(
     res.status(201).json(feedback);
   })
 );
+
+// Public - no auth, reached by clicking "Unsubscribe" in the daily digest
+// email. businessId is a uuid, not sequential/guessable, and the worst case
+// of someone else hitting this link is turning off a digest they don't
+// own - no data exposure - so no extra token is needed here.
+app.get(
+  "/api/digest/unsubscribe/:businessId",
+  handle(async (req, res) => {
+    await db.unsubscribeDailyDigest(req.params.businessId);
+    res.set("Content-Type", "text/html").send(
+      `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:60px auto;text-align:center;color:#17211c"><h1 style="color:#147d64">Unsubscribed</h1><p>You won't receive any more daily digest emails from SellersPoint. You can turn them back on any time from Settings.</p></body></html>`
+    );
+  })
+);
+
 app.get(
   "/api/cashbook",
   requireAuth,

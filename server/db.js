@@ -100,6 +100,7 @@ function toBusinessJson(b) {
     loyaltyRedeemValue: Number(b.loyalty_redeem_value ?? 1),
     autoReminderEnabled: !!b.auto_reminder_enabled,
     autoReminderDaysAfter: Number(b.auto_reminder_days_after ?? 2),
+    dailyDigestEnabled: b.daily_digest_enabled !== false,
     shipbubbleSenderAddressCode: b.shipbubble_sender_address_code || null,
     regType: b.reg_type || null,
     regStatus: b.reg_status || "not_started",
@@ -672,12 +673,13 @@ async function updateBusiness(businessId, fields) {
     loyalty_redeem_value: fields.loyaltyRedeemValue !== undefined ? requireNumber(fields.loyaltyRedeemValue, "Loyalty redeem value", { min: 0 }) : current.loyalty_redeem_value,
     auto_reminder_enabled: fields.autoReminderEnabled ?? current.auto_reminder_enabled,
     auto_reminder_days_after: fields.autoReminderDaysAfter !== undefined ? requireNumber(fields.autoReminderDaysAfter, "Days after due", { min: 1, max: 30, integer: true }) : current.auto_reminder_days_after,
+    daily_digest_enabled: fields.dailyDigestEnabled ?? current.daily_digest_enabled,
   };
   const { rows: updated } = await query(
     `UPDATE businesses SET name=$1, phone=$2, logo=$3, address=$4, payment_provider=$5, payment_link=$6,
        payment_details=$7, currency=$8, loyalty_enabled=$9, loyalty_earn_rate=$10, loyalty_redeem_value=$11,
-       auto_reminder_enabled=$12, auto_reminder_days_after=$13
-     WHERE id = $14 RETURNING *`,
+       auto_reminder_enabled=$12, auto_reminder_days_after=$13, daily_digest_enabled=$14
+     WHERE id = $15 RETURNING *`,
     [
       merged.name,
       merged.phone,
@@ -692,6 +694,7 @@ async function updateBusiness(businessId, fields) {
       merged.loyalty_redeem_value,
       merged.auto_reminder_enabled,
       merged.auto_reminder_days_after,
+      merged.daily_digest_enabled,
       businessId,
     ]
   );
@@ -3195,6 +3198,61 @@ async function sendAutoRemindersForBusiness(businessId, daysAfter, whatsapp) {
   return { businessId, total: due.length, sent: results.filter((r) => r.sent).length };
 }
 
+// --- Daily digest email (server/scheduler.js#runDailyDigestScan) -----------
+
+async function listBusinessesDueForDigest() {
+  const { rows } = await query(
+    `SELECT id FROM businesses
+     WHERE daily_digest_enabled = true AND (last_digest_sent_date IS NULL OR last_digest_sent_date < CURRENT_DATE)`
+  );
+  return rows;
+}
+
+async function markDigestSent(businessId) {
+  await query("UPDATE businesses SET last_digest_sent_date = CURRENT_DATE WHERE id = $1", [businessId]);
+}
+
+async function unsubscribeDailyDigest(businessId) {
+  await query("UPDATE businesses SET daily_digest_enabled = false WHERE id = $1", [businessId]);
+}
+
+// Owner's email is who the digest goes to, not every staff member - avoids
+// spamming a whole team with the same daily summary.
+async function getBusinessOwnerEmail(businessId) {
+  const { rows } = await query("SELECT email FROM business_members WHERE business_id = $1 AND role = 'owner' LIMIT 1", [businessId]);
+  return rows[0]?.email || null;
+}
+
+// Gathers everything the daily digest email needs in one call - today's
+// sales/orders/new customers (same "today" definition as the dashboard's
+// Today card, just computed server-side here since this runs outside a
+// browser, not from state already loaded client-side), low stock products,
+// this month's P&L (reuses getProfitAndLoss, no separate query), and
+// pending-payment count.
+async function getDailyDigestData(businessId) {
+  const [business, todayRows, newCustomerRows, lowStockRows, pendingRows, pl] = await Promise.all([
+    getBusiness(businessId),
+    query(
+      `SELECT COALESCE(SUM(subtotal) FILTER (WHERE status IN ('Paid','Delivered')), 0) AS revenue, COUNT(*) AS orders
+       FROM orders WHERE business_id = $1 AND created_at::date = CURRENT_DATE`,
+      [businessId]
+    ),
+    query("SELECT COUNT(*)::int AS n FROM customers WHERE business_id = $1 AND created_at::date = CURRENT_DATE", [businessId]),
+    query("SELECT name, stock FROM products WHERE business_id = $1 AND stock < 5 ORDER BY stock ASC LIMIT 5", [businessId]),
+    query("SELECT COUNT(*)::int AS n FROM orders WHERE business_id = $1 AND status = 'Pending payment'", [businessId]),
+    getProfitAndLoss(businessId),
+  ]);
+  return {
+    business,
+    todayRevenue: Number(todayRows.rows[0].revenue),
+    todayOrders: Number(todayRows.rows[0].orders),
+    todayNewCustomers: newCustomerRows.rows[0].n,
+    lowStock: lowStockRows.rows.map((r) => ({ name: r.name, stock: r.stock })),
+    pendingCount: pendingRows.rows[0].n,
+    pl,
+  };
+}
+
 // --- ShipBubble: real courier booking behind "SellersPoint Logistics" ------
 // shipbubble client is passed in by the caller (server/index.js), same
 // convention as sendPaymentReminder(businessId, orderId, whatsapp) - keeps
@@ -3373,6 +3431,11 @@ module.exports = {
   isOrderDueForAutoReminder,
   listBusinessesWithAutoReminderEnabled,
   sendAutoRemindersForBusiness,
+  listBusinessesDueForDigest,
+  markDigestSent,
+  unsubscribeDailyDigest,
+  getBusinessOwnerEmail,
+  getDailyDigestData,
   computeSegments,
   setShipbubbleSenderAddress,
   getShipbubbleQuote,

@@ -318,6 +318,14 @@ alter table businesses add column if not exists founder_discount boolean not nul
 alter table products add column if not exists cost_price numeric;
 alter table order_items add column if not exists cost_price numeric not null default 0;
 
+-- Daily digest email (personalized daily business summary) - see
+-- server/scheduler.js#runDailyDigestScan. daily_digest_enabled is the
+-- one-click unsubscribe flag; last_digest_sent_date prevents duplicate
+-- sends within a single day since the scheduler polls more often than
+-- once/day (see scheduler.js's own comment on that pattern).
+alter table businesses add column if not exists daily_digest_enabled boolean not null default true;
+alter table businesses add column if not exists last_digest_sent_date date;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying
