@@ -10,13 +10,16 @@
 // Audiences tab once you've created one; without it, welcome emails still
 // send, addToAudience just no-ops so newsletter sign-up isn't a hard
 // requirement for the rest of this module to work.
+const { BRAND } = require("./branding");
+
+const APP_BASE_URL = process.env.APP_BASE_URL || `https://${BRAND.domain}`;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "SellersPoint <onboarding@sellerspoint.app>";
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || `${BRAND.name} <onboarding@${BRAND.domain}>`;
 const RESEND_AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID || "";
 // Where in-app Feedback submissions get emailed to - see the /api/feedback
 // route, which sends here with Reply-To set to the submitting seller's own
 // email, so replying in your inbox goes straight back to them.
-const FEEDBACK_NOTIFY_EMAIL = process.env.FEEDBACK_NOTIFY_EMAIL || "support@sellerspoint.ng";
+const FEEDBACK_NOTIFY_EMAIL = process.env.FEEDBACK_NOTIFY_EMAIL || BRAND.supportEmail;
 
 function isConfigured() {
   return !!RESEND_API_KEY;
@@ -55,9 +58,9 @@ async function addToAudience({ email, firstName }) {
 function welcomeEmailHtml(businessName) {
   const name = String(businessName || "Seller").replace(/[<>&]/g, "");
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
-<div style="text-align:center;margin-bottom:28px"><img src="https://sellerspoint.app/assets/branding/logo/logo_1_main-real.png" alt="SellersPoint" style="max-width:180px;height:auto"></div>
+<div style="text-align:center;margin-bottom:28px"><img src="${APP_BASE_URL}${BRAND.logoUrl}" alt="${BRAND.name}" style="max-width:180px;height:auto"></div>
 <p style="margin:0 0 4px">Hi ${name},</p>
-<h1 style="color:#147d64;font-size:22px;margin:0 0 16px">Welcome to SellersPoint!</h1>
+<h1 style="color:#147d64;font-size:22px;margin:0 0 16px">Welcome to ${BRAND.name}!</h1>
 <p>We're excited to have you on board. Run your entire business from one intelligent platform. Manage inventory, customers, orders, invoices, receipts, WhatsApp, AI and reports — all from one beautifully simple app built for African entrepreneurs.</p>
 <p>You're just a few steps away from setting up your business.</p>
 <p><strong>Here's how to get started in the next 5 minutes:</strong></p>
@@ -67,10 +70,10 @@ function welcomeEmailHtml(businessName) {
 <li><strong>Add your first customer</strong> - or import your existing list</li>
 <li><strong>Share your storefront link</strong> - and take your first order</li>
 </ul>
-<p><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
+<p><a href="${APP_BASE_URL}/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
 <p>If you have any questions, suggestions, or run into anything at all — tap <strong>Feedback</strong> inside the app and send us a message. We respond personally.</p>
-<p>SellersPoint was built with your type of business in mind.</p>
-<p style="margin-top:24px;color:#647067;font-size:13px">— The SellersPoint Team</p>
+<p>${BRAND.name} was built with your type of business in mind.</p>
+<p style="margin-top:24px;color:#647067;font-size:13px">— The ${BRAND.name} Team</p>
 </div>`;
 }
 
@@ -105,7 +108,7 @@ function dailyDigestEmailHtml({ businessName, currency, todayRevenue, todayOrder
     : `<p style="margin:0;color:#647067">Nothing running low today.</p>`;
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
 <p style="margin:0 0 4px">Hi ${biz},</p>
-<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">Your SellersPoint digest - ${dateLabel}</h1>
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">Your ${BRAND.name} digest - ${dateLabel}</h1>
 <div style="display:flex;gap:12px;margin-bottom:20px">
 <div style="flex:1;background:#f5f7f4;border-radius:8px;padding:12px"><small style="color:#647067;font-size:12px">Revenue today</small><br><b style="font-size:18px">${money(todayRevenue)}</b></div>
 <div style="flex:1;background:#f5f7f4;border-radius:8px;padding:12px"><small style="color:#647067;font-size:12px">Orders today</small><br><b style="font-size:18px">${todayOrders}</b></div>
@@ -116,7 +119,7 @@ ${lowStockHtml}
 <p style="margin:20px 0 6px;font-weight:700">This month so far</p>
 <p style="margin:0;color:#17211c">Revenue ${money(pl.revenue)} · Expenses ${money(pl.expensesTotal)} · Net profit ${money(pl.netProfit)}</p>
 ${pendingCount > 0 ? `<p style="margin:16px 0 0;padding:12px 16px;background:#fff4e8;border-radius:8px;color:#d36b2c;font-weight:700">${pendingCount} order${pendingCount === 1 ? "" : "s"} still pending payment - a nudge on WhatsApp might help.</p>` : ""}
-<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
+<p style="margin-top:24px"><a href="${APP_BASE_URL}/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
 <p style="margin-top:28px;color:#8fa89b;font-size:12px"><a href="${unsubscribeUrl}" style="color:#8fa89b">Unsubscribe from daily digests</a></p>
 </div>`;
 }
@@ -139,13 +142,13 @@ function orderItemsTableHtml(items, currency) {
 function newOrderEmailHtml({ businessName, currency, customerName, items, total, orderId, source }) {
   const biz = String(businessName || "there").replace(/[<>&]/g, "");
   const cust = String(customerName || "A customer").replace(/[<>&]/g, "");
-  const sourceLabel = { storefront: "your storefront", pos: "POS", dashboard: "the dashboard" }[source] || "SellersPoint";
+  const sourceLabel = { storefront: "your storefront", pos: "POS", dashboard: "the dashboard" }[source] || BRAND.name;
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
 <h1 style="color:#147d64;font-size:20px;margin:0 0 16px">🛒 New order from ${cust}</h1>
 <p style="margin:0 0 16px;color:#647067">Placed via ${sourceLabel}.</p>
 ${orderItemsTableHtml(items, currency)}
 <p style="margin:0;font-weight:700;font-size:16px">Total: ${currency || "NGN"} ${Number(total || 0).toLocaleString("en-NG")}</p>
-<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
+<p style="margin-top:24px"><a href="${APP_BASE_URL}/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
 <p style="margin-top:20px;color:#8fa89b;font-size:12px">Order ${orderId} · ${biz}</p>
 </div>`;
 }
@@ -158,7 +161,7 @@ function paymentReceivedEmailHtml({ businessName, currency, customerName, items,
 <h1 style="color:#147d64;font-size:20px;margin:0 0 16px">💰 Payment received from ${cust}</h1>
 ${orderItemsTableHtml(items, currency)}
 <p style="margin:0;font-weight:700;font-size:16px">Total: ${currency || "NGN"} ${Number(total || 0).toLocaleString("en-NG")}</p>
-<p style="margin-top:24px"><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
+<p style="margin-top:24px"><a href="${APP_BASE_URL}/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">View in dashboard →</a></p>
 <p style="margin-top:20px;color:#8fa89b;font-size:12px">Order ${orderId} · ${String(businessName || "").replace(/[<>&]/g, "")}</p>
 </div>`;
 }
@@ -184,16 +187,16 @@ ${orderItemsTableHtml(items, currency)}
 // their business's team. Acceptance today only works by signing up fresh
 // with this exact email at sellerspoint.app (see db.createBusiness's
 // pending-invite check) - it doesn't yet cover someone who already owns a
-// different SellersPoint business, which is a real gap but a separate one
+// different business on this platform, which is a real gap but a separate one
 // from just getting the invite email out.
 function staffInviteEmailHtml({ businessName }) {
   const biz = String(businessName || "A business").replace(/[<>&]/g, "");
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
 <h1 style="color:#147d64;font-size:20px;margin:0 0 16px">You've been invited to join ${biz}</h1>
-<p>You've been invited to join <strong>${biz}</strong> on SellersPoint as a team member.</p>
+<p>You've been invited to join <strong>${biz}</strong> on ${BRAND.name} as a team member.</p>
 <p>Sign up with this same email address and you'll be added to their team automatically.</p>
-<p style="margin-top:24px"><a href="https://sellerspoint.app/signup.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Accept invite →</a></p>
-<p style="margin-top:20px;color:#647067;font-size:13px">Already have a SellersPoint account under this email? Just log in and you'll be added.</p>
+<p style="margin-top:24px"><a href="${APP_BASE_URL}/signup.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Accept invite →</a></p>
+<p style="margin-top:20px;color:#647067;font-size:13px">Already have a ${BRAND.name} account under this email? Just log in and you'll be added.</p>
 </div>`;
 }
 

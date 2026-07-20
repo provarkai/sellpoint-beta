@@ -8,6 +8,7 @@ const db = require("./db");
 const { CURRENCIES } = require("./currencies");
 const { requireAuthOnly, requireAuth, requirePermission, requirePlatformAdmin, supabaseAdmin } = require("./auth");
 const { OWNER_ALL_PERMISSIONS } = require("./roles");
+const { BRAND } = require("./branding");
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
@@ -94,6 +95,27 @@ app.get("/", (req, res) => res.sendFile(path.join(ROOT, "app.html")));
 // and can use a 304 - this app ships frequent small JS/CSS fixes, and a
 // stale cached script silently running old logic is worse than one extra
 // revalidation round trip per load.
+// Registered before express.static so these two exact paths are served
+// dynamically (brand-driven) instead of falling through to the static files
+// of the same name - see server/branding.js for how a buyer of this
+// codebase rebrands the app.
+app.get("/api/brand", (req, res) => res.json(BRAND));
+app.get("/manifest.json", (req, res) => {
+  res.json({
+    name: BRAND.name,
+    short_name: BRAND.name,
+    description: BRAND.tagline,
+    start_url: "/app.html",
+    display: "standalone",
+    background_color: BRAND.backgroundColor,
+    theme_color: BRAND.themeColor,
+    icons: [
+      { src: BRAND.iconUrl, sizes: "192x192", type: "image/png" },
+      { src: BRAND.iconUrl, sizes: "512x512", type: "image/png" },
+    ],
+  });
+});
+
 app.use(express.static(ROOT, { etag: true, lastModified: true, cacheControl: true, maxAge: 0, setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
 
 // API versioning: /api/v1/* is an alias for /api/* - same routes, same

@@ -7,11 +7,12 @@
 const db = require("./db");
 const whatsapp = require("./whatsapp");
 const email = require("./email");
+const { BRAND } = require("./branding");
 
 const SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // 4x/day; isOrderDueForAutoReminder's
 // own date math (not wall-clock alignment) is what prevents duplicate sends,
 // so polling more often than once/day is safe.
-const APP_BASE_URL = process.env.APP_BASE_URL || "https://sellerspoint.app";
+const APP_BASE_URL = process.env.APP_BASE_URL || `https://${BRAND.domain}`;
 
 async function runAutoReminderScan() {
   if (!whatsapp.isConfigured()) return;
@@ -67,7 +68,7 @@ async function runDailyDigestScan() {
       const data = await db.getDailyDigestData(b.id);
       await email.sendEmail({
         to: ownerEmail,
-        subject: `Your SellersPoint digest - ${data.business.businessName}`,
+        subject: `Your ${BRAND.name} digest - ${data.business.businessName}`,
         html: email.dailyDigestEmailHtml({
           businessName: data.business.businessName,
           currency: data.business.currency,

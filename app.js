@@ -1,5 +1,6 @@
 let state={businessName:"Your Business",businessPhone:"",businessLogo:"",paymentProvider:"Paystack",paymentLink:"",paymentDetails:"",plan:"starter",currency:"NGN",products:[],customers:[],orders:[],events:[]};
 let pricing={};
+let brand={name:"SellersPoint"};
 let authToken=null;
 let userEmail=null;
 let myRole=null;
@@ -18,7 +19,7 @@ const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");setTi
 const markStoreAiUsed=()=>localStorage.setItem("sp_used_store_ai","1");
 async function api(method,url,body){const res=await fetch(url,{method,headers:{...(body?{"Content-Type":"application/json"}:{}),Authorization:`Bearer ${authToken}`},body:body?JSON.stringify(body):undefined});if(!res.ok){const err=await res.json().catch(()=>({error:"Request failed"}));throw new Error(err.error||"Request failed")}return res.status===204?null:res.json()}
 function applyState(s){Object.assign(state,s.business,{products:s.products,customers:s.customers,orders:s.orders,events:s.events})}
-async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo)]);applyState(s);pricing=p;myRole=me.role;myPermissions=me.permissions||[];logisticsInfo=log;updateDeliveryMethodOptions();applyRoleVisibility()}
+async function loadState(){const [s,p,me,log,b]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo),fetch("/api/brand").then(r=>r.ok?r.json():brand).catch(()=>brand)]);applyState(s);pricing=p;myRole=me.role;myPermissions=me.permissions||[];logisticsInfo=log;brand=b;updateDeliveryMethodOptions();applyRoleVisibility()}
 const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===undefined?30:raw===null?Infinity:raw};
 // Hides sidebar tabs a role has no permission to use at all - Feedback,
 // Dashboard, and AI Assistant stay visible to every role (no write
@@ -234,7 +235,7 @@ if($("oAddItem"))$("oAddItem").onclick=()=>{
   renderOrderCart();
 };
 $("orderForm").onsubmit=async e=>{e.preventDefault();const c=customer($("oCustomer").value),status=$("oStatus").value,isQuote=status==="Quote",method=$("oDeliveryMethod")?.value||"self";if(!orderCart.length)return toast("Add at least one item to the order");if(!isQuote&&state.orders.filter(o=>o.status!=="Quote").length>=orderLimit()){showPaywall();return}if(!c)return toast("Choose a customer first");if(method==="sellerspoint"&&!shipbubbleChosenQuote)return toast("Get a shipping quote first");try{const payload={items:orderCart.map(l=>({productId:l.productId,qty:l.qty})),customerId:c.id,status,deliveryMethod:method,dueDate:$("oDueDate")?.value||undefined};if(method==="sellerspoint"){payload.shipbubbleRequestToken=shipbubbleChosenQuote.requestToken;payload.shipbubbleServiceCode=shipbubbleChosenQuote.serviceCode;payload.shipbubbleCourierId=shipbubbleChosenQuote.courierId;payload.shipbubbleQuotedCost=shipbubbleChosenQuote.quotedCost}const created=await api("POST","/api/orders",payload);if(!isQuote)(created.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock-=item.qty});state.orders.unshift(created);e.target.reset();$("oQty").value=1;orderCart=[];renderOrderCart();shipbubbleChosenQuote=null;updateDeliveryFeeEstimate();render();toast(isQuote?"Quote saved":"Order created")}catch(err){toast(err.message)}};
-function updateDeliveryMethodOptions(){const opt=$("oDeliveryMethod")?.querySelector('option[value="sellerspoint"]');if(!opt)return;if(logisticsInfo.enabled){opt.disabled=false;opt.textContent="SellersPoint Logistics"}else{opt.disabled=true;opt.textContent="SellersPoint Logistics (not available yet)"}updateDeliveryFeeEstimate()}
+function updateDeliveryMethodOptions(){const opt=$("oDeliveryMethod")?.querySelector('option[value="sellerspoint"]');if(!opt)return;if(logisticsInfo.enabled){opt.disabled=false;opt.textContent=`${brand.name} Logistics`}else{opt.disabled=true;opt.textContent=`${brand.name} Logistics (not available yet)`}updateDeliveryFeeEstimate()}
 // Real shipping cost comes from a locked-in ShipBubble quote (see the
 // "Get Shipping Quote" flow above), not a synchronous flat/percent
 // estimate - there's nothing to show until the seller has actually gotten
@@ -267,7 +268,7 @@ function amountInWords(amount){
   if(kobo>0)text+=" "+numberToWords(kobo)+" Kobo";
   return text+" Only";
 }
-function watermarkHtml(text){const t=clean(text||"SellersPoint");return `<div class="receipt-watermark">${Array(48).fill(`<span>${t}</span>`).join("")}</div>`}
+function watermarkHtml(text){const t=clean(text||brand.name);return `<div class="receipt-watermark">${Array(48).fill(`<span>${t}</span>`).join("")}</div>`}
 function renderInvoice(){
   const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];
   if(!o){$("invoiceBox").textContent="Create an order first.";return}
@@ -545,7 +546,7 @@ async function shareImageViaWhatsApp(canvas,filename){const blob=await new Promi
 if($("shareInvoiceImage"))$("shareInvoiceImage").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{const canvas=await renderInvoiceCanvas();await shareImageViaWhatsApp(canvas,o.id+".png");docsSaveReceiptToVault(o,canvas)}catch(err){if(err.name!=="AbortError")toast(err.message)}};
 
 function showPaywall(){const d=$("paywall");if(d?.showModal)d.showModal();else toast("Upgrade to continue taking orders")}
-function salesPitch(){const paid=Object.values(pricing).find(t=>t.monthly>0);return "Hi, SellersPoint Beta helps sellers and service businesses manage products, services, customers, orders, invoices, stock or slots, payment links, WhatsApp messages, and AI captions in one simple app."+(paid?` ${paid.name} plan is ${money(paid.monthly)}/month.`:"")}
+function salesPitch(){const paid=Object.values(pricing).find(t=>t.monthly>0);return `Hi, ${brand.name} helps sellers and service businesses manage products, services, customers, orders, invoices, stock or slots, payment links, WhatsApp messages, and AI captions in one simple app.`+(paid?` ${paid.name} plan is ${money(paid.monthly)}/month.`:"")}
 if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();const updated=await api("PUT","/api/business",{businessName:$("sBusiness").value.trim(),businessPhone:$("sPhone").value.replace(/\D/g,""),businessAddress:$("sAddress")?.value.trim()||"",paymentDetails:$("sPayment").value.trim(),currency:$("sCurrency")?.value||state.currency,dailyDigestEnabled:$("sDailyDigest")?.checked!==false});Object.assign(state,updated);render();toast("Settings saved")}}
 if($("loyaltyForm"))$("loyaltyForm").onsubmit=async e=>{e.preventDefault();try{const updated=await api("PUT","/api/business",{loyaltyEnabled:$("loyEnabled").checked,loyaltyEarnRate:+$("loyEarnRate").value,loyaltyRedeemValue:+$("loyRedeemValue").value});Object.assign(state,updated);render();toast("Loyalty settings saved")}catch(err){toast(err.message)}};
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
@@ -601,7 +602,7 @@ function renderOnlinePaymentSection(){
   loadBanksOnce();
   const totalCutPct=state.plan==="starter"?"4%":"3%";
   if($("platformCutNote")){
-    $("platformCutNote").textContent=`SellersPoint takes ${totalCutPct} + NGN 50 per order from online payments processing${state.plan==="starter"?" on the free Starter plan - upgrade to lower this to 3%":""}. Manual bank transfer orders are never charged.`;
+    $("platformCutNote").textContent=`${brand.name} takes ${totalCutPct} + NGN 50 per order from online payments processing${state.plan==="starter"?" on the free Starter plan - upgrade to lower this to 3%":""}. Manual bank transfer orders are never charged.`;
   }
   if($("absorbFeesLabel"))$("absorbFeesLabel").textContent=`I'll absorb the ~${totalCutPct} +50 payment processing fee myself`;
   if(state.hasPaystackSubaccount){
@@ -945,7 +946,7 @@ function renderDeliveries(){
   $("deliveries").innerHTML=pending.map(o=>{
     const c=customer(o.customerId);
     const isSellerspoint=o.deliveryMethod==="sellerspoint";
-    const methodLabel=isSellerspoint?"SellersPoint Logistics":o.deliveryMethod==="rider"?"Dispatch rider":"Self / hand delivery";
+    const methodLabel=isSellerspoint?`${brand.name} Logistics`:o.deliveryMethod==="rider"?"Dispatch rider":"Self / hand delivery";
     let actions,trackingLabel="";
     if(isSellerspoint&&o.shipbubbleOrderId){
       trackingLabel=o.shipbubbleTrackingCode?` - Tracking: ${clean(o.shipbubbleTrackingCode)}`:"";
@@ -990,7 +991,7 @@ function renderSmartAlerts(){
   }
 }
 function renderBackend(){if(!$("devEvents"))return;const digitalRevenue=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>{const items=o.items&&o.items.length?o.items:[{productId:o.productId,productType:o.productType,qty:o.qty,price:o.price}];const digitalTotal=items.filter(i=>(i.productType||product(i.productId)?.type)==="Digital product").reduce((t,i)=>t+i.price*i.qty,0);return s+digitalTotal},0);const storage=Math.round((JSON.stringify(state).length/1024)*10)/10;$("devEvents").textContent=state.events.length;$("devDigitalRevenue").textContent=money(digitalRevenue);$("devSetup").textContent=setupScore()+"%";$("devStorage").textContent=storage+" KB";const checks=[["Business profile",state.businessName&&state.businessName!=="Your Business"],["Logo uploaded",state.businessLogo],["Payment configured",state.paymentDetails||state.paymentLink],["First item added",state.products.length],["First customer added",state.customers.length],["First order created",state.orders.length],["Digital delivery ready",state.products.some(p=>p.type==="Digital product"&&p.deliveryLink)]];$("checklist").innerHTML=checks.map(x=>"<div class=\"check "+(x[1]?"done":"")+"\"><b>"+(x[1]?"✓":"!")+"</b><span>"+x[0]+"</span></div>").join("");const top=bestProduct()||"No sales yet";$("devSummary").innerHTML="<div class=\"item\"><strong>Top item</strong><span class=\"meta\">"+clean(top)+"</span></div><div class=\"item\"><strong>Orders</strong><span class=\"meta\">"+state.orders.length+" total, "+state.orders.filter(o=>o.status==="Pending payment").length+" pending payment</span></div><div class=\"item\"><strong>Catalog</strong><span class=\"meta\">"+state.products.filter(p=>p.type==="Product").length+" products, "+state.products.filter(p=>p.type==="Service").length+" services, "+state.products.filter(p=>p.type==="Digital product").length+" digital products</span></div>";$("eventLog").innerHTML=state.events.slice(0,12).map(e=>"<div class=\"item\"><strong><span class=\"badge\">"+clean(e.type)+"</span> "+clean(e.detail||"")+"</strong><span class=\"meta\">"+date(e.at)+"</span></div>").join("")}
-function backendReport(){return "SellersPoint Beta report\nOrders: "+state.orders.length+"\nCustomers: "+state.customers.length+"\nItems: "+state.products.length+"\nSetup: "+setupScore()+"%\nTop item: "+(bestProduct()||"No sales yet")}
+function backendReport(){return brand.name+" report\nOrders: "+state.orders.length+"\nCustomers: "+state.customers.length+"\nItems: "+state.products.length+"\nSetup: "+setupScore()+"%\nTop item: "+(bestProduct()||"No sales yet")}
 if($("copyReport"))$("copyReport").onclick=()=>copy(backendReport());if($("exportAnalytics"))$("exportAnalytics").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({generatedAt:new Date().toISOString(),summary:backendReport(),state},null,2)],{type:"application/json"}));a.download="sellerspoint-analytics.json";a.click()};
 const renderForBackend=render;render=function(){renderForBackend();renderBackend()};
 

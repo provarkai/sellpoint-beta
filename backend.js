@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 let owner = { name: "SellersPoint", provider: "Paystack", link: "" };
+let brand = { name: "SellersPoint" };
 let businesses = [];
 let payments = [];
 let pricing = {};
@@ -33,7 +34,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, paymentConfigRes, platformAdminsRes, registrationQueueRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, paymentConfigRes, platformAdminsRes, registrationQueueRes, brandRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -46,8 +47,10 @@ async function loadAll() {
     api("GET", "/api/admin/payment-config"),
     api("GET", "/api/admin/platform-admins"),
     api("GET", "/api/admin/registration-queue"),
+    fetch("/api/brand").then((r) => (r.ok ? r.json() : brand)).catch(() => brand),
   ]);
   owner = ownerRes;
+  brand = brandRes;
   businesses = businessesRes;
   payments = paymentsRes;
   pricing = pricingRes;
@@ -246,7 +249,7 @@ document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => show(b.datas
 $("ownerPaymentForm").onsubmit = async (e) => {
   e.preventDefault();
   owner = await api("PUT", "/api/owner", { name: $("ownerName").value.trim(), provider: "Paystack", link: $("ownerLink").value.trim() });
-  toast("SellersPoint payment details saved");
+  toast(`${brand.name} payment details saved`);
   render();
 };
 $("pricingForm").onsubmit = async (e) => {
