@@ -13,19 +13,23 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "SellersPoint <onboarding@sellerspoint.app>";
 const RESEND_AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID || "";
+// Where in-app Feedback submissions get emailed to - see the /api/feedback
+// route, which sends here with Reply-To set to the submitting seller's own
+// email, so replying in your inbox goes straight back to them.
+const FEEDBACK_NOTIFY_EMAIL = process.env.FEEDBACK_NOTIFY_EMAIL || "support@sellerspoint.ng";
 
 function isConfigured() {
   return !!RESEND_API_KEY;
 }
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, replyTo }) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: RESEND_FROM_EMAIL, to, subject, html, text }),
+    body: JSON.stringify({ from: RESEND_FROM_EMAIL, to, subject, html, text, reply_to: replyTo || undefined }),
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.message || "Resend request failed");
@@ -70,4 +74,21 @@ function welcomeEmailHtml(businessName) {
 </div>`;
 }
 
-module.exports = { isConfigured, sendEmail, addToAudience, welcomeEmailHtml };
+function feedbackEmailHtml({ businessName, sellerEmail, message, rating }) {
+  const biz = String(businessName || "A business").replace(/[<>&]/g, "");
+  const from = String(sellerEmail || "unknown").replace(/[<>&]/g, "");
+  const stars = rating ? "★".repeat(rating) + "☆".repeat(5 - rating) + ` (${rating}/5)` : "No rating given";
+  const safeMessage = String(message || "").replace(/[<>&]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[m])).replace(/\n/g, "<br>");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">New feedback from ${biz}</h1>
+<p style="margin:0 0 4px;color:#647067;font-size:13px">From</p>
+<p style="margin:0 0 16px;font-weight:700">${from}</p>
+<p style="margin:0 0 4px;color:#647067;font-size:13px">Rating</p>
+<p style="margin:0 0 16px;font-weight:700">${stars}</p>
+<p style="margin:0 0 4px;color:#647067;font-size:13px">Message</p>
+<p style="margin:0;padding:14px 16px;background:#f5f7f4;border-radius:8px">${safeMessage}</p>
+<p style="margin-top:20px;color:#647067;font-size:13px">Reply to this email to respond directly to ${from}.</p>
+</div>`;
+}
+
+module.exports = { isConfigured, sendEmail, addToAudience, welcomeEmailHtml, feedbackEmailHtml, FEEDBACK_NOTIFY_EMAIL };

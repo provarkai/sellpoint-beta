@@ -1546,7 +1546,28 @@ app.get(
 app.post(
   "/api/feedback",
   requireAuth,
-  handle(async (req, res) => res.status(201).json(await db.createFeedback(req.businessId, req.body || {})))
+  handle(async (req, res) => {
+    const feedback = await db.createFeedback(req.businessId, req.body || {});
+    // Best-effort - a Resend hiccup should never block the feedback submit.
+    if (email.isConfigured()) {
+      db.getBusiness(req.businessId)
+        .then((business) =>
+          email.sendEmail({
+            to: email.FEEDBACK_NOTIFY_EMAIL,
+            replyTo: req.user.email,
+            subject: `New feedback from ${business?.businessName || "a business"}`,
+            html: email.feedbackEmailHtml({
+              businessName: business?.businessName,
+              sellerEmail: req.user.email,
+              message: feedback.message,
+              rating: feedback.rating,
+            }),
+          })
+        )
+        .catch((err) => console.error("Feedback notification email failed:", err.message));
+    }
+    res.status(201).json(feedback);
+  })
 );
 app.get(
   "/api/cashbook",
