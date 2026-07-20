@@ -1684,6 +1684,22 @@ app.post(
   })
 );
 
+// Public, no auth - powers the founder-promo countdown banner on the
+// marketing site (sellerspoint.ng, a separate WordPress origin from this
+// app), so it needs CORS opened up on just this one read-only route
+// rather than a blanket policy for the whole API. Only ever returns an
+// aggregate count and the fixed limit/deadline - nothing per-business.
+app.get(
+  "/api/founder-promo/status",
+  handle(async (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    const redeemed = await db.countFounderRedemptions();
+    const remaining = Math.max(0, pricing.FOUNDER_PROMO_LIMIT - redeemed);
+    const active = remaining > 0 && Date.now() <= new Date(pricing.FOUNDER_PROMO_DEADLINE).getTime();
+    res.json({ remaining, limit: pricing.FOUNDER_PROMO_LIMIT, deadline: pricing.FOUNDER_PROMO_DEADLINE, active });
+  })
+);
+
 // --- Payments ----------------------------------------------------------------
 
 app.post(

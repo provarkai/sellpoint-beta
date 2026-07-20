@@ -18,6 +18,10 @@ const ADDON_WHATSAPP_CREDITS = 100;
 const FOUNDER_PROMO_CODE = "FOUNDER50";
 const FOUNDER_PROMO_DEADLINE = "2026-12-31T23:59:59Z";
 const FOUNDER_DISCOUNT_RATE = 0.5;
+// Hard cap on top of the deadline - once this many businesses have
+// redeemed, the code stops working even if the deadline hasn't passed yet.
+// See db.redeemFounderCode/countFounderRedemptions.
+const FOUNDER_PROMO_LIMIT = 1000;
 
 // staffLimit/aiLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
@@ -209,4 +213,5 @@ module.exports = {
   FOUNDER_PROMO_CODE,
   FOUNDER_PROMO_DEADLINE,
   FOUNDER_DISCOUNT_RATE,
+  FOUNDER_PROMO_LIMIT,
 };

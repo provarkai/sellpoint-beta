@@ -3,7 +3,7 @@ const { Pool, types } = require("pg");
 const {
   orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
-  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE,
+  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT,
 } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
@@ -735,9 +735,24 @@ async function grantBonusProMonths(businessId, months) {
   await logEvent(businessId, "plan_upgraded", `pro (${months}mo bonus - registration package)`);
 }
 
-// The code itself stops being redeemable after FOUNDER_PROMO_DEADLINE, but
-// a business that already redeemed keeps the discount for life - the flag
-// on businesses, not the code's validity window, is what payments check.
+// First 1000 businesses only (FOUNDER_PROMO_LIMIT) - counted by the
+// founder_discount flag itself, so the cap self-enforces without a
+// separate counter table to keep in sync. Not a hard guarantee against
+// two redemptions landing in the same instant both slipping in over the
+// limit (that would need a serializable transaction or an advisory lock)
+// - the conditional UPDATE below just narrows the race window to a
+// single query instead of a separate check-then-write round trip, which
+// is enough for "roughly 1000," not a payments-grade exact cutoff.
+async function countFounderRedemptions() {
+  const { rows } = await query("SELECT COUNT(*)::int AS n FROM businesses WHERE founder_discount = true");
+  return rows[0].n;
+}
+
+// The code itself stops being redeemable after FOUNDER_PROMO_DEADLINE or
+// once FOUNDER_PROMO_LIMIT businesses have redeemed, whichever comes
+// first - but a business that already redeemed keeps the discount for
+// life either way, since the flag on businesses (not the code's ongoing
+// validity) is what payments check from that point on.
 async function redeemFounderCode(businessId, code) {
   const submitted = requireString(code, "Promo code").trim().toUpperCase();
   if (submitted !== FOUNDER_PROMO_CODE) throw new OrderError("Invalid promo code");
@@ -745,7 +760,15 @@ async function redeemFounderCode(businessId, code) {
   const business = await getBusiness(businessId);
   if (!business) throw new OrderError("Business not found");
   if (business.founderDiscount) return business;
-  await query("UPDATE businesses SET founder_discount = true WHERE id = $1", [businessId]);
+  const redeemed = await countFounderRedemptions();
+  if (redeemed >= FOUNDER_PROMO_LIMIT) throw new OrderError("All founding member spots have been claimed");
+  const { rows } = await query(
+    `UPDATE businesses SET founder_discount = true
+     WHERE id = $1 AND (SELECT COUNT(*) FROM businesses WHERE founder_discount = true) < $2
+     RETURNING id`,
+    [businessId, FOUNDER_PROMO_LIMIT]
+  );
+  if (!rows.length) throw new OrderError("All founding member spots have been claimed");
   await logEvent(businessId, "founder_discount_redeemed", "50% off for life");
   return getBusiness(businessId);
 }
@@ -3533,6 +3556,7 @@ module.exports = {
   activatePlan,
   grantBonusProMonths,
   redeemFounderCode,
+  countFounderRedemptions,
   getOrCreateReferralCode,
   rewardReferrerIfEligible,
   downgradeToStarter,
