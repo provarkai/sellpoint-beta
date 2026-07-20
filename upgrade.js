@@ -20,7 +20,8 @@ function featuresFor(key, t) {
     unlimited(t.orderLimit) ? "Unlimited orders" : t.orderLimit + " orders/month",
     unlimited(t.productLimit) ? "Unlimited products" : t.productLimit + " products",
   ];
-  if (t.staffLimit > 0) list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
+  if (t.storefront) list.push("Storefront with Facebook Pixel & Google Analytics tracking");
+  if (t.staffLimit > 0) list.push((unlimited(t.staffLimit) ? "Unlimited staff seats" : t.staffLimit + " staff seats") + " with custom permissions");
   list.push(unlimited(t.receiptLimit) ? "Unlimited free receipts" : t.receiptLimit + " free receipts/month");
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
   if (t.whatsappLimit > 0 || unlimited(t.whatsappLimit)) {
@@ -71,7 +72,9 @@ function comparisonTableHtml() {
     ["Price", (t) => (t.monthly == null ? "Custom" : t.monthly === 0 ? "Free" : money(cycle === "yearly" ? t.yearly : t.monthly) + "/" + (cycle === "yearly" ? "yr" : "mo"))],
     ["Orders", (t) => (unlimited(t.orderLimit) ? "Unlimited" : t.orderLimit + "/month")],
     ["Products", (t) => (unlimited(t.productLimit) ? "Unlimited" : t.productLimit)],
-    ["Staff", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
+    ["Storefront Pixel/GA tracking", (t) => (t.storefront ? "Included" : "-")],
+    ["Staff seats", (t) => (t.staffLimit > 0 ? (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit) : "-")],
+    ["Staff permissions", (t) => (t.staffLimit > 0 ? "Custom per-member" : "-")],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
     ["WhatsApp sends", (t) => (unlimited(t.whatsappLimit) ? "Unlimited" : t.whatsappLimit > 0 ? t.whatsappLimit + "/month" : "wa.me link only")],
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
