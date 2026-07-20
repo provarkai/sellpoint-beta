@@ -93,7 +93,7 @@ let pendingImages=[];
 function renderImagePreview(){if($("pImagePreview"))$("pImagePreview").innerHTML=pendingImages.map((src,i)=>`<div class="product-photo-thumb"><img src="${src}" alt=""><button type="button" onclick="removePendingImage(${i})">&times;</button></div>`).join("")}
 function removePendingImage(i){pendingImages.splice(i,1);renderImagePreview()}
 if($("pImage"))$("pImage").onchange=async e=>{const files=[...e.target.files].slice(0,Math.max(0,5-pendingImages.length));for(const f of files){pendingImages.push(await readFileAsDataUrl(f))}renderImagePreview();e.target.value=""};
-function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;if($("pWeight"))$("pWeight").value=p.weight??"";$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";if($("pShowInStorefront"))$("pShowInStorefront").checked=p.showInStorefront!==false;$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
+function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";if($("pCostPrice"))$("pCostPrice").value=p.costPrice??"";$("pStock").value=p.stock;if($("pWeight"))$("pWeight").value=p.weight??"";$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";if($("pShowInStorefront"))$("pShowInStorefront").checked=p.showInStorefront!==false;$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
 function cancelEditProduct(){editingProductId=null;pendingImages=[];renderImagePreview();$("productForm").reset();updateProductFields();$("pFormTitle").textContent="Add product / service";$("pSubmitBtn").textContent="Save Item";$("pCancelEdit").style.display="none"}
 if($("pCancelEdit"))$("pCancelEdit").onclick=cancelEditProduct;
 async function loadBatches(){
@@ -161,7 +161,7 @@ if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   }catch(err){toast(err.message)}
   finally{btn.disabled=false;btn.textContent="Write with AI"}
 };
-$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const weightRaw=$("pWeight")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,weight:weightRaw?+weightRaw:null,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages,showInStorefront:$("pShowInStorefront")?.checked!==false};
+$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const weightRaw=$("pWeight")?.value.trim();const costRaw=$("pCostPrice")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,costPrice:costRaw?+costRaw:null,stock:+$("pStock").value,weight:weightRaw?+weightRaw:null,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages,showInStorefront:$("pShowInStorefront")?.checked!==false};
   if(editingProductId){const updated=await api("PUT",`/api/products/${editingProductId}`,payload);const idx=state.products.findIndex(x=>x.id===editingProductId);if(idx>-1)state.products[idx]=updated;cancelEditProduct();render();toast("Item updated")}
   else{const created=await api("POST","/api/products",payload);state.products.unshift(created);e.target.reset();pendingImages=[];renderImagePreview();updateProductFields();render();toast("Item saved")}
 }catch(err){toast(err.message)}};
@@ -742,6 +742,13 @@ async function loadReports(){
     $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint("top customers"):r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
   }catch(err){toast(err.message)}
+  if($("repPlRevenue")){try{
+    const pl=await api("GET","/api/profit-loss");
+    $("repPlRevenue").textContent=money(pl.revenue);
+    $("repPlExpenses").textContent=money(pl.expensesTotal);
+    $("repPlGrossProfit").textContent=money(pl.grossProfit);
+    $("repPlNetProfit").textContent=money(pl.netProfit);
+  }catch(err){}}
   loadReportsChart(currentRepRange);
 }
 let repChartInstance=null,currentRepRange="7";
@@ -792,6 +799,7 @@ function applyMonthlyPL(pl){
   if($("mplRevenue"))$("mplRevenue").textContent=money(pl.revenue);
   if($("mplExpenses"))$("mplExpenses").textContent=money(pl.expensesTotal);
   if($("mplNetProfit"))$("mplNetProfit").textContent=money(pl.netProfit);
+  if($("mplGrossProfit"))$("mplGrossProfit").textContent=money(pl.grossProfit);
 }
 async function loadMonthlyPL(){
   if(!can("reports.read"))return;
@@ -809,7 +817,7 @@ async function loadExpensesTab(){
     if($("eCategory").options.length===0)$("eCategory").innerHTML=expenseCategories.map(c=>`<option>${clean(c)}</option>`).join("");
     $("eCount").textContent=`(${expRes.expenses.length})`;
     $("eList").innerHTML=expRes.expenses.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.description)}</strong><span>${money(e.amount)}</span></div><div class="meta">${clean(e.category)} - ${date(e.date)}</div><div class="item-actions"><button onclick="delExpense('${e.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No expenses logged yet</span></div>`;
-    $("plSummary").innerHTML=`<div class="item"><strong>Revenue</strong><span>${money(pl.revenue)}</span></div><div class="item"><strong>Expenses</strong><span>${money(pl.expensesTotal)}</span></div><div class="item"><strong>Net profit</strong><span>${money(pl.netProfit)}</span></div>`;
+    $("plSummary").innerHTML=`<div class="item"><strong>Revenue</strong><span>${money(pl.revenue)}</span></div><div class="item"><strong>Expenses</strong><span>${money(pl.expensesTotal)}</span></div><div class="item"><strong>Gross profit</strong><span>${money(pl.grossProfit)}</span></div><div class="item"><strong>Net profit</strong><span>${money(pl.netProfit)}</span></div>`;
     applyMonthlyPL(pl);
     $("plByCategory").innerHTML=pl.expensesByCategory.map(c=>`<div class="item"><strong>${clean(c.category)}</strong><span>${money(c.total)}</span></div>`).join("")||`<div class="item"><span class="meta">No expenses this month</span></div>`;
     $("cashbookSummary").innerHTML=`<div class="item"><strong>Cash in</strong><span>${money(cb.totalIn)}</span></div><div class="item"><strong>Cash out</strong><span>${money(cb.totalOut)}</span></div><div class="item"><strong>Net</strong><span>${money(cb.totalIn-cb.totalOut)}</span></div>`;
@@ -1044,13 +1052,17 @@ const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - await
 const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",filed:"pill-success"};
 const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-// Templates, Calendar, and Tax Tools are open to everyone regardless of
-// registration status; only Overview and Registration assume a registered
-// (or registering) business, so those fully redirect to the onboarding
-// gate until that's true. Trackers/Vault are locked instead by plan
-// (Starter excluded) - a separate axis, checked independently per view.
+// Templates is open to everyone regardless of registration status; only
+// Overview and Registration assume a registered (or registering)
+// business, so those fully redirect to the onboarding gate until that's
+// true. Trackers/Vault are locked by plan (Starter excluded); Calendar/
+// Tax Tools are locked by plan too, but to Pro and above - a separate
+// axis from registration, checked independently per view.
 const DOCS_GATED_VIEWS=["overview","registration"];
+const DOCS_PRO_PLANS=["pro","business","enterprise"];
 const DOCS_PREVIEW_LOCK={
+  calendar:{body:"docsCalendarBody",lock:"docsCalendarLocked",locked:()=>!DOCS_PRO_PLANS.includes(state.plan)},
+  tax:{body:"docsTaxBody",lock:"docsTaxLocked",locked:()=>!DOCS_PRO_PLANS.includes(state.plan)},
   trackers:{body:"docsTrackersBody",lock:"docsTrackersLocked",locked:()=>state.plan==="starter"},
   vault:{body:"docsVaultBody",lock:"docsVaultLocked",locked:()=>state.plan==="starter"},
 };

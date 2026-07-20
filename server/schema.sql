@@ -311,6 +311,13 @@ alter table products add column if not exists show_in_storefront boolean not nul
 -- stops being redeemable by new businesses.
 alter table businesses add column if not exists founder_discount boolean not null default false;
 
+-- What the seller paid for the item - shown only to the seller (never in
+-- storefront/customer-facing product JSON) and used to compute gross
+-- profit in reports. order_items.cost_price snapshots the product's cost
+-- at sale time, same reasoning as its existing price/product_name columns.
+alter table products add column if not exists cost_price numeric;
+alter table order_items add column if not exists cost_price numeric not null default 0;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying

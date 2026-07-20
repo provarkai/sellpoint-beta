@@ -68,14 +68,14 @@ const TIERS = {
     reportsTier: "basic", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 100, expenseLimit: 200, plHistoryDays: 180, supplierLimit: 10, poLimit: 25,
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
-    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, loyalty & wallet, 100 AI generations, and 100 automated WhatsApp sends/month",
+    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, loyalty & wallet, Trackers & Document Vault in My Docs, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
   pro: {
     name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500, branchLimit: 2,
     reportsTier: "standard", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 500, expenseLimit: 500, plHistoryDays: 365, supplierLimit: 50, poLimit: 100,
     loyaltyAvailable: true, batchLimit: 100, posLimit: 500,
-    tagline: "Everything in Growth plus 2 staff, 2 branches, suppliers, batch tracking, POS mode, 500 automated WhatsApp sends/month, and more AI generations",
+    tagline: "Everything in Growth plus 2 staff, 2 branches, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, 500 automated WhatsApp sends/month, and more AI generations",
   },
   business: {
     name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000, branchLimit: 10,

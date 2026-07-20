@@ -131,6 +131,7 @@ function toProductJson(p) {
     barcode: p.barcode || "",
     weight: p.weight != null ? Number(p.weight) : null,
     showInStorefront: p.show_in_storefront !== false,
+    costPrice: p.cost_price != null ? Number(p.cost_price) : null,
   };
 }
 function toCustomerJson(c) {
@@ -545,7 +546,7 @@ async function getCashbook(businessId, { from, to } = {}) {
 async function getProfitAndLoss(businessId, { from, to } = {}) {
   const rangeFrom = await clipHistoryFrom(businessId, from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const rangeTo = to || new Date().toISOString().slice(0, 10);
-  const [revenueRows, expenseRows, categoryRows] = await Promise.all([
+  const [revenueRows, expenseRows, categoryRows, cogsRows] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(subtotal), 0) AS revenue FROM orders
        WHERE business_id = $1 AND status IN ('Paid', 'Delivered') AND created_at::date >= $2 AND created_at::date <= $3`,
@@ -562,15 +563,27 @@ async function getProfitAndLoss(businessId, { from, to } = {}) {
        GROUP BY category ORDER BY total DESC`,
       [businessId, rangeFrom, rangeTo]
     ),
+    // Cost of goods sold - each line item's cost_price is snapshotted at
+    // sale time (see createOrder), so this stays accurate even if a
+    // product's cost changes later. Separate from expensesTotal, which is
+    // operating cost (rent, fuel, etc.), not product cost.
+    query(
+      `SELECT COALESCE(SUM(oi.cost_price * oi.qty), 0) AS total FROM order_items oi JOIN orders o ON o.id = oi.order_id
+       WHERE o.business_id = $1 AND o.status IN ('Paid', 'Delivered') AND o.created_at::date >= $2 AND o.created_at::date <= $3`,
+      [businessId, rangeFrom, rangeTo]
+    ),
   ]);
   const revenue = Number(revenueRows.rows[0].revenue);
   const expensesTotal = Number(expenseRows.rows[0].total);
+  const costOfGoodsSold = Number(cogsRows.rows[0].total);
   return {
     from: rangeFrom,
     to: rangeTo,
     revenue,
     expensesTotal,
     netProfit: revenue - expensesTotal,
+    costOfGoodsSold,
+    grossProfit: revenue - costOfGoodsSold,
     expensesByCategory: categoryRows.rows.map((r) => ({ category: r.category, total: Number(r.total) })),
   };
 }
@@ -702,16 +715,18 @@ async function activatePlan(businessId, plan, billingCycle) {
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
 }
 
-// The registration package bundles a few months of Growth as a bonus -
-// only applied if the business is still on Starter, so it can never
-// downgrade or shorten a plan that's already equal or better than Growth.
-async function grantBonusGrowthMonths(businessId, months) {
+// The registration package bundles a few months of Pro as a bonus - Pro
+// (not just Growth) because Calendar/Tax Tools require Pro, and the whole
+// point is the business can actually use them right after registering.
+// Only applied if the business is on Starter or Growth, so it can never
+// downgrade or shorten a plan that's already equal or better than Pro.
+async function grantBonusProMonths(businessId, months) {
   const business = await getBusiness(businessId);
-  if (!business || business.plan !== "starter") return;
+  if (!business || !["starter", "growth"].includes(business.plan)) return;
   const expires = new Date();
   expires.setMonth(expires.getMonth() + months);
-  await setPlan(businessId, "growth", "monthly", expires.toISOString());
-  await logEvent(businessId, "plan_upgraded", `growth (${months}mo bonus - registration package)`);
+  await setPlan(businessId, "pro", "monthly", expires.toISOString());
+  await logEvent(businessId, "plan_upgraded", `pro (${months}mo bonus - registration package)`);
 }
 
 // The code itself stops being redeemable after FOUNDER_PROMO_DEADLINE, but
@@ -1436,9 +1451,10 @@ async function createProduct(businessId, data) {
   await assertBarcodeAvailable(businessId, barcode);
   const id = uid("p");
   const weight = data.weight !== undefined && data.weight !== "" && data.weight !== null ? requireNumber(data.weight, "Weight", { min: 0 }) : null;
+  const costPrice = data.costPrice !== undefined && data.costPrice !== "" && data.costPrice !== null ? requireNumber(data.costPrice, "Cost price", { min: 0 }) : null;
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode, weight, show_in_storefront)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode, weight, show_in_storefront, cost_price)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
     [
       id,
       businessId,
@@ -1456,6 +1472,7 @@ async function createProduct(businessId, data) {
       barcode,
       weight,
       data.showInStorefront !== false,
+      costPrice,
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -1476,9 +1493,10 @@ async function updateProduct(businessId, id, data) {
   if (data.barcode !== undefined) await assertBarcodeAvailable(businessId, barcode, id);
   const weight = data.weight !== undefined ? (data.weight === "" || data.weight === null ? null : requireNumber(data.weight, "Weight", { min: 0 })) : current.weight;
   const showInStorefront = data.showInStorefront !== undefined ? data.showInStorefront !== false : current.show_in_storefront;
+  const costPrice = data.costPrice !== undefined ? (data.costPrice === "" || data.costPrice === null ? null : requireNumber(data.costPrice, "Cost price", { min: 0 })) : current.cost_price;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12, weight=$13, show_in_storefront=$14
-     WHERE id = $15 AND business_id = $16 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12, weight=$13, show_in_storefront=$14, cost_price=$15
+     WHERE id = $16 AND business_id = $17 RETURNING *`,
     [
       name,
       price,
@@ -1494,6 +1512,7 @@ async function updateProduct(businessId, id, data) {
       barcode,
       weight,
       showInStorefront,
+      costPrice,
       id,
       businessId,
     ]
@@ -2032,7 +2051,7 @@ async function createOrder(businessId, data) {
       // discount is a real selling price, not just a display label.
       const discountPrice = product.discount_price == null ? null : Number(product.discount_price);
       const sellingPrice = discountPrice != null && discountPrice < Number(product.price) ? discountPrice : Number(product.price);
-      lineItems.push({ productId: product.id, productName: product.name, productType: product.type, qty, price: sellingPrice });
+      lineItems.push({ productId: product.id, productName: product.name, productType: product.type, qty, price: sellingPrice, costPrice: Number(product.cost_price || 0) });
       subtotal += sellingPrice * qty;
     }
 
@@ -2043,8 +2062,8 @@ async function createOrder(businessId, data) {
     );
     for (const li of lineItems) {
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, product_type, qty, price) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [id, li.productId, li.productName, li.productType, li.qty, li.price]
+        `INSERT INTO order_items (order_id, product_id, product_name, product_type, qty, price, cost_price) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [id, li.productId, li.productName, li.productType, li.qty, li.price, li.costPrice]
       );
     }
     await client.query("COMMIT");
@@ -3396,7 +3415,7 @@ module.exports = {
   getState,
   updateBusiness,
   activatePlan,
-  grantBonusGrowthMonths,
+  grantBonusProMonths,
   redeemFounderCode,
   getOrCreateReferralCode,
   rewardReferrerIfEligible,

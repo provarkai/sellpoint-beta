@@ -195,9 +195,9 @@ async function finalizeIfSuccessful(txData) {
     });
     if (isNew) {
       await db.recordAddonPurchase(businessId, metadata.addonType);
-      // The registration package bundles 3 months of Growth - see
-      // db.grantBonusGrowthMonths for why it only applies on Starter.
-      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusGrowthMonths(businessId, 4);
+      // The registration package bundles 3 months of Pro - see
+      // db.grantBonusProMonths for why it only applies on Starter/Growth.
+      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusProMonths(businessId, 3);
     }
     return isNew;
   }
