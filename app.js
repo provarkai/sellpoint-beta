@@ -79,7 +79,7 @@ function render(){
   if($("msmCustomers"))$("msmCustomers").textContent=state.customers.filter(c=>c.createdAt&&isThisMonth(c.createdAt)).length;
   if($("msmAbandoned"))$("msmAbandoned").textContent=pending;
   renderActivationChecklist();
-  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item-line"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</span><span class="il-amount">${money(total(o))}</span><span class="il-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind</button></span></div>`}).join("")}
+  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item-line"><div class="il-top"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-amount">${money(total(o))}</span></div><div class="il-meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</div><div class="il-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind</button></div></div>`}).join("")}
   renderDeliveries();
   renderSmartAlerts();
   renderShipbubbleStatus();
@@ -948,7 +948,7 @@ function renderDeliveries(){
     }else{
       actions=`<button onclick="setOrderStatus('${o.id}','Delivered')">Mark Delivered</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>`;
     }
-    return `<div class="item-line"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-meta">${clean(orderItemsText(o))} - ${clean(methodLabel)}${trackingLabel} - ${date(o.createdAt)}</span><span class="il-amount">${money(total(o))}</span><span class="il-actions">${actions}</span></div>`;
+    return `<div class="item-line"><div class="il-top"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-amount">${money(total(o))}</span></div><div class="il-meta">${clean(orderItemsText(o))} - ${clean(methodLabel)}${trackingLabel} - ${date(o.createdAt)}</div><div class="il-actions">${actions}</div></div>`;
   }).join("");
 }
 function renderSmartAlerts(){
