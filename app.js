@@ -551,7 +551,7 @@ if($("loyaltyForm"))$("loyaltyForm").onsubmit=async e=>{e.preventDefault();try{c
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
 if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to Starter now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to Starter")}catch(err){toast(err.message)}};
-const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("sCurrency"))$("sCurrency").value=state.currency||"NGN";if($("sDailyDigest"))$("sDailyDigest").checked=state.dailyDigestEnabled!==false}if($("loyEnabled")){$("loyEnabled").checked=!!state.loyaltyEnabled;$("loyEarnRate").value=state.loyaltyEarnRate??1;$("loyRedeemValue").value=state.loyaltyRedeemValue??1}renderProfile();renderTeamVisibility();renderBranchesVisibility();renderStorefrontSection();renderReferralSection();renderAuditLogSection()};
+const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("sCurrency"))$("sCurrency").value=state.currency||"NGN";if($("sDailyDigest"))$("sDailyDigest").checked=state.dailyDigestEnabled!==false}if($("loyEnabled")){$("loyEnabled").checked=!!state.loyaltyEnabled;$("loyEarnRate").value=state.loyaltyEarnRate??1;$("loyRedeemValue").value=state.loyaltyRedeemValue??1}renderProfile();renderTeamVisibility();renderStorefrontSection();renderReferralSection();renderAuditLogSection()};
 
 function renderStorefrontSection(){
   if($("dashStoreLink")){
@@ -579,6 +579,8 @@ function renderStorefrontSection(){
   if($("socialFacebook"))$("socialFacebook").value=social.facebook||"";
   if($("socialTiktok"))$("socialTiktok").value=social.tiktok||"";
   if($("socialX"))$("socialX").value=social.x||"";
+  if($("storefrontFbPixel"))$("storefrontFbPixel").value=state.facebookPixelId||"";
+  if($("storefrontGaId"))$("storefrontGaId").value=state.googleAnalyticsId||"";
   renderOnlinePaymentSection();
   renderCouponsSection();
 }
@@ -645,7 +647,7 @@ if($("paymentModeForm"))$("paymentModeForm").onsubmit=async e=>{
 };
 if($("copyStoreUrl"))$("copyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
 if($("dashCopyStoreUrl"))$("dashCopyStoreUrl").onclick=()=>{copy(`${location.origin}/store/${state.slug||""}`)};
-if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
+if($("storefrontForm"))$("storefrontForm").onsubmit=async e=>{e.preventDefault();try{const file=$("storefrontBannerInput")?.files?.[0];const banner=file?await readFileAsDataUrl(file):undefined;const payload={enabled:$("storefrontEnabled").checked,slug:$("storefrontSlug").value.trim(),whyBuyText:$("storefrontWhyBuy")?.value.trim()||"",facebookPixelId:$("storefrontFbPixel")?.value.trim()||"",googleAnalyticsId:$("storefrontGaId")?.value.trim()||"",socialLinks:{instagram:$("socialInstagram").value.trim(),facebook:$("socialFacebook").value.trim(),tiktok:$("socialTiktok").value.trim(),x:$("socialX").value.trim()}};if(banner!==undefined)payload.banner=banner;const updated=await api("PUT","/api/business/storefront",payload);Object.assign(state,updated);render();toast("Storefront settings saved")}catch(err){toast(err.message)}};
 
 let referralLinkLoaded=false;
 async function renderReferralSection(){
@@ -877,8 +879,30 @@ function renderTeamVisibility(){
   $("teamSection").style.display=can("staff.manage")?"block":"none";
   if(can("staff.manage"))loadTeam();
 }
-const ROLE_LABELS={manager:"Manager",sales_staff:"Sales Staff",accountant:"Accountant"};
-const ROLE_OPTIONS=Object.entries(ROLE_LABELS).map(([v,label])=>`<option value="${v}">${label}</option>`).join("");
+const ROLE_LABELS={manager:"Manager",sales_staff:"Sales Staff",accountant:"Accountant",custom:"Team Member"};
+// Mirrors server/roles.js's ASSIGNABLE_PERMISSIONS/PERMISSION_PRESETS -
+// enforcement lives server-side, this is just for rendering the checkbox
+// grid and the quick-fill preset buttons.
+const PERMISSION_DEFS=[["products.write","Products"],["customers.write","Customers"],["orders.write","Orders"],["pos.use","POS"],["invoices.use","Invoices"],["expenses.write","Expenses"],["reports.read","Reports"],["suppliers.write","Suppliers"],["campaigns.send","Campaigns"],["coupons.manage","Coupons"],["logistics.manage","Logistics"],["settings.write","Settings"],["docs.manage","My Docs"]];
+const PERMISSION_PRESETS={manager:["products.write","customers.write","orders.write","pos.use","invoices.use","expenses.write","reports.read","suppliers.write","campaigns.send","coupons.manage","logistics.manage","settings.write","docs.manage"],sales_staff:["customers.write","orders.write","pos.use","invoices.use"],accountant:["reports.read","expenses.write","invoices.use"]};
+const presetButtonsHtml=`<div class="permission-presets"><button type="button" data-preset="manager">Manager</button><button type="button" data-preset="sales_staff">Sales Staff</button><button type="button" data-preset="accountant">Accountant</button><button type="button" data-preset="">Clear all</button></div>`;
+function permissionCheckboxesHtml(checked){const set=new Set(checked||[]);return PERMISSION_DEFS.map(([key,label])=>`<label><input type="checkbox" data-perm="${key}" ${set.has(key)?"checked":""}> ${label}</label>`).join("")}
+function readCheckedPermissions(scopeEl){return scopeEl?[...scopeEl.querySelectorAll("[data-perm]:checked")].map(cb=>cb.dataset.perm):[]}
+function permissionSummary(perms){return `${(perms||[]).length}/${PERMISSION_DEFS.length} permissions`}
+// Single delegated listener (not rewired per loadTeam() re-render) - any
+// [data-preset] button just pre-checks its matching preset's boxes in the
+// checkbox-grid immediately after it (invite form and every staff row both
+// follow that same presets-div-then-grid-div markup order).
+document.addEventListener("click",e=>{
+  const btn=e.target.closest("[data-preset]");
+  if(!btn)return;
+  e.preventDefault();
+  const grid=btn.closest(".permission-presets")?.nextElementSibling;
+  if(!grid||!grid.classList.contains("checkbox-grid"))return;
+  const set=new Set(PERMISSION_PRESETS[btn.dataset.preset]||[]);
+  grid.querySelectorAll("[data-perm]").forEach(cb=>{cb.checked=set.has(cb.dataset.perm)});
+});
+if($("invitePermissions"))$("invitePermissions").innerHTML=permissionCheckboxesHtml([]);
 async function loadTeam(){
   try{
     const roster=await api("GET","/api/staff");
@@ -887,31 +911,14 @@ async function loadTeam(){
     $("teamCount").textContent=`${roster.staff.length}/${limit} staff`;
     $("teamLimitNote").innerHTML=rawLimit===0?`Your plan doesn't include staff seats. <a href="upgrade.html#addonCards">Buy a staff seat for ₦2,000</a> without upgrading your whole plan, or move to Pro for 3 included.`:`You can invite up to ${limit} staff member(s).`;
     $("inviteForm").style.display=rawLimit===0?"none":"grid";
-    const rows=[...roster.staff.map(s=>`<div class="item"><strong>${clean(s.email)}</strong><select onchange="changeStaffRole('${s.userId}',this.value)">${ROLE_OPTIONS.replace(`value="${s.role}"`,`value="${s.role}" selected`)}</select><div class="item-actions"><button onclick="removeStaffMember('${s.userId}')">Remove</button></div></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending - ${ROLE_LABELS[i.role]||i.role}</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
+    const rows=[...roster.staff.map(s=>`<div class="item"><details class="staff-permission-summary"><summary><strong>${clean(s.email)}</strong> <span class="meta">${permissionSummary(s.permissions)}</span></summary>${presetButtonsHtml}<div class="checkbox-grid" data-member="${s.userId}">${permissionCheckboxesHtml(s.permissions)}</div><div class="item-actions"><button type="button" onclick="saveStaffPermissions('${s.userId}')">Save</button><button type="button" onclick="removeStaffMember('${s.userId}')">Remove</button></div></details></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending - ${permissionSummary(i.permissions)}</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
     $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;
   }catch(err){toast(err.message)}
 }
 async function removeStaffMember(userId){await api("DELETE",`/api/staff/${userId}`);loadTeam()}
 async function revokeStaffInvite(email){await api("DELETE",`/api/staff/invites/${encodeURIComponent(email)}`);loadTeam()}
-async function changeStaffRole(userId,role){try{await api("PATCH",`/api/staff/${userId}/role`,{role});loadTeam();toast("Role updated")}catch(err){toast(err.message)}}
-if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim(),role:$("inviteRole").value});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
-
-function renderBranchesVisibility(){
-  if(!$("branchesSection"))return;
-  $("branchesSection").style.display=can("settings.write")?"block":"none";
-  if(can("settings.write"))loadBranches();
-}
-async function loadBranches(){
-  try{
-    const{branches,limit:rawLimit}=await api("GET","/api/branches");
-    const limit=rawLimit===null||rawLimit===undefined?Infinity:rawLimit;
-    $("branchCount").textContent=`${branches.length}/${limit===Infinity?"unlimited":limit} branches used`;
-    if($("branchForm"))$("branchForm").style.display=branches.length>=limit?"none":"grid";
-    $("branchList").innerHTML=branches.map(b=>`<div class="item"><strong>${clean(b.name)}</strong><span class="meta">${clean(b.address||"No address")}</span><div class="item-actions"><button onclick="deleteBranch('${b.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No branches yet</span></div>`;
-  }catch(err){toast(err.message)}
-}
-async function deleteBranch(id){await api("DELETE",`/api/branches/${id}`);loadBranches()}
-if($("branchForm"))$("branchForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/branches",{name:$("branchName").value.trim(),address:$("branchAddress").value.trim()});e.target.reset();loadBranches();toast("Branch added")}catch(err){toast(err.message)}};
+async function saveStaffPermissions(userId){try{const grid=document.querySelector(`.checkbox-grid[data-member="${userId}"]`);await api("PATCH",`/api/staff/${userId}/permissions`,{permissions:readCheckedPermissions(grid)});loadTeam();toast("Permissions updated")}catch(err){toast(err.message)}}
+if($("inviteForm"))$("inviteForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/staff/invite",{email:$("inviteEmail").value.trim(),permissions:readCheckedPermissions($("invitePermissions"))});e.target.reset();loadTeam();toast("Invite sent")}catch(err){toast(err.message)}};
 
 if($("sLogo"))$("sLogo").onchange=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{const updated=await api("PUT","/api/business",{businessLogo:reader.result});Object.assign(state,updated);render();toast("Logo saved")};reader.readAsDataURL(file)};
 

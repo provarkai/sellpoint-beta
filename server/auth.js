@@ -41,19 +41,20 @@ function requireAuth(req, res, next) {
       if (!membership) return res.status(403).json({ error: "No business associated with this account" });
       req.businessId = membership.businessId;
       req.role = membership.role;
+      req.permissions = membership.permissions;
       next();
     })
     .catch(next);
 }
 
-// Mount after requireAuth (needs req.role already set). Owner always
-// passes; other roles need `key` in their ROLE_PERMISSIONS set (see
-// server/roles.js) - this is the single enforcement point that replaces
-// the old scattered `if (req.role !== "owner") return res.status(403)...`
-// checks previously inline in each route.
+// Mount after requireAuth (needs req.role/req.permissions already set).
+// Owner always passes; other roles need `key` in their own custom
+// permissions array (see server/roles.js) - this is the single enforcement
+// point that replaces the old scattered `if (req.role !== "owner") return
+// res.status(403)...` checks previously inline in each route.
 function requirePermission(key) {
   return (req, res, next) => {
-    if (!hasPermission(req.role, key)) return res.status(403).json({ error: "You don't have permission to do that" });
+    if (!hasPermission(req.role, req.permissions, key)) return res.status(403).json({ error: "You don't have permission to do that" });
     next();
   };
 }

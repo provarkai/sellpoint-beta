@@ -3,11 +3,11 @@ const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 // A-la-carte add-ons (see /api/addons/purchase). "ai_credits" grants
 // ADDON_AI_CREDITS extra AI generations for the calendar month purchased in;
 // "whatsapp_credits" grants ADDON_WHATSAPP_CREDITS extra automated WhatsApp
-// sends for the calendar month purchased in; "staff" and "branch" grant one
-// extra seat/branch permanently. Prices differ per type (WhatsApp costs the
-// platform real money per send, priced lower to stay a genuine top-up
-// rather than a second subscription) - see ADDON_PRICES.
-const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, branch: 2000, registration_package: 80000, bn_registration_package: 40000 };
+// sends for the calendar month purchased in; "staff" grants one extra seat
+// permanently. Prices differ per type (WhatsApp costs the platform real
+// money per send, priced lower to stay a genuine top-up rather than a
+// second subscription) - see ADDON_PRICES.
+const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, registration_package: 80000, bn_registration_package: 40000 };
 const ADDON_AI_CREDITS = 500;
 const ADDON_WHATSAPP_CREDITS = 100;
 
@@ -19,7 +19,7 @@ const FOUNDER_PROMO_CODE = "FOUNDER50";
 const FOUNDER_PROMO_DEADLINE = "2026-12-31T23:59:59Z";
 const FOUNDER_DISCOUNT_RATE = 0.5;
 
-// staffLimit/aiLimit/branchLimit/productLimit/reportsTier are what actually
+// staffLimit/aiLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
 // enforcement) - this is the fix for the gap flagged in CLAUDE.md's pricing
 // strategy section.
@@ -28,8 +28,6 @@ const FOUNDER_DISCOUNT_RATE = 0.5;
 // lead-magnet tool, not tied to the orders/invoicing flow, so it's
 // unlimited on every tier including Starter rather than being a paywall
 // lever at all.
-// branchLimit is the number of branches allowed beyond the business's main
-// location (0 = single location only).
 // reportsTier is "none"/"basic"/"standard"/"advanced" - see db.js#getReports
 // for what each level actually includes.
 // storefront: every tier gets a public catalog page (/store/<slug>) - see
@@ -54,38 +52,38 @@ const FOUNDER_DISCOUNT_RATE = 0.5;
 // business's own on/off choice once the plan allows it.
 // batchLimit/posLimit are monthly counts for batch/lot tracking and POS
 // sales; 0 means the feature is unavailable on that tier, matching item 8's
-// own CLAUDE.md framing as serving larger/multi-branch businesses first.
+// own CLAUDE.md framing as serving larger businesses first.
 const TIERS = {
   starter: {
-    name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10, branchLimit: 0,
+    name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10,
     reportsTier: "none", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 2, poLimit: 5,
     loyaltyAvailable: false, batchLimit: 0, posLimit: 0,
     tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, unlimited free receipts, a public storefront, and manual WhatsApp messaging",
   },
   growth: {
-    name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 100, branchLimit: 0,
+    name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 100,
     reportsTier: "basic", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 100, expenseLimit: 200, plHistoryDays: 180, supplierLimit: 10, poLimit: 25,
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
     tagline: "Unlimited orders, 30 products, branded invoices, a public storefront, loyalty & wallet, Trackers & Document Vault in My Docs, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
   pro: {
-    name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500, branchLimit: 2,
+    name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500,
     reportsTier: "standard", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 500, expenseLimit: 500, plHistoryDays: 365, supplierLimit: 50, poLimit: 100,
     loyaltyAvailable: true, batchLimit: 100, posLimit: 500,
-    tagline: "Everything in Growth plus 2 staff, 2 branches, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, 500 automated WhatsApp sends/month, and more AI generations",
+    tagline: "Everything in Growth plus 2 staff, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, 500 automated WhatsApp sends/month, and more AI generations",
   },
   business: {
-    name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000, branchLimit: 10,
+    name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000,
     reportsTier: "advanced", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 1000, expenseLimit: Infinity, plHistoryDays: Infinity, supplierLimit: Infinity, poLimit: Infinity,
     loyaltyAvailable: true, batchLimit: Infinity, posLimit: Infinity,
-    tagline: "Everything in Pro plus up to 10 staff, 10 branches, 1,000 automated WhatsApp sends/month, and advanced reports",
+    tagline: "Everything in Pro plus up to 10 staff, 1,000 automated WhatsApp sends/month, and advanced reports",
   },
   enterprise: {
-    name: "Enterprise", monthly: null, orderLimit: Infinity, productLimit: Infinity, staffLimit: Infinity, aiLimit: Infinity, branchLimit: Infinity,
+    name: "Enterprise", monthly: null, orderLimit: Infinity, productLimit: Infinity, staffLimit: Infinity, aiLimit: Infinity,
     reportsTier: "advanced", receiptLimit: Infinity, storefront: true,
     whatsappLimit: Infinity, expenseLimit: Infinity, plHistoryDays: Infinity, supplierLimit: Infinity, poLimit: Infinity,
     loyaltyAvailable: true, batchLimit: Infinity, posLimit: Infinity,
@@ -138,10 +136,6 @@ function staffLimitFor(plan) {
 
 function aiLimitFor(plan) {
   return PRICING[plan]?.aiLimit ?? PRICING.starter.aiLimit;
-}
-
-function branchLimitFor(plan) {
-  return PRICING[plan]?.branchLimit ?? PRICING.starter.branchLimit;
 }
 
 function reportsTierFor(plan) {
@@ -197,7 +191,6 @@ module.exports = {
   productLimitFor,
   staffLimitFor,
   aiLimitFor,
-  branchLimitFor,
   reportsTierFor,
   receiptLimitFor,
   storefrontEnabledFor,

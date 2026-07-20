@@ -102,6 +102,37 @@ create index if not exists business_invites_email_idx on business_invites(lower(
 alter table business_invites add column if not exists role text not null default 'manager'
   check (role in ('manager', 'sales_staff', 'accountant'));
 
+-- Widened again: fixed roles replaced with custom per-member permissions
+-- (see server/roles.js's ASSIGNABLE_PERMISSIONS) - the owner now ticks
+-- individual capabilities per team member instead of picking one of 3
+-- presets. `role` stays as a display label only (the matching preset name,
+-- or 'custom' once hand-edited away from one) - enforcement reads
+-- `permissions` exclusively now. Backfill gives every existing member/
+-- invite exactly what their current role already granted, so nobody's
+-- access changes on deploy - same "nobody's access silently shrinks"
+-- principle as the migration above.
+alter table business_members add column if not exists permissions text[] not null default '{}';
+alter table business_invites add column if not exists permissions text[] not null default '{}';
+alter table business_members drop constraint if exists business_members_role_check;
+alter table business_members add constraint business_members_role_check
+  check (role in ('owner', 'manager', 'sales_staff', 'accountant', 'custom'));
+alter table business_invites drop constraint if exists business_invites_role_check;
+alter table business_invites add constraint business_invites_role_check
+  check (role in ('manager', 'sales_staff', 'accountant', 'custom'));
+
+update business_members set permissions = ARRAY['products.write','customers.write','orders.write','pos.use','invoices.use','expenses.write','reports.read','suppliers.write','campaigns.send','coupons.manage','logistics.manage','settings.write','docs.manage']
+  where role = 'manager' and permissions = '{}';
+update business_members set permissions = ARRAY['customers.write','orders.write','pos.use','invoices.use']
+  where role = 'sales_staff' and permissions = '{}';
+update business_members set permissions = ARRAY['reports.read','expenses.write','invoices.use']
+  where role = 'accountant' and permissions = '{}';
+update business_invites set permissions = ARRAY['products.write','customers.write','orders.write','pos.use','invoices.use','expenses.write','reports.read','suppliers.write','campaigns.send','coupons.manage','logistics.manage','settings.write','docs.manage']
+  where role = 'manager' and permissions = '{}';
+update business_invites set permissions = ARRAY['customers.write','orders.write','pos.use','invoices.use']
+  where role = 'sales_staff' and permissions = '{}';
+update business_invites set permissions = ARRAY['reports.read','expenses.write','invoices.use']
+  where role = 'accountant' and permissions = '{}';
+
 -- One named location per business. Deliberately lightweight today: a
 -- label + address only, not yet a scoping key on products/orders/inventory -
 -- see CLAUDE_HANDOFF.md for what a real multi-branch data model would need.
@@ -444,6 +475,12 @@ create table if not exists platform_admins (
 -- storefront - the seller's own claims about themselves, not numbers the
 -- app invents.
 alter table businesses add column if not exists why_buy_text text not null default '';
+
+-- Per-business Facebook Pixel / Google Analytics IDs, injected into the
+-- public storefront (store.js) when set. Optional - an empty string means
+-- that tracking script is simply not injected.
+alter table businesses add column if not exists facebook_pixel_id text not null default '';
+alter table businesses add column if not exists google_analytics_id text not null default '';
 
 -- SellersPoint Logistics (item 7): platform-run delivery as a third
 -- deliveryMethod option alongside a seller's own self/rider arrangements.

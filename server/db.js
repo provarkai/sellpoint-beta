@@ -1,12 +1,13 @@
 const crypto = require("crypto");
 const { Pool, types } = require("pg");
 const {
-  orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor,
+  orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
   ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE,
 } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
+const { filterAssignablePermissions, roleLabelForPermissions } = require("./roles");
 
 // By default node-postgres parses `date` columns (OID 1082) into a JS Date
 // at local-server-midnight, which shifts to the previous/next day once
@@ -87,6 +88,8 @@ function toBusinessJson(b) {
     storefrontBanner: b.storefront_banner,
     socialLinks: b.social_links || {},
     whyBuyText: b.why_buy_text || "",
+    facebookPixelId: b.facebook_pixel_id || "",
+    googleAnalyticsId: b.google_analytics_id || "",
     paymentMode: b.payment_mode || "manual",
     absorbFees: !!b.absorb_fees,
     hasPaystackSubaccount: !!b.paystack_subaccount_code,
@@ -213,10 +216,10 @@ async function logEvent(businessId, type, detail = "") {
 
 async function getMembership(userId) {
   const { rows } = await query(
-    `SELECT m.business_id, m.role FROM business_members m WHERE m.user_id = $1`,
+    `SELECT m.business_id, m.role, m.permissions FROM business_members m WHERE m.user_id = $1`,
     [userId]
   );
-  return rows[0] ? { businessId: rows[0].business_id, role: rows[0].role } : null;
+  return rows[0] ? { businessId: rows[0].business_id, role: rows[0].role, permissions: rows[0].permissions || [] } : null;
 }
 
 async function createBusiness(userId, fields, email) {
@@ -234,8 +237,8 @@ async function createBusiness(userId, fields, email) {
     if (invite) {
       const { rows: businessRows } = await client.query("SELECT * FROM businesses WHERE id = $1", [invite.business_id]);
       await client.query(
-        `INSERT INTO business_members (business_id, user_id, email, role) VALUES ($1, $2, $3, $4)`,
-        [invite.business_id, userId, email, invite.role]
+        `INSERT INTO business_members (business_id, user_id, email, role, permissions) VALUES ($1, $2, $3, $4, $5)`,
+        [invite.business_id, userId, email, invite.role, invite.permissions || []]
       );
       await client.query("DELETE FROM business_invites WHERE id = $1", [invite.id]);
       await client.query("COMMIT");
@@ -818,7 +821,7 @@ async function downgradeToStarter(businessId) {
 // anything be stashed in social_links, unbounded.
 const SOCIAL_KEYS = ["instagram", "facebook", "tiktok", "x", "whatsapp"];
 
-async function updateStorefrontSettings(businessId, { enabled, slug, banner, socialLinks, whyBuyText }) {
+async function updateStorefrontSettings(businessId, { enabled, slug, banner, socialLinks, whyBuyText, facebookPixelId, googleAnalyticsId }) {
   const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
   const current = rows[0];
   if (!current) throw new OrderError("Business not found");
@@ -841,9 +844,11 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
     );
   }
   const nextWhyBuy = whyBuyText !== undefined ? String(whyBuyText).slice(0, 2000) : current.why_buy_text;
+  const nextPixelId = facebookPixelId !== undefined ? String(facebookPixelId).trim().slice(0, 64) : current.facebook_pixel_id;
+  const nextGaId = googleAnalyticsId !== undefined ? String(googleAnalyticsId).trim().slice(0, 64) : current.google_analytics_id;
   const { rows: updated } = await query(
-    "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4, why_buy_text=$5 WHERE id = $6 RETURNING *",
-    [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), nextWhyBuy, businessId]
+    "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4, why_buy_text=$5, facebook_pixel_id=$6, google_analytics_id=$7 WHERE id = $8 RETURNING *",
+    [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), nextWhyBuy, nextPixelId, nextGaId, businessId]
   );
   return toBusinessJson(updated[0]);
 }
@@ -889,6 +894,8 @@ async function getStorefront(slug) {
     memberSince: business.created_at,
     completedOrders: completedRows[0].n,
     whyBuyText: business.why_buy_text || "",
+    facebookPixelId: business.facebook_pixel_id || "",
+    googleAnalyticsId: business.google_analytics_id || "",
     onlinePaymentEnabled: business.payment_mode === "paystack" && !!business.paystack_subaccount_code,
     shippingAvailable,
     shippingMarkup,
@@ -1220,11 +1227,6 @@ async function getAddonSeatBonus(businessId) {
   return rows[0].n;
 }
 
-async function getAddonBranchBonus(businessId) {
-  const { rows } = await query("SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'branch'", [businessId]);
-  return rows[0].n;
-}
-
 async function hasPurchasedRegistrationPackage(businessId) {
   const { rows } = await query(
     "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type IN ('registration_package','bn_registration_package')",
@@ -1236,13 +1238,11 @@ async function hasPurchasedRegistrationPackage(businessId) {
 // --- Staff seats --------------------------------------------------------
 
 function toStaffJson(m) {
-  return { userId: m.user_id, email: m.email, role: m.role, createdAt: m.created_at };
+  return { userId: m.user_id, email: m.email, role: m.role, permissions: m.permissions || [], createdAt: m.created_at };
 }
 function toInviteJson(i) {
-  return { id: i.id, email: i.email, role: i.role, createdAt: i.created_at };
+  return { id: i.id, email: i.email, role: i.role, permissions: i.permissions || [], createdAt: i.created_at };
 }
-
-const NON_OWNER_ROLES = ["manager", "sales_staff", "accountant"];
 
 async function listStaff(businessId) {
   const [members, invites] = await Promise.all([
@@ -1251,7 +1251,7 @@ async function listStaff(businessId) {
   ]);
   return {
     owner: members.rows.filter((m) => m.role === "owner").map(toStaffJson)[0] || null,
-    staff: members.rows.filter((m) => NON_OWNER_ROLES.includes(m.role)).map(toStaffJson),
+    staff: members.rows.filter((m) => m.role !== "owner").map(toStaffJson),
     invites: invites.rows.map(toInviteJson),
   };
 }
@@ -1262,9 +1262,10 @@ async function effectiveStaffLimit(businessId) {
   return base === Infinity ? base : base + (await getAddonSeatBonus(businessId));
 }
 
-async function inviteStaff(businessId, email, role) {
+async function inviteStaff(businessId, email, permissions) {
   const clean = requireString(email, "Email").toLowerCase();
-  if (!NON_OWNER_ROLES.includes(role)) throw new OrderError("Role must be manager, sales_staff, or accountant");
+  const grantedPermissions = filterAssignablePermissions(permissions);
+  const role = roleLabelForPermissions(grantedPermissions);
   const limit = await effectiveStaffLimit(businessId);
   const { staff } = await listStaff(businessId);
   if (staff.length >= limit) throw new OrderError("Staff seat limit reached for the current plan");
@@ -1274,8 +1275,8 @@ async function inviteStaff(businessId, email, role) {
   );
   if (existing.rows.length) throw new OrderError("This person is already on your team");
   await query(
-    "INSERT INTO business_invites (business_id, email, role) VALUES ($1, $2, $3) ON CONFLICT (business_id, email) DO UPDATE SET role = excluded.role",
-    [businessId, clean, role]
+    "INSERT INTO business_invites (business_id, email, role, permissions) VALUES ($1, $2, $3, $4) ON CONFLICT (business_id, email) DO UPDATE SET role = excluded.role, permissions = excluded.permissions",
+    [businessId, clean, role, grantedPermissions]
   );
   return listStaff(businessId);
 }
@@ -1285,11 +1286,12 @@ async function revokeInvite(businessId, email) {
   return listStaff(businessId);
 }
 
-async function updateStaffRole(businessId, userId, role) {
-  if (!NON_OWNER_ROLES.includes(role)) throw new OrderError("Role must be manager, sales_staff, or accountant");
+async function updateStaffPermissions(businessId, userId, permissions) {
+  const grantedPermissions = filterAssignablePermissions(permissions);
+  const role = roleLabelForPermissions(grantedPermissions);
   const { rows } = await query(
-    "UPDATE business_members SET role = $1 WHERE business_id = $2 AND user_id = $3 AND role != 'owner' RETURNING *",
-    [role, businessId, userId]
+    "UPDATE business_members SET role = $1, permissions = $2 WHERE business_id = $3 AND user_id = $4 AND role != 'owner' RETURNING *",
+    [role, grantedPermissions, businessId, userId]
   );
   if (!rows[0]) throw new OrderError("Team member not found");
   return listStaff(businessId);
@@ -1370,39 +1372,6 @@ async function incrementReceiptUsage(businessId) {
   return used + 1;
 }
 
-// --- Branches (Pro: 1, Business: 20, plus purchasable add-ons) -------------
-
-function toBranchJson(b) {
-  return { id: b.id, name: b.name, address: b.address, createdAt: b.created_at };
-}
-
-async function listBranches(businessId) {
-  const { rows } = await query("SELECT * FROM branches WHERE business_id = $1 ORDER BY created_at", [businessId]);
-  return rows.map(toBranchJson);
-}
-
-async function effectiveBranchLimit(businessId) {
-  const { rows: businessRows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
-  const base = branchLimitFor(effectivePlan(businessRows[0]));
-  return base === Infinity ? base : base + (await getAddonBranchBonus(businessId));
-}
-
-async function createBranch(businessId, data) {
-  const limit = await effectiveBranchLimit(businessId);
-  const existing = await listBranches(businessId);
-  if (existing.length >= limit) throw new OrderError("Branch limit reached for the current plan");
-  const name = requireString(data.name, "Branch name");
-  const { rows } = await query(
-    "INSERT INTO branches (business_id, name, address) VALUES ($1, $2, $3) RETURNING *",
-    [businessId, name, data.address || ""]
-  );
-  await logEvent(businessId, "branch_created", name);
-  return toBranchJson(rows[0]);
-}
-
-async function deleteBranch(businessId, id) {
-  await query("DELETE FROM branches WHERE id = $1 AND business_id = $2", [id, businessId]);
-}
 
 // --- Products / customers ------------------------------------------------
 
@@ -2369,7 +2338,7 @@ async function listAllAuditLog(limit = 100) {
 
 // --- Platform-admin (cross-tenant) -------------------------------------------
 
-// Everything under a business (products/customers/orders/branches/staff/
+// Everything under a business (products/customers/orders/staff/
 // invites/usage counters/payments) cascades via "on delete cascade" FKs -
 // this is deliberately just the one statement. Returns the member user_ids
 // first so the caller (server/index.js, which has the Supabase admin
@@ -3041,14 +3010,14 @@ async function notifyCustomerOrderConfirmation(orderId, buyerEmail, emailClient)
   }
 }
 
-async function notifyStaffInvite(businessId, inviteEmail, role, emailClient) {
+async function notifyStaffInvite(businessId, inviteEmail, emailClient) {
   if (!emailClient.isConfigured()) return;
   try {
     const business = await getBusiness(businessId);
     await emailClient.sendEmail({
       to: inviteEmail,
       subject: `You've been invited to join ${business?.businessName || "a business"} on SellersPoint`,
-      html: emailClient.staffInviteEmailHtml({ businessName: business?.businessName, role }),
+      html: emailClient.staffInviteEmailHtml({ businessName: business?.businessName }),
     });
   } catch (err) {
     console.error("Staff invite email failed:", err.message);
@@ -3646,7 +3615,7 @@ module.exports = {
   listStaff,
   inviteStaff,
   revokeInvite,
-  updateStaffRole,
+  updateStaffPermissions,
   removeStaff,
   effectiveStaffLimit,
   getAiUsage,
@@ -3656,10 +3625,6 @@ module.exports = {
   effectiveWhatsAppLimit,
   getReceiptUsage,
   incrementReceiptUsage,
-  listBranches,
-  createBranch,
-  deleteBranch,
-  effectiveBranchLimit,
   getReports,
   getReportsChart,
   recordAddonPurchase,

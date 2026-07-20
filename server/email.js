@@ -186,12 +186,11 @@ ${orderItemsTableHtml(items, currency)}
 // pending-invite check) - it doesn't yet cover someone who already owns a
 // different SellersPoint business, which is a real gap but a separate one
 // from just getting the invite email out.
-function staffInviteEmailHtml({ businessName, role }) {
+function staffInviteEmailHtml({ businessName }) {
   const biz = String(businessName || "A business").replace(/[<>&]/g, "");
-  const roleLabel = { manager: "Manager", sales_staff: "Sales Staff", accountant: "Accountant" }[role] || "team member";
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
 <h1 style="color:#147d64;font-size:20px;margin:0 0 16px">You've been invited to join ${biz}</h1>
-<p>You've been invited to join <strong>${biz}</strong> on SellersPoint as a <strong>${roleLabel}</strong>.</p>
+<p>You've been invited to join <strong>${biz}</strong> on SellersPoint as a team member.</p>
 <p>Sign up with this same email address and you'll be added to their team automatically.</p>
 <p style="margin-top:24px"><a href="https://sellerspoint.app/signup.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Accept invite →</a></p>
 <p style="margin-top:20px;color:#647067;font-size:13px">Already have a SellersPoint account under this email? Just log in and you'll be added.</p>

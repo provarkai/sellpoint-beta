@@ -7,7 +7,7 @@ const rateLimit = require("express-rate-limit");
 const db = require("./db");
 const { CURRENCIES } = require("./currencies");
 const { requireAuthOnly, requireAuth, requirePermission, requirePlatformAdmin, supabaseAdmin } = require("./auth");
-const { permissionsFor, ROLE_LABELS, INVITABLE_ROLES } = require("./roles");
+const { OWNER_ALL_PERMISSIONS } = require("./roles");
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
@@ -332,7 +332,7 @@ app.get(
     const membership = await db.getMembership(req.user.id);
     if (!membership) return res.json({ user: { id: req.user.id, email: req.user.email }, business: null, role: null, permissions: [] });
     const business = await db.getBusiness(membership.businessId);
-    res.json({ user: { id: req.user.id, email: req.user.email }, business, role: membership.role, permissions: permissionsFor(membership.role) });
+    res.json({ user: { id: req.user.id, email: req.user.email }, business, role: membership.role, permissions: membership.role === "owner" ? OWNER_ALL_PERMISSIONS : membership.permissions });
   })
 );
 
@@ -562,6 +562,24 @@ app.post(
       plan: result.plan,
     });
     res.json({ authorizationUrl: initialized.authorizationUrl, amount: initialized.amount, reference });
+  })
+);
+
+// Public, no auth - lets the storefront page confirm a payment once the
+// customer bounces back from Paystack (?reference=...) so it can fire the
+// Purchase pixel/GA event with the real amount. The reference itself is an
+// unguessable random token (same trust model as the receipt-image
+// endpoint), and only orderId-bearing references (storefront/order
+// payments, never plan upgrades or add-on purchases) are answered, so this
+// can't be used to probe other payment types. finalizeIfSuccessful is
+// idempotent - safe to call again even if the webhook already processed it.
+app.get(
+  "/api/store/verify/:reference",
+  handle(async (req, res) => {
+    const txData = await payments.verifyTransaction(req.params.reference);
+    if (!txData.metadata?.orderId) return res.status(404).json({ error: "Not found" });
+    await finalizeIfSuccessful(txData);
+    res.json({ status: txData.status, value: Number(txData.amount || 0) / 100, currency: txData.currency || "NGN" });
   })
 );
 
@@ -1023,9 +1041,9 @@ app.post(
   requireAuth,
   requirePermission("staff.manage"),
   handle(async (req, res) => {
-    const { email: inviteEmail, role } = req.body || {};
-    const roster = await db.inviteStaff(req.businessId, inviteEmail, role);
-    db.notifyStaffInvite(req.businessId, inviteEmail, role, email);
+    const { email: inviteEmail, permissions } = req.body || {};
+    const roster = await db.inviteStaff(req.businessId, inviteEmail, permissions);
+    db.notifyStaffInvite(req.businessId, inviteEmail, email);
     res.status(201).json(roster);
   })
 );
@@ -1038,10 +1056,10 @@ app.delete(
   })
 );
 app.patch(
-  "/api/staff/:userId/role",
+  "/api/staff/:userId/permissions",
   requireAuth,
   requirePermission("staff.manage"),
-  handle(async (req, res) => res.json(await db.updateStaffRole(req.businessId, req.params.userId, (req.body || {}).role)))
+  handle(async (req, res) => res.json(await db.updateStaffPermissions(req.businessId, req.params.userId, (req.body || {}).permissions)))
 );
 app.delete(
   "/api/staff/:userId",
@@ -1623,33 +1641,9 @@ app.post(
   handle(async (req, res) => res.json(await db.upsertReconciliation(req.businessId, req.body || {})))
 );
 
-// --- Branches (Business+) -----------------------------------------------------
-
-app.get(
-  "/api/branches",
-  requireAuth,
-  handle(async (req, res) => {
-    const branches = await db.listBranches(req.businessId);
-    res.json({ branches, limit: await db.effectiveBranchLimit(req.businessId) });
-  })
-);
-app.post(
-  "/api/branches",
-  requireAuth,
-  handle(async (req, res) => res.status(201).json(await db.createBranch(req.businessId, req.body || {})))
-);
-app.delete(
-  "/api/branches/:id",
-  requireAuth,
-  handle(async (req, res) => {
-    await db.deleteBranch(req.businessId, req.params.id);
-    res.status(204).end();
-  })
-);
-
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
-const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch", "registration_package", "bn_registration_package"];
+const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "registration_package", "bn_registration_package"];
 const REGISTRATION_ADDON_TYPES = ["registration_package", "bn_registration_package"];
 
 app.post(

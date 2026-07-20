@@ -36,7 +36,7 @@ async function initializeTransaction({ email, plan, billingCycle, amountNaira, r
   return { authorizationUrl: body.data.authorization_url, amount: amountNaira };
 }
 
-// One-off a-la-carte purchases (extra AI credits / staff seat / branch) -
+// One-off a-la-carte purchases (extra AI credits / staff seat) -
 // same dynamic Paystack checkout as plan upgrades (not a static payment
 // link) so activation stays automatic; addonType travels in metadata
 // instead of plan/billingCycle.

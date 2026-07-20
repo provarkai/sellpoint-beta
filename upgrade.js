@@ -21,7 +21,6 @@ function featuresFor(key, t) {
     unlimited(t.productLimit) ? "Unlimited products" : t.productLimit + " products",
   ];
   if (t.staffLimit > 0) list.push(unlimited(t.staffLimit) ? "Unlimited staff" : t.staffLimit + " staff");
-  if (t.branchLimit > 0) list.push(unlimited(t.branchLimit) ? "Unlimited branches" : t.branchLimit + " branch" + (t.branchLimit > 1 ? "es" : ""));
   list.push(unlimited(t.receiptLimit) ? "Unlimited free receipts" : t.receiptLimit + " free receipts/month");
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
   if (t.whatsappLimit > 0 || unlimited(t.whatsappLimit)) {
@@ -75,7 +74,6 @@ function comparisonTableHtml() {
     ["Staff", (t) => (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit)],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
     ["WhatsApp sends", (t) => (unlimited(t.whatsappLimit) ? "Unlimited" : t.whatsappLimit > 0 ? t.whatsappLimit + "/month" : "wa.me link only")],
-    ["Branches", (t) => (unlimited(t.branchLimit) ? "Unlimited" : t.branchLimit > 0 ? t.branchLimit : "Single location")],
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
     ["Expense entries", (t) => (unlimited(t.expenseLimit) ? "Unlimited" : t.expenseLimit + "/month")],
     ["P&L / cashbook history", (t) => (unlimited(t.plHistoryDays) ? "Full history" : t.plHistoryDays + " days")],
@@ -136,7 +134,7 @@ async function chooseAndPay(plan) {
   }
 }
 
-const ADDON_LABELS = { ai_credits: "500 extra AI generations", whatsapp_credits: "100 extra WhatsApp sends", staff: "an extra staff seat", branch: "an extra branch" };
+const ADDON_LABELS = { ai_credits: "500 extra AI generations", whatsapp_credits: "100 extra WhatsApp sends", staff: "an extra staff seat" };
 
 async function checkReturnFromPaystack() {
   const params = new URLSearchParams(location.search);

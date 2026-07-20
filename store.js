@@ -64,6 +64,64 @@ function addToCart(id) {
   saveCart();
   renderCartBar();
   toast("Added to cart");
+  const p = product(id);
+  if (p) {
+    fbTrack("AddToCart", { content_ids: [id], content_name: p.name, value: effectivePrice(p), currency: store.currency || "NGN" });
+    gaTrack("add_to_cart", { currency: store.currency || "NGN", value: effectivePrice(p), items: [{ item_id: id, item_name: p.name, quantity: 1 }] });
+  }
+}
+
+// Facebook Pixel / Google Analytics - only active when the seller has set
+// the corresponding ID in Settings (store.facebookPixelId/googleAnalyticsId,
+// see server/db.js#getStorefront). Both no-op silently when unset.
+function fbTrack(event, params) {
+  if (window.fbq && store?.facebookPixelId) window.fbq("track", event, params);
+}
+function gaTrack(event, params) {
+  if (window.gtag && store?.googleAnalyticsId) window.gtag("event", event, params);
+}
+function initTrackingScripts() {
+  if (store.facebookPixelId) {
+    const s = document.createElement("script");
+    s.textContent = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${JSON.stringify(store.facebookPixelId)});fbq('track','PageView');`;
+    document.head.appendChild(s);
+  }
+  if (store.googleAnalyticsId) {
+    const src = document.createElement("script");
+    src.async = true;
+    src.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(store.googleAnalyticsId)}`;
+    document.head.appendChild(src);
+    const inline = document.createElement("script");
+    inline.textContent = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}window.gtag=gtag;gtag('js',new Date());gtag('config',${JSON.stringify(store.googleAnalyticsId)});`;
+    document.head.appendChild(inline);
+  }
+}
+
+// Runs once on boot if the page loaded with ?reference= (the customer just
+// returned from Paystack). Verifies the payment server-side (never trusts
+// the query param alone) before firing a Purchase event, then strips the
+// param so a refresh can't double-fire it.
+async function handlePaymentReturn() {
+  const params = new URLSearchParams(location.search);
+  const reference = params.get("reference");
+  if (reference) {
+    try {
+      const res = await fetch(`/api/store/verify/${encodeURIComponent(reference)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "success") {
+          fbTrack("Purchase", { value: data.value, currency: data.currency });
+          gaTrack("purchase", { transaction_id: reference, value: data.value, currency: data.currency });
+          toast("Payment received - thank you!");
+        } else {
+          toast("Payment was not completed");
+        }
+      }
+    } catch {}
+    params.delete("reference");
+    const qs = params.toString();
+    history.replaceState({}, "", location.pathname + (qs ? "?" + qs : ""));
+  }
 }
 
 function setQty(id, qty) {
@@ -311,6 +369,8 @@ if ($("payOnline")) $("payOnline").onclick = async () => {
   if (!buyerName || !buyerEmail) return toast("Enter your name and email to pay online");
   const deliveryMethod = $("storeDeliveryMethod") ? $("storeDeliveryMethod").value : "self";
   if (deliveryMethod === "sellerspoint" && !storeShipbubbleQuote) return toast("Get a delivery quote first");
+  fbTrack("InitiateCheckout", { value: finalTotal(), currency: store.currency || "NGN", num_items: entries.length });
+  gaTrack("begin_checkout", { value: finalTotal(), currency: store.currency || "NGN" });
   const btn = $("payOnline");
   btn.disabled = true;
   btn.textContent = "Redirecting...";
@@ -431,6 +491,7 @@ if ($("downloadVcf")) $("downloadVcf").onclick = () => {
   store = await res.json();
   cartKey = "sellerspoint_cart_" + slug;
   loadCart();
+  initTrackingScripts();
 
   $("storeName").textContent = store.businessName;
   if (store.businessPhone) { $("storePhoneText").textContent = store.businessPhone; $("storePhoneRow").style.display = "inline-flex"; }
@@ -458,6 +519,7 @@ if ($("downloadVcf")) $("downloadVcf").onclick = () => {
   renderCartBar();
   $("storeContent").style.display = "block";
   if (window.track) track("storefront_view", { slug });
+  handlePaymentReturn();
 
   // A direct link to one product (from the Share button) opens straight
   // into that product's detail view instead of just the catalog.
