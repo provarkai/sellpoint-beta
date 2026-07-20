@@ -1044,17 +1044,13 @@ const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - await
 const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",filed:"pill-success"};
 const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-// Templates is a self-serve utility, open to everyone; Overview and
-// Registration assume a registered (or registering) business, so those
-// fully redirect to the onboarding gate until that's true. Calendar/Tax
-// sit in between - locked until registered, but still show their own
-// description instead of vanishing into the generic gate. Trackers/Vault
-// are locked instead by plan (Starter excluded) - a separate axis from
-// the registration gate, so both checks run independently per view.
+// Templates, Calendar, and Tax Tools are open to everyone regardless of
+// registration status; only Overview and Registration assume a registered
+// (or registering) business, so those fully redirect to the onboarding
+// gate until that's true. Trackers/Vault are locked instead by plan
+// (Starter excluded) - a separate axis, checked independently per view.
 const DOCS_GATED_VIEWS=["overview","registration"];
 const DOCS_PREVIEW_LOCK={
-  calendar:{body:"docsCalendarBody",lock:"docsCalendarLocked",locked:()=>docsIsFirstTimer()},
-  tax:{body:"docsTaxBody",lock:"docsTaxLocked",locked:()=>docsIsFirstTimer()},
   trackers:{body:"docsTrackersBody",lock:"docsTrackersLocked",locked:()=>state.plan==="starter"},
   vault:{body:"docsVaultBody",lock:"docsVaultLocked",locked:()=>state.plan==="starter"},
 };
@@ -1432,16 +1428,57 @@ document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>
 function docsCollectFieldValues(){
   return [...document.querySelectorAll("#docsBasicDocFields input")].map(el=>({label:el.dataset.field,value:el.value.trim()}));
 }
-function docsDownloadTextFile(filename,text){
-  const blob=new Blob([text],{type:"text/plain"});
+const DOCS_LEGAL_DISCLAIMER="This document was drafted by AI from a template for common situations. It is not a substitute for personalized legal advice - always have a qualified lawyer review it before you sign or rely on it.";
+let docsLastDoc=null; // {title, text, filenameBase}
+function docsBuildPdfDoc(title,bodyText){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:"pt",format:"a4"});
+  const margin=56,pageWidth=doc.internal.pageSize.getWidth(),pageHeight=doc.internal.pageSize.getHeight(),maxWidth=pageWidth-margin*2;
+  let y=margin;
+  doc.setFont("helvetica","bold");doc.setFontSize(16);
+  doc.splitTextToSize(title,maxWidth).forEach(line=>{doc.text(line,margin,y);y+=20});
+  y+=10;
+  doc.setFont("helvetica","normal");doc.setFontSize(11);
+  bodyText.split("\n").forEach(paragraph=>{
+    const lines=paragraph?doc.splitTextToSize(paragraph,maxWidth):[""];
+    lines.forEach(line=>{
+      if(y>pageHeight-margin){doc.addPage();y=margin}
+      doc.text(line,margin,y);y+=16;
+    });
+  });
+  y+=16;
+  doc.setFont("helvetica","italic");doc.setFontSize(9);doc.setTextColor(179,84,30);
+  doc.splitTextToSize(DOCS_LEGAL_DISCLAIMER,maxWidth).forEach(line=>{
+    if(y>pageHeight-margin){doc.addPage();y=margin}
+    doc.text(line,margin,y);y+=13;
+  });
+  return doc;
+}
+function docsDownloadDocWord(title,bodyText,filename){
+  const paragraphs=bodyText.split("\n").map(l=>`<p style="margin:0 0 10px;font-size:11pt;font-family:Calibri,Arial,sans-serif">${clean(l)||"&nbsp;"}</p>`).join("");
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${clean(title)}</title></head><body><h2 style="font-family:Calibri,Arial,sans-serif">${clean(title)}</h2>${paragraphs}<p style="margin-top:24px;font-size:9pt;color:#b3541e;font-style:italic">${clean(DOCS_LEGAL_DISCLAIMER)}</p></body></html>`;
+  const blob=new Blob(["﻿",html],{type:"application/msword"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   a.href=url;a.download=filename;a.click();
   URL.revokeObjectURL(url);
 }
-async function docsSaveTemplateToVault(name,text,warn){
+function docsShowDocResult(title,text,filenameBase){
+  docsLastDoc={title,text,filenameBase};
+  $("docsDocPreview").textContent=text;
+  $("docsDocResult").style.display="block";
+}
+if($("docsDownloadDocPdf"))$("docsDownloadDocPdf").onclick=()=>{
+  if(!docsLastDoc||!window.jspdf)return toast("PDF export isn't available right now - try again in a moment.");
+  docsBuildPdfDoc(docsLastDoc.title,docsLastDoc.text).save(`${docsLastDoc.filenameBase}.pdf`);
+};
+if($("docsDownloadDocWord"))$("docsDownloadDocWord").onclick=()=>{
+  if(!docsLastDoc)return;
+  docsDownloadDocWord(docsLastDoc.title,docsLastDoc.text,`${docsLastDoc.filenameBase}.doc`);
+};
+async function docsSaveTemplateToVault(name,title,text){
   try{
-    const file="data:text/plain;base64,"+btoa(unescape(encodeURIComponent(text)));
+    const file=window.jspdf?docsBuildPdfDoc(title,text).output("datauristring"):"data:text/plain;base64,"+btoa(unescape(encodeURIComponent(text)));
     await api("POST","/api/docs/vault",{name,docType:"Template",file});
     docsVaultItems=await api("GET","/api/docs/vault");
     renderDocsTemplateList();renderDocsVault();renderDocsOverview();
@@ -1454,8 +1491,8 @@ if($("docsDownloadBasic"))$("docsDownloadBasic").onclick=async()=>{
   const btn=$("docsDownloadBasic");btn.disabled=true;btn.textContent="Drafting with AI...";
   try{
     const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"standard",fields:docsCollectFieldValues()});
-    docsDownloadTextFile(`${docsSelectedTpl}.txt`,result.text);
-    await docsSaveTemplateToVault(name,result.text,docsSelectedTpl==="loan");
+    docsShowDocResult(label,result.text,docsSelectedTpl);
+    await docsSaveTemplateToVault(name,label,result.text);
     markStoreAiUsed();
     toast("Document drafted - saved to your Vault");
   }catch(err){toast(err.message)}
@@ -1469,15 +1506,14 @@ if($("docsSuggestFields"))$("docsSuggestFields").onclick=()=>{
   $("docsSuggestList").innerHTML=fields.map(f=>`<label class="suggest-item"><input type="checkbox" checked value="${clean(f)}"> ${clean(f)}</label>`).join("")+'<p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" id="docsGenerateImproved">Generate improved document →</button></p>';
   $("docsSuggestList").classList.add("show");
   $("docsGenerateImproved").onclick=async()=>{
-    const label=DOCS_TPL_LABELS[docsSelectedTpl];
-    const isHighValue=docsSelectedTpl==="loan";
-    const name=`${label} (Improved) - draft ${new Date().toLocaleDateString()}`;
+    const label=DOCS_TPL_LABELS[docsSelectedTpl]+" (Improved)";
+    const name=`${label} - draft ${new Date().toLocaleDateString()}`;
     const extraClauses=[...document.querySelectorAll("#docsSuggestList input:checked")].map(el=>el.value);
     const btn=$("docsGenerateImproved");btn.disabled=true;btn.textContent="Drafting with AI...";
     try{
       const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"improved",fields:docsCollectFieldValues(),extraClauses,detail:input});
-      docsDownloadTextFile(`${docsSelectedTpl}-improved.txt`,result.text);
-      await docsSaveTemplateToVault(name,result.text,isHighValue);
+      docsShowDocResult(label,result.text,docsSelectedTpl+"-improved");
+      await docsSaveTemplateToVault(name,label,result.text);
       markStoreAiUsed();
       toast("Improved document drafted - saved to your Vault");
     }catch(err){toast(err.message)}
@@ -1486,7 +1522,7 @@ if($("docsSuggestFields"))$("docsSuggestFields").onclick=()=>{
 };
 function renderDocsTemplateList(){
   const docs=docsVaultItems.filter(v=>v.docType==="Template");
-  $("docsTemplateList").innerHTML=docs.length?docs.map(d=>`<div class="doc-row"><div class="info"><b>\u{1F9FE} ${clean(d.name)}</b><small>${date(d.createdAt)}</small></div><div class="doc-actions"><a class="btn btn-ghost btn-sm" href="${d.file}" download="${clean(d.name)}">Download</a></div></div>`).join(""):'<p class="meta" style="padding:20px 0;text-align:center">No documents yet for this business.</p>';
+  $("docsTemplateList").innerHTML=docs.length?docs.map(d=>`<div class="doc-row"><div class="info"><b>\u{1F9FE} ${clean(d.name)}</b><small>${date(d.createdAt)}</small></div><div class="doc-actions"><a class="btn btn-ghost btn-sm" href="${d.file}" download="${clean(d.name)}${d.file.startsWith("data:application/pdf")?".pdf":""}">Download</a></div></div>`).join(""):'<p class="meta" style="padding:20px 0;text-align:center">No documents yet for this business.</p>';
 }
 
 // --- Docs Vault (search + filter) ---------------------------------------

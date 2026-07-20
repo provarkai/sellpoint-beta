@@ -197,7 +197,7 @@ async function finalizeIfSuccessful(txData) {
       await db.recordAddonPurchase(businessId, metadata.addonType);
       // The registration package bundles 3 months of Growth - see
       // db.grantBonusGrowthMonths for why it only applies on Starter.
-      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusGrowthMonths(businessId, 3);
+      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusGrowthMonths(businessId, 4);
     }
     return isNew;
   }
@@ -1184,7 +1184,20 @@ app.post(
     // Docs > Templates: drafts a real document from the fields the seller
     // filled in, instead of the placeholder text this used to ship with.
     const DOC_TEMPLATE_LABELS = { business: "Business Agreement", tenancy: "Tenancy Agreement", freelance: "Freelance / Service Contract", loan: "Loan Agreement", sales: "Sales / Supplier Agreement", proposal: "Proposal / Quote" };
+    // The clause skeleton each template type should follow - gives the AI
+    // (and the offline fallback) a concrete structure to fill in, rather
+    // than one generic shape stretched across every document type.
+    const DOC_TEMPLATE_CLAUSES = {
+      loan: ["Parties (Lender and Borrower)", "Principal amount and currency", "Interest rate (if any)", "Repayment schedule and method", "Collateral/security (if any)", "Default and remedies", "Governing law and jurisdiction", "Signatures and date"],
+      tenancy: ["Parties (Landlord and Tenant)", "Property description and address", "Lease term and renewal", "Rent amount, due date, and payment method", "Security deposit", "Maintenance and repair responsibilities", "Termination conditions", "Signatures and date"],
+      freelance: ["Parties (Client and Freelancer)", "Scope of work and deliverables", "Timeline and deadlines", "Payment terms and schedule", "Revisions policy", "Confidentiality", "Termination conditions", "Signatures and date"],
+      business: ["Parties (all partners)", "Business name and purpose", "Capital contributions", "Profit and loss sharing", "Roles and responsibilities", "Decision-making process", "Exit/dissolution terms", "Signatures and date"],
+      sales: ["Parties (Buyer and Seller)", "Description of goods/services", "Price and payment terms", "Delivery timeline", "Warranty and returns policy", "Late delivery/payment penalties", "Signatures and date"],
+      proposal: ["Client and project summary", "Scope of work", "Pricing and payment terms", "Timeline", "Validity period of this proposal", "Acceptance/signature"],
+    };
+    const DOC_TEMPLATE_DISCLAIMER = "This document was drafted by AI from a template for common situations. It is not a substitute for personalized legal advice - always have a qualified lawyer review it before you sign or rely on it.";
     const docTemplateLabel = DOC_TEMPLATE_LABELS[templateType] || "Business Agreement";
+    const docClauseStructure = DOC_TEMPLATE_CLAUSES[templateType] || DOC_TEMPLATE_CLAUSES.business;
     const docFields = Array.isArray(fields) ? fields.filter((f) => f && f.label) : [];
     const docFieldsText = docFields.map((f) => `${f.label}: ${(f.value || "").trim() || "[not provided]"}`).join("\n");
     const docExtraClauses = Array.isArray(extraClauses) ? extraClauses.filter(Boolean) : [];
@@ -1213,7 +1226,10 @@ app.post(
         docExtraClauses.length ? `\nAdditional terms:\n${docExtraClauses.map((c) => `- ${c}`).join("\n")}` : "",
         docDetail ? `\nNotes: ${docDetail}` : "",
         "",
-        "This is a template for common situations, not a substitute for personalized legal advice.",
+        "Sections this document should cover:",
+        docClauseStructure.map((c) => `- ${c}`).join("\n"),
+        "",
+        DOC_TEMPLATE_DISCLAIMER,
       ].filter(Boolean).join("\n"),
     };
     const prompts = {
@@ -1225,7 +1241,7 @@ app.post(
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
       summary: `Write a short sales summary for a Nigerian small business owner based on this data: ${state.orders.length} total orders, ${money(revenue)} paid revenue, best-selling item "${bestSeller || "none yet"}", ${state.orders.filter((o) => o.status === "Pending payment").length} orders still pending payment. End with one concrete suggested action. 4-5 sentences.`,
       description: `Write a short storefront product description (2-3 sentences, plain text, no markdown, no hashtags, no emojis) for a Nigerian small business selling "${draftName}"${draftCategory ? ` (category: ${draftCategory})` : ""}, a ${draftType.toLowerCase()} priced at ${money(draftPrice)}.${draftExtra ? ` Extra details to weave in naturally: ${draftExtra}.` : ""} Describe what it is, who it's for, and why it's worth buying.`,
-      doc_template: `Draft a complete, ready-to-use "${docTemplateLabel}" for a Nigerian small business called "${state.business.businessName}". Use these details exactly as given, and only fill a sensible standard default where a detail is marked [not provided]: ${docFieldsText || "no fields provided"}.${docExtraClauses.length ? ` Include these additional clauses: ${docExtraClauses.join("; ")}.` : ""}${docDetail ? ` Extra context from the business owner: ${docDetail}.` : ""} Write it with a proper document structure - a title, numbered clauses, and a signature block for each party. Plain text only, no markdown formatting. End with this exact disclaimer on its own line: "This is a template for common situations, not a substitute for personalized legal advice."`,
+      doc_template: `Draft a complete, professional, ready-to-use "${docTemplateLabel}" for a Nigerian small business called "${state.business.businessName}", written the way a Nigerian lawyer would draft it - formal, precise, and legally structured, not a casual letter. Cover these sections, in this order, as numbered clauses (combine or split where it reads more naturally, but don't skip any): ${docClauseStructure.join("; ")}. Use these details exactly as given, and only fill a sensible standard default where a detail is marked [not provided]: ${docFieldsText || "no fields provided"}.${docExtraClauses.length ? ` Also include these additional clauses: ${docExtraClauses.join("; ")}.` : ""}${docDetail ? ` Extra context from the business owner: ${docDetail}.` : ""} Structure: a formal title, a preamble naming the parties, the date, and the recitals; the numbered clauses above; and a signature block for each party with space for name, signature, and date. Plain text only, no markdown formatting. End with this exact disclaimer on its own line: "${DOC_TEMPLATE_DISCLAIMER}"`,
     };
     if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
     let used = await db.getAiUsage(req.businessId);

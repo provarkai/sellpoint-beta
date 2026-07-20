@@ -104,7 +104,7 @@
       </div>
 
       <div id="docs-gate" class="docs-subpage">
-        <div class="view-header"><h1>Let's get your business registered</h1><p>SellersPoint helps every seller run as a fully registered, bank-ready business - filed for you end to end. Choose a package to get started; the Compliance Calendar and Tax Tools unlock once you do.</p></div>
+        <div class="view-header"><h1>Let's get your business registered</h1><p>SellersPoint helps every seller run as a fully registered, bank-ready business - filed for you end to end.</p></div>
         <div class="grid grid-2">
           <div class="card">
             <h3>BUSINESS NAME REGISTRATION ✍️</h3>
@@ -114,9 +114,9 @@
               <li>Status Report</li>
               <li>Congratulatory Letter</li>
               <li>FIRS TIN Certificate</li>
-              <li>3 months of the Growth plan, on us</li>
+              <li><b>4 months of the Growth plan, on us</b></li>
             </ul>
-            <div class="gate-price">₦40,000<small>SCUML price not included</small></div>
+            <div class="gate-price">₦40,000<small>SCUML not included</small></div>
             <button type="button" class="btn btn-primary" id="docsBuyBnPackage">Subscribe &amp; Get Started</button>
           </div>
           <div class="card" style="border-color:var(--primary);background:#f0faf6">
@@ -128,9 +128,9 @@
               <li>Congratulatory Letter</li>
               <li>FIRS TIN Certificate</li>
               <li>MEMART</li>
-              <li>3 months of the Growth plan, on us</li>
+              <li><b>4 months of the Growth plan, on us</b></li>
             </ul>
-            <div class="gate-price">₦80,000<small>SCUML price not included</small></div>
+            <div class="gate-price">₦80,000<small>SCUML not included</small></div>
             <button type="button" class="btn btn-accent" id="docsBuyRegPackage">Subscribe &amp; Get Started</button>
           </div>
         </div>
@@ -279,11 +279,6 @@
 
       <div id="docs-calendar" class="docs-subpage">
         <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view - this month and next.</p></div>
-        <div class="card docs-locked-prompt" id="docsCalendarLocked" style="display:none">
-          <b>🔒 Unlock the Compliance Calendar</b>
-          <p class="meta" style="margin-top:6px">See every statutory tax deadline plus your own Trackers, merged into one view - available once your business registration is underway.</p>
-          <p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" onclick="showDocsView('overview')">Register your business →</button></p>
-        </div>
         <div class="cal-layout" id="docsCalendarBody">
           <div>
             <div class="card next-deadline">
@@ -320,11 +315,6 @@
 
       <div id="docs-tax" class="docs-subpage">
         <div class="view-header"><h1>Tax Tools</h1><p>PAYE, payroll, payslips and FIRS/NRS e-invoicing - built on the Nigeria Tax Act 2025. Estimates only - not a filed position.</p></div>
-        <div class="card docs-locked-prompt" id="docsTaxLocked" style="display:none">
-          <b>🔒 Unlock Tax Tools</b>
-          <p class="meta" style="margin-top:6px">PAYE, VAT, payroll, payslips and FIRS/NRS e-invoicing - available once your business registration is underway.</p>
-          <p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" onclick="showDocsView('overview')">Register your business →</button></p>
-        </div>
         <div id="docsTaxBody">
         <div class="tax-subnav">
           <button type="button" class="tax-tab active" data-tax="calculator">🧮 Tax Calculator</button>
@@ -474,6 +464,12 @@
               <p class="actions" style="margin-top:10px"><button type="button" class="btn btn-accent" id="docsSuggestFields">Improve it →</button></p>
               <div class="suggest-list" id="docsSuggestList"></div>
               <p class="ai-note">Drafted by AI from the details you fill in above, plus anything specific you add here. Always review before you send or sign it - this is a template for common situations, not a substitute for personalized legal advice.</p>
+            </div>
+            <div id="docsDocResult" style="display:none;margin-top:22px;border-top:1px dashed var(--line);padding-top:16px">
+              <b style="font-size:15px;font-weight:800">Your drafted document</b>
+              <div id="docsDocPreview" class="doc-preview"></div>
+              <p class="meta" style="margin-top:10px;color:var(--accent);font-weight:700">⚠️ AI-drafted from a template - always have a qualified lawyer review this before you sign or rely on it.</p>
+              <p class="actions" style="margin-top:10px"><button type="button" class="btn btn-primary" id="docsDownloadDocPdf">Download PDF</button><button type="button" class="btn btn-ghost" id="docsDownloadDocWord">Download Word</button></p>
             </div>
           </div>
         </article>
