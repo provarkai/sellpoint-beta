@@ -70,14 +70,12 @@ function render(){
   if($("todayOrders"))$("todayOrders").textContent=todayOrders.length;
   if($("todayCustomers"))$("todayCustomers").textContent=todayCustomers;
   if($("todayAvgOrder"))$("todayAvgOrder").textContent=money(avgOrder);
-  $("restock").innerHTML=low.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} left - restock soon</span></div>`).join("");
-  if($("restockHighlight")){$("restockHighlight").classList.toggle("has-alerts",low.length>0);$("restockCount").textContent=low.length?`(${low.length})`:""}
+  if($("restockAlertCount")){$("restockAlertCount").textContent=low.length;$("restockBox").classList.toggle("has-alerts",low.length>0)}
   if($("msmOrders"))$("msmOrders").textContent=state.orders.filter(o=>isThisMonth(o.createdAt)&&["Paid","Delivered"].includes(o.status)).length;
   if($("msmCustomers"))$("msmCustomers").textContent=state.customers.filter(c=>c.createdAt&&isThisMonth(c.createdAt)).length;
-  if($("msmLowStock"))$("msmLowStock").textContent=low.length;
   if($("msmAbandoned"))$("msmAbandoned").textContent=pending;
   renderActivationChecklist();
-  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
+  if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item-line"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</span><span class="il-amount">${money(total(o))}</span><span class="il-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind</button></span></div>`}).join("")}
   renderDeliveries();
   renderSmartAlerts();
   renderShipbubbleStatus();
@@ -940,7 +938,7 @@ function renderDeliveries(){
     }else{
       actions=`<button onclick="setOrderStatus('${o.id}','Delivered')">Mark Delivered</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>`;
     }
-    return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${clean(methodLabel)}${trackingLabel} - ${date(o.createdAt)}</div><div class="item-actions">${actions}</div></div>`;
+    return `<div class="item-line"><span class="il-name">${clean(c?.name||"Deleted customer")}</span><span class="il-meta">${clean(orderItemsText(o))} - ${clean(methodLabel)}${trackingLabel} - ${date(o.createdAt)}</span><span class="il-amount">${money(total(o))}</span><span class="il-actions">${actions}</span></div>`;
   }).join("");
 }
 function renderSmartAlerts(){
@@ -958,6 +956,21 @@ function renderSmartAlerts(){
   const avg=state.orders.length?state.orders.reduce((s,o)=>s+total(o),0)/state.orders.length:0;
   const large=state.orders.length>=3?state.orders.filter(o=>total(o)>avg*2).sort((a,b)=>total(b)-total(a)).slice(0,5):[];
   $("largeOrders").innerHTML=large.map(o=>{const c=customer(o.customerId);return `<div class="item"><strong>${clean(c?.name||"Deleted customer")}</strong><span class="meta">${money(total(o))} - avg is ${money(avg)}</span></div>`}).join("");
+
+  if($("abandonedCartArticle")){
+    const abandoned=state.orders.filter(o=>o.status==="Pending payment").sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
+    const hasAccess=["standard","advanced"].includes(pricing[state.plan]?.reportsTier);
+    $("abandonedCartArticle").style.display=hasAccess?"block":"none";
+    $("abandonedCartUpsell").style.display=hasAccess?"none":"block";
+    if(hasAccess){
+      $("abandonedCartCount").textContent=abandoned.length?`(${abandoned.length})`:"";
+      $("abandonedCartList").innerHTML=abandoned.map(o=>{
+        const c=customer(o.customerId);
+        const daysPending=Math.floor((Date.now()-new Date(o.createdAt).getTime())/(24*60*60*1000));
+        return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(c?.phone||"No phone on file")}${c?.email?` - ${clean(c.email)}`:""}${c?.location?` - ${clean(c.location)}`:""}</div><div class="meta">${clean(orderItemsText(o))}</div><div class="meta">Abandoned ${date(o.createdAt)} - ${daysPending===0?"today":daysPending+" day"+(daysPending===1?"":"s")+" ago"}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`;
+      }).join("");
+    }
+  }
 }
 function renderBackend(){if(!$("devEvents"))return;const digitalRevenue=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>{const items=o.items&&o.items.length?o.items:[{productId:o.productId,productType:o.productType,qty:o.qty,price:o.price}];const digitalTotal=items.filter(i=>(i.productType||product(i.productId)?.type)==="Digital product").reduce((t,i)=>t+i.price*i.qty,0);return s+digitalTotal},0);const storage=Math.round((JSON.stringify(state).length/1024)*10)/10;$("devEvents").textContent=state.events.length;$("devDigitalRevenue").textContent=money(digitalRevenue);$("devSetup").textContent=setupScore()+"%";$("devStorage").textContent=storage+" KB";const checks=[["Business profile",state.businessName&&state.businessName!=="Your Business"],["Logo uploaded",state.businessLogo],["Payment configured",state.paymentDetails||state.paymentLink],["First item added",state.products.length],["First customer added",state.customers.length],["First order created",state.orders.length],["Digital delivery ready",state.products.some(p=>p.type==="Digital product"&&p.deliveryLink)]];$("checklist").innerHTML=checks.map(x=>"<div class=\"check "+(x[1]?"done":"")+"\"><b>"+(x[1]?"✓":"!")+"</b><span>"+x[0]+"</span></div>").join("");const top=bestProduct()||"No sales yet";$("devSummary").innerHTML="<div class=\"item\"><strong>Top item</strong><span class=\"meta\">"+clean(top)+"</span></div><div class=\"item\"><strong>Orders</strong><span class=\"meta\">"+state.orders.length+" total, "+state.orders.filter(o=>o.status==="Pending payment").length+" pending payment</span></div><div class=\"item\"><strong>Catalog</strong><span class=\"meta\">"+state.products.filter(p=>p.type==="Product").length+" products, "+state.products.filter(p=>p.type==="Service").length+" services, "+state.products.filter(p=>p.type==="Digital product").length+" digital products</span></div>";$("eventLog").innerHTML=state.events.slice(0,12).map(e=>"<div class=\"item\"><strong><span class=\"badge\">"+clean(e.type)+"</span> "+clean(e.detail||"")+"</strong><span class=\"meta\">"+date(e.at)+"</span></div>").join("")}
 function backendReport(){return "SellersPoint Beta report\nOrders: "+state.orders.length+"\nCustomers: "+state.customers.length+"\nItems: "+state.products.length+"\nSetup: "+setupScore()+"%\nTop item: "+(bestProduct()||"No sales yet")}
