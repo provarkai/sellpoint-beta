@@ -49,17 +49,23 @@ async function addToAudience({ email, firstName }) {
 }
 
 function welcomeEmailHtml(businessName) {
-  const name = String(businessName || "there").replace(/[<>&]/g, "");
+  const name = String(businessName || "Seller").replace(/[<>&]/g, "");
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
-<h1 style="color:#147d64;font-size:22px;margin:0 0 12px">Welcome to SellersPoint, ${name}! 🎉</h1>
-<p>Your account is ready. Here's how to get moving fast:</p>
-<ul style="line-height:1.8">
-<li>Add your first product</li>
-<li>Add your first customer</li>
-<li>Share your storefront link and take your first order</li>
+<p style="margin:0 0 4px">Hi ${name},</p>
+<h1 style="color:#147d64;font-size:22px;margin:0 0 16px">Welcome to SellersPoint!</h1>
+<p>We're excited to have you on board. Run your entire business from one intelligent platform. Manage inventory, customers, orders, invoices, receipts, WhatsApp, AI and reports — all from one beautifully simple app built for African entrepreneurs.</p>
+<p>You're just a few steps away from setting up your business.</p>
+<p><strong>Here's how to get started in the next 5 minutes:</strong></p>
+<ul style="line-height:1.9;padding-left:20px">
+<li><strong>Add your payment details</strong> - so you're ready to get paid</li>
+<li><strong>Add your first product</strong> - takes under a minute</li>
+<li><strong>Add your first customer</strong> - or import your existing list</li>
+<li><strong>Share your storefront link</strong> - and take your first order</li>
 </ul>
 <p><a href="https://sellerspoint.app/app.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open your dashboard →</a></p>
-<p style="color:#647067;font-size:13px">Questions? Just reply to this email.</p>
+<p>If you have any questions, suggestions, or run into anything at all — tap <strong>Feedback</strong> inside the app and send us a message. We respond personally.</p>
+<p>SellersPoint was built with your type of business in mind.</p>
+<p style="margin-top:24px;color:#647067;font-size:13px">— The SellersPoint Team</p>
 </div>`;
 }
 
