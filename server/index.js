@@ -216,12 +216,7 @@ async function finalizeIfSuccessful(txData) {
       status: "success",
       rawPayload: txData,
     });
-    if (isNew) {
-      await db.recordAddonPurchase(businessId, metadata.addonType);
-      // The registration package bundles 3 months of Pro - see
-      // db.grantBonusProMonths for why it only applies on Starter/Growth.
-      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusProMonths(businessId, 3);
-    }
+    if (isNew) await db.recordAddonPurchase(businessId, metadata.addonType);
     return isNew;
   }
 
@@ -1459,146 +1454,6 @@ app.delete(
   })
 );
 
-// --- SellersPoint Docs: business registration (CAC incorporation) ----------
-// Fulfilled manually via backend.html's Registration Queue for now - see
-// db.js's advanceBusinessRegistration comment for the plan to automate
-// once CAC accreditation clears.
-
-app.get(
-  "/api/docs/registration",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.getDocsRegistration(req.businessId)))
-);
-app.put(
-  "/api/docs/registration",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.saveRegistrationDetails(req.businessId, req.body || {})))
-);
-app.put(
-  "/api/docs/registration/shares",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.saveRegistrationShares(req.businessId, req.body || {})))
-);
-app.post(
-  "/api/docs/registration/affiliates",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.addRegistrationAffiliate(req.businessId, req.body || {})))
-);
-app.delete(
-  "/api/docs/registration/affiliates/:id",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => {
-    await db.deleteRegistrationAffiliate(req.businessId, req.params.id);
-    res.status(204).end();
-  })
-);
-app.post(
-  "/api/docs/registration/psc",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.addRegistrationPsc(req.businessId, req.body || {})))
-);
-app.post(
-  "/api/docs/registration/submit",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.submitBusinessRegistration(req.businessId)))
-);
-
-app.get(
-  "/api/docs/trackers",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listTrackers(req.businessId)))
-);
-app.post(
-  "/api/docs/trackers",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createTracker(req.businessId, req.body || {})))
-);
-app.put(
-  "/api/docs/trackers/:id",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.updateTracker(req.businessId, req.params.id, req.body || {})))
-);
-app.delete(
-  "/api/docs/trackers/:id",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => {
-    await db.deleteTracker(req.businessId, req.params.id);
-    res.status(204).end();
-  })
-);
-
-app.get(
-  "/api/docs/vault",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listVaultItems(req.businessId)))
-);
-app.post(
-  "/api/docs/vault",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createVaultItem(req.businessId, req.body || {})))
-);
-
-app.get(
-  "/api/docs/employees",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listEmployees(req.businessId)))
-);
-app.post(
-  "/api/docs/employees",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createEmployee(req.businessId, req.body || {})))
-);
-app.delete(
-  "/api/docs/employees/:id",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => {
-    await db.deleteEmployee(req.businessId, req.params.id);
-    res.status(204).end();
-  })
-);
-
-app.get(
-  "/api/docs/invoices",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listInvoices(req.businessId)))
-);
-app.post(
-  "/api/docs/invoices",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createInvoice(req.businessId, req.body || {})))
-);
-
-app.get(
-  "/api/docs/filings",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listFilings(req.businessId)))
-);
-app.post(
-  "/api/docs/filings",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createFiling(req.businessId, req.body || {})))
-);
-
 // --- Feedback (business -> SellersPoint team) --------------------------------
 app.get(
   "/api/feedback",
@@ -1673,8 +1528,7 @@ app.post(
 
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
-const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "registration_package", "bn_registration_package"];
-const REGISTRATION_ADDON_TYPES = ["registration_package", "bn_registration_package"];
+const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff"];
 
 app.post(
   "/api/addons/purchase",
@@ -1686,12 +1540,7 @@ app.post(
       return res.status(400).json({ error: "No payment gateway is configured on this server" });
     }
     const reference = `spaddon_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
-    // Either registration package is bought from inside My Docs, so it
-    // returns there instead of the standalone upgrade page.
-    const callbackUrl =
-      REGISTRATION_ADDON_TYPES.includes(type)
-        ? `${req.protocol}://${req.get("host")}/app.html?docsPaymentRef=${reference}`
-        : `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
+    const callbackUrl = `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
     const result = await payments.initializeAddonTransaction({
       email: req.user.email,
       addonType: type,
@@ -1822,25 +1671,6 @@ app.get(
   "/api/admin/payments",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.listAllPayments()))
-);
-
-// SellersPoint Docs Registration Queue - every business currently mid-flight
-// on CAC incorporation, and the action to advance them (manual fulfillment
-// until CAC accreditation clears - see db.js#advanceBusinessRegistration).
-app.get(
-  "/api/admin/registration-queue",
-  requirePlatformAdmin,
-  handle(async (req, res) => res.json(await db.listRegistrationQueue()))
-);
-app.get(
-  "/api/admin/registration-queue/:id",
-  requirePlatformAdmin,
-  handle(async (req, res) => res.json(await db.getDocsRegistration(req.params.id)))
-);
-app.put(
-  "/api/admin/registration-queue/:id",
-  requirePlatformAdmin,
-  handle(async (req, res) => res.json(await db.advanceBusinessRegistration(req.params.id, req.body || {})))
 );
 
 app.get(

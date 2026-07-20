@@ -33,8 +33,6 @@ function featuresFor(key, t) {
   if (t.batchLimit > 0 || unlimited(t.batchLimit)) list.push("Batch/lot tracking");
   if (t.posLimit > 0 || unlimited(t.posLimit)) list.push("POS mode");
   if (t.loyaltyAvailable) list.push("Loyalty points & wallet");
-  if (key !== "starter") list.push("Trackers & Document Vault (My Docs)");
-  if (["pro", "business", "enterprise"].includes(key)) list.push("Compliance Calendar & Tax Tools (My Docs)");
   const reportLabel = REPORT_LABELS[t.reportsTier];
   if (reportLabel) list.push(reportLabel);
   return list;
@@ -86,8 +84,6 @@ function comparisonTableHtml() {
     ["Batch/lot tracking", (t) => (unlimited(t.batchLimit) ? "Unlimited" : t.batchLimit > 0 ? t.batchLimit + "/month" : "-")],
     ["POS mode", (t) => (unlimited(t.posLimit) ? "Unlimited" : t.posLimit > 0 ? t.posLimit + " sales/month" : "-")],
     ["Reports", (t) => (REPORT_LABELS[t.reportsTier] || "-")],
-    ["Trackers & Document Vault", (t, k) => (k !== "starter" ? "Included" : "-")],
-    ["Compliance Calendar & Tax Tools", (t, k) => (["pro", "business", "enterprise"].includes(k) ? "Included" : "-")],
   ];
   const head = "<tr><th>Feature</th>" + keys.map((k) => "<th>" + pricing[k].name + "</th>").join("") + "</tr>";
   const body = rows.map(([label, fn]) => "<tr><td>" + label + "</td>" + keys.map((k) => "<td>" + fn(pricing[k], k) + "</td>").join("") + "</tr>").join("");

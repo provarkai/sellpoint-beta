@@ -16,15 +16,12 @@ const PAYMENT_GATEWAY_FIELDS = {
   stripe: [["secretKey", "Secret Key"], ["publicKey", "Publishable Key"], ["webhookSecret", "Webhook Signing Secret"]],
 };
 let platformAdmins = [];
-let registrationQueue = [];
 let authToken = null;
 let myEmail = null;
 let confirmDeleteId = null;
 let expandedId = null;
 let businessDetails = {};
 let loadingDetailId = null;
-let expandedRegId = null;
-let registrationDetails = {};
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const clean = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
 const date = (d) => { const x = new Date(d); return `${String(x.getDate()).padStart(2, "0")}-${String(x.getMonth() + 1).padStart(2, "0")}-${x.getFullYear()}`; };
@@ -34,7 +31,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, paymentConfigRes, platformAdminsRes, registrationQueueRes, brandRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, paymentConfigRes, platformAdminsRes, brandRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -46,7 +43,6 @@ async function loadAll() {
     api("GET", "/api/admin/logistics-settings"),
     api("GET", "/api/admin/payment-config"),
     api("GET", "/api/admin/platform-admins"),
-    api("GET", "/api/admin/registration-queue"),
     fetch("/api/brand").then((r) => (r.ok ? r.json() : brand)).catch(() => brand),
   ]);
   owner = ownerRes;
@@ -61,7 +57,6 @@ async function loadAll() {
   logisticsSettings = logisticsRes;
   paymentConfig = paymentConfigRes;
   platformAdmins = platformAdminsRes;
-  registrationQueue = registrationQueueRes;
 }
 
 function renderPaymentGatewayFields() {
@@ -117,71 +112,6 @@ function businessDetailHtml(id) {
   </div>`;
 }
 
-// Registration Queue detail - full CAC filing data (company details, shares,
-// affiliates with their ID docs, PSC) plus the manual status-advance
-// controls. See db.js#advanceBusinessRegistration for why this is the one
-// path that both manual fulfillment and future API automation will share.
-function registrationDetailHtml(id) {
-  if (loadingDetailId === id) return '<div class="item-details"><p class="meta">Loading...</p></div>';
-  const d = registrationDetails[id];
-  if (!d) return '<div class="item-details"><p class="meta">Couldn\'t load details.</p></div>';
-  const b = d.business;
-  return `<div class="item-details">
-    <div class="row"><span>Nature of business</span><b>${clean(b.regNatureOfBusinessCategory || "-")} / ${clean(b.regNatureOfBusiness || "-")}</b></div>
-    <div class="row"><span>Objects</span><b>${clean((b.regObjects || []).join("; ") || "-")}</b></div>
-    <div class="row"><span>Registered address</span><b>${clean(b.regAddress?.registeredAddress?.full || "-")}</b></div>
-    <div class="row"><span>Head office</span><b>${clean(b.regAddress?.headOffice?.full || "-")}</b></div>
-    <div class="row"><span>Shares</span><b>${d.shares.ordinaryIssuedShare} ordinary / ${d.shares.preferenceIssuedShare} preference @ ${money(d.shares.pricePerShare)}</b></div>
-    <h3>Affiliates (${d.affiliates.length})</h3>
-    ${d.affiliates.map((a) => `<div class="row"><span>${clean(a.firstname)} ${clean(a.surname)} - ${clean((a.affiliateType || []).join(", "))}</span><b>${clean(a.idType)} ${clean(a.idNumber)}</b></div>`).join("") || '<p class="meta">None added yet</p>'}
-    <h3>PSC (${d.psc.length})</h3>
-    ${d.psc.map((p) => `<div class="row"><span>${clean(p.sharePercent)}% share</span><b>${p.hasSignificantControl ? "Significant control" : ""}${p.isPep ? " - PEP" : ""}</b></div>`).join("") || '<p class="meta">None added yet</p>'}
-    <h3>Advance registration</h3>
-    <label>Status<select id="regStatus_${id}"><option value="in_review">In review</option><option value="action_needed">Action needed</option><option value="approved">Approved</option></select></label>
-    <label>Note to seller<textarea id="regNote_${id}" rows="2" placeholder="e.g. awaiting proof of address"></textarea></label>
-    <label>TIN (once issued)<input id="regTin_${id}" placeholder="20304050-0002"></label>
-    <label>SCUML status<select id="regScuml_${id}"><option value="">No change</option><option value="submitted">Submitted</option><option value="approved">Approved</option></select></label>
-    <label>Certificate <span class="meta">(optional - upload once approved)</span><input id="regCert_${id}" type="file" accept="application/pdf,image/*"></label>
-    <p class="actions"><button onclick="saveRegistrationStatus('${id}')">Save</button></p>
-  </div>`;
-}
-async function toggleRegistrationDetail(id) {
-  if (expandedRegId === id) { expandedRegId = null; return render(); }
-  expandedRegId = id;
-  if (!registrationDetails[id]) {
-    loadingDetailId = id;
-    render();
-    try {
-      registrationDetails[id] = await api("GET", "/api/admin/registration-queue/" + id);
-    } catch (err) {
-      toast(err.message);
-    }
-    loadingDetailId = null;
-  }
-  render();
-}
-async function saveRegistrationStatus(id) {
-  try {
-    const fileInput = $("regCert_" + id);
-    const file = fileInput.files?.[0];
-    const certificate = file ? await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); }) : undefined;
-    await api("PUT", "/api/admin/registration-queue/" + id, {
-      status: $("regStatus_" + id).value,
-      note: $("regNote_" + id).value.trim(),
-      tin: $("regTin_" + id).value.trim() || undefined,
-      scumlStatus: $("regScuml_" + id).value || undefined,
-      certificate,
-    });
-    delete registrationDetails[id];
-    registrationQueue = await api("GET", "/api/admin/registration-queue");
-    expandedRegId = null;
-    render();
-    toast("Registration updated");
-  } catch (err) {
-    toast(err.message);
-  }
-}
-
 function render() {
   $("totalBusinesses").textContent = businesses.length;
   $("businessCount").textContent = `(${businesses.length})`;
@@ -223,13 +153,6 @@ function render() {
   $("logApiBase").value = logisticsSettings.apiBase || "";
   $("logApiKeyStatus").textContent = logisticsSettings.apiKeySet ? `(set - ${logisticsSettings.apiKeyMasked})` : "(not set)";
   if ($("pgActiveProvider")) { $("pgActiveProvider").value = paymentConfig.activeProvider || "paystack"; renderPaymentGatewayFields(); }
-  $("registrationQueueCount").textContent = `(${registrationQueue.length})`;
-  $("registrationQueueList").innerHTML = registrationQueue.map((r) => {
-    const expanded = expandedRegId === r.id;
-    return '<div class="item"><div class="item-top"><strong>' + clean(r.businessName) + '</strong><span>' + clean((r.regType || "").replace(/_/g, " ")) + '</span></div><div class="meta">Status: ' + clean(r.regStatus) + (r.regNote ? ' - ' + clean(r.regNote) : '') + ' - ' + dateTime(r.createdAt) + '</div>' +
-      (expanded ? registrationDetailHtml(r.id) : '') +
-      '<div class="item-actions"><button onclick="toggleRegistrationDetail(\'' + r.id + '\')">' + (expanded ? 'Hide' : 'Manage') + '</button></div></div>';
-  }).join("") || '<div class="item"><span class="meta">Nothing in the queue right now</span></div>';
   $("platformAdminCount").textContent = `(${platformAdmins.length})`;
   $("platformAdminList").innerHTML = platformAdmins.map((a) => {
     const isMe = myEmail && a.email === myEmail;
@@ -242,7 +165,7 @@ function render() {
 function show(tab) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === tab));
-  $("title").textContent = { overview: "Overview", businesses: "Businesses & Payments", growth: "Growth", auditlog: "Audit Log", settings: "Platform Settings", registrations: "Registration Queue", admins: "Platform Admins" }[tab];
+  $("title").textContent = { overview: "Overview", businesses: "Businesses & Payments", growth: "Growth", auditlog: "Audit Log", settings: "Platform Settings", admins: "Platform Admins" }[tab];
 }
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => show(b.dataset.tab)));
 

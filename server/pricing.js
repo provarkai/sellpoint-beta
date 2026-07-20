@@ -7,7 +7,7 @@ const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 // permanently. Prices differ per type (WhatsApp costs the platform real
 // money per send, priced lower to stay a genuine top-up rather than a
 // second subscription) - see ADDON_PRICES.
-const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, registration_package: 80000, bn_registration_package: 40000 };
+const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000 };
 const ADDON_AI_CREDITS = 500;
 const ADDON_WHATSAPP_CREDITS = 100;
 
@@ -66,14 +66,14 @@ const TIERS = {
     reportsTier: "basic", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 100, expenseLimit: 200, plHistoryDays: 180, supplierLimit: 10, poLimit: 25,
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
-    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront with Pixel/GA tracking, loyalty & wallet, Trackers & Document Vault in My Docs, 100 AI generations, and 100 automated WhatsApp sends/month",
+    tagline: "Unlimited orders, 30 products, branded invoices, a public storefront with Pixel/GA tracking, loyalty & wallet, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
   pro: {
     name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500,
     reportsTier: "standard", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 500, expenseLimit: 500, plHistoryDays: 365, supplierLimit: 50, poLimit: 100,
     loyaltyAvailable: true, batchLimit: 100, posLimit: 500,
-    tagline: "Everything in Growth plus 2 staff seats with custom permissions, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, 500 automated WhatsApp sends/month, and more AI generations",
+    tagline: "Everything in Growth plus 2 staff seats with custom permissions, suppliers, batch tracking, POS mode, 500 automated WhatsApp sends/month, and more AI generations",
   },
   business: {
     name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000,

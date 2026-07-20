@@ -33,7 +33,6 @@ const ASSIGNABLE_PERMISSIONS = [
   { key: "coupons.manage", label: "Coupons" },
   { key: "logistics.manage", label: "Logistics" },
   { key: "settings.write", label: "Settings" },
-  { key: "docs.manage", label: "My Docs" },
 ];
 const ASSIGNABLE_PERMISSION_KEYS = ASSIGNABLE_PERMISSIONS.map((p) => p.key);
 
@@ -46,7 +45,7 @@ const OWNER_ALL_PERMISSIONS = [...ASSIGNABLE_PERMISSION_KEYS, ...OWNER_ONLY_PERM
 // migration, so picking a preset and saving without changes behaves
 // identically to how it always did.
 const PERMISSION_PRESETS = {
-  manager: ["products.write", "customers.write", "orders.write", "pos.use", "invoices.use", "expenses.write", "reports.read", "suppliers.write", "campaigns.send", "coupons.manage", "logistics.manage", "settings.write", "docs.manage"],
+  manager: ["products.write", "customers.write", "orders.write", "pos.use", "invoices.use", "expenses.write", "reports.read", "suppliers.write", "campaigns.send", "coupons.manage", "logistics.manage", "settings.write"],
   sales_staff: ["customers.write", "orders.write", "pos.use", "invoices.use"],
   accountant: ["reports.read", "expenses.write", "invoices.use"],
 };
