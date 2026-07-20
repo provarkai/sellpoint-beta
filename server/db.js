@@ -3,7 +3,7 @@ const { Pool, types } = require("pg");
 const {
   orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, branchLimitFor, receiptLimitFor, storefrontEnabledFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
-  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS,
+  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE,
 } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
@@ -106,6 +106,7 @@ function toBusinessJson(b) {
     regNote: b.reg_note || "",
     tin: b.tin || "",
     scumlStatus: b.scuml_status || "not_started",
+    founderDiscount: !!b.founder_discount,
   };
 }
 function effectivePlan(b) {
@@ -713,6 +714,21 @@ async function grantBonusGrowthMonths(businessId, months) {
   await logEvent(businessId, "plan_upgraded", `growth (${months}mo bonus - registration package)`);
 }
 
+// The code itself stops being redeemable after FOUNDER_PROMO_DEADLINE, but
+// a business that already redeemed keeps the discount for life - the flag
+// on businesses, not the code's validity window, is what payments check.
+async function redeemFounderCode(businessId, code) {
+  const submitted = requireString(code, "Promo code").trim().toUpperCase();
+  if (submitted !== FOUNDER_PROMO_CODE) throw new OrderError("Invalid promo code");
+  if (Date.now() > new Date(FOUNDER_PROMO_DEADLINE).getTime()) throw new OrderError("This promo code has expired");
+  const business = await getBusiness(businessId);
+  if (!business) throw new OrderError("Business not found");
+  if (business.founderDiscount) return business;
+  await query("UPDATE businesses SET founder_discount = true WHERE id = $1", [businessId]);
+  await logEvent(businessId, "founder_discount_redeemed", "50% off for life");
+  return getBusiness(businessId);
+}
+
 // --- Referral program (real paying customers) -------------------------------
 
 // Generated lazily on first request rather than at signup, so businesses
@@ -1193,7 +1209,7 @@ async function getAddonBranchBonus(businessId) {
 
 async function hasPurchasedRegistrationPackage(businessId) {
   const { rows } = await query(
-    "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'registration_package'",
+    "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type IN ('registration_package','bn_registration_package')",
     [businessId]
   );
   return rows[0].n > 0;
@@ -2569,23 +2585,6 @@ async function submitBusinessRegistration(businessId) {
   return getDocsRegistration(businessId);
 }
 
-// A seller who is already incorporated elsewhere self-declares their CAC
-// number instead of buying the registration package - skips the
-// affiliates/shares requirement submitBusinessRegistration enforces since
-// this business isn't being incorporated from scratch. Staff verify the
-// number (e.g. via CAC's public search) and approve through the same
-// Registration Queue as a from-scratch filing.
-async function submitExistingRegistration(businessId, { regType, existingRegNumber }) {
-  const type = requireString(regType, "Registration type");
-  if (!["business_name", "llc", "partnership"].includes(type)) throw new OrderError("Invalid registration type");
-  const number = requireString(existingRegNumber, "Registration number");
-  await query(
-    "UPDATE businesses SET reg_type=$1, reg_existing_number=$2, reg_status='submitted' WHERE id=$3",
-    [type, number, businessId]
-  );
-  return getDocsRegistration(businessId);
-}
-
 // Cross-tenant queue for backend.html's Registration Queue tab - every
 // business currently mid-flight (submitted/in_review/action_needed).
 async function listRegistrationQueue() {
@@ -3398,6 +3397,7 @@ module.exports = {
   updateBusiness,
   activatePlan,
   grantBonusGrowthMonths,
+  redeemFounderCode,
   getOrCreateReferralCode,
   rewardReferrerIfEligible,
   downgradeToStarter,
@@ -3448,7 +3448,6 @@ module.exports = {
   deleteRegistrationAffiliate,
   addRegistrationPsc,
   submitBusinessRegistration,
-  submitExistingRegistration,
   hasPurchasedRegistrationPackage,
   listRegistrationQueue,
   advanceBusinessRegistration,

@@ -7,9 +7,17 @@ const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 // extra seat/branch permanently. Prices differ per type (WhatsApp costs the
 // platform real money per send, priced lower to stay a genuine top-up
 // rather than a second subscription) - see ADDON_PRICES.
-const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, branch: 2000, registration_package: 80000 };
+const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, branch: 2000, registration_package: 80000, bn_registration_package: 40000 };
 const ADDON_AI_CREDITS = 500;
 const ADDON_WHATSAPP_CREDITS = 100;
+
+// Founder promo: redeemable at checkout until FOUNDER_PROMO_DEADLINE, after
+// which new redemptions are rejected - but a business that already redeemed
+// keeps FOUNDER_DISCOUNT_RATE off every future plan payment for life (see
+// db.redeemFounderCode / businesses.founder_discount).
+const FOUNDER_PROMO_CODE = "FOUNDER50";
+const FOUNDER_PROMO_DEADLINE = "2026-12-31T23:59:59Z";
+const FOUNDER_DISCOUNT_RATE = 0.5;
 
 // staffLimit/aiLimit/branchLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
@@ -205,4 +213,7 @@ module.exports = {
   ADDON_PRICES,
   ADDON_AI_CREDITS,
   ADDON_WHATSAPP_CREDITS,
+  FOUNDER_PROMO_CODE,
+  FOUNDER_PROMO_DEADLINE,
+  FOUNDER_DISCOUNT_RATE,
 };

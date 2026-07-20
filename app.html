@@ -44,7 +44,7 @@
         <article><h2>Monthly Store Metrics</h2><div class="metrics"><div><small>Orders this month</small><b id="msmOrders">0</b></div><div><small>New customers this month</small><b id="msmCustomers">0</b></div><div><small>Abandoned checkouts</small><b id="msmAbandoned">0</b></div></div></article>
       </div>
     </section>
-    <section id="products" class="page"><div class="grid"><form id="productForm"><h2 id="pFormTitle">Add product / service</h2><label>Type<select id="pType"><option>Product</option><option>Service</option><option>Digital product</option></select></label><label>Name<input id="pName" required></label><label>Price<input id="pPrice" type="number" min="0" required></label><label>Discount price <span class="meta">(optional - leave blank for no discount)</span><input id="pDiscountPrice" type="number" min="0" placeholder="e.g. 4500"></label><label>Stock / slots / licenses<input id="pStock" type="number" min="0" required></label><label>Weight (kg) <span class="meta">(optional - used to calculate shipping cost for SellersPoint Logistics)</span><input id="pWeight" type="number" min="0" step="0.01" placeholder="e.g. 0.5"></label><label>Category<input id="pCat"></label><label><input type="checkbox" id="pShowInStorefront" checked> Show in storefront <span class="meta">(uncheck to keep this item in inventory/POS/orders without listing it publicly)</span></label><label>Barcode <span class="meta">(optional - scan with a USB barcode scanner or type manually)</span><input id="pBarcode" placeholder="e.g. 6009123456789"></label><label>Extra details for AI <span class="meta">(optional - material, key features, who it's for, size/variants - helps AI write a stronger description)</span><textarea id="pAiContext" rows="2" placeholder="e.g. 100% cotton, hand-stitched, made for humid weather, comes in 3 colors"></textarea></label><label>Description <span class="meta">(shows on your storefront)</span><textarea id="pDescription" rows="3" placeholder="What is this, who is it for, what makes it good"></textarea></label><p class="actions"><button type="button" id="pGenDescription">Write with AI</button></p><label>Product photos <span class="meta">(up to 5, shown on your storefront)</span><input id="pImage" type="file" accept="image/*" multiple></label><div id="pImagePreview" class="product-photo-preview"></div><div id="pDeliveryLinkField" style="display:none"><label>Digital delivery link<input id="pDelivery" placeholder="https://drive.google.com/... or download page"></label></div><div id="pNoteField" style="display:none"><label><span id="pNoteLabel">Delivery note</span><textarea id="pNote" rows="3" placeholder="Access instructions, license key note, support contact"></textarea></label></div><p class="actions"><button id="pSubmitBtn">Save Item</button><button type="button" id="pCancelEdit" style="display:none">Cancel Edit</button></p></form><article><h2>Products & Services <small id="pCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="pImportCsv" type="file" accept=".csv" style="display:none"></label><button id="pExportPdf">Export PDF</button><button id="pExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, price, stock, category, type</p><div id="pList" class="list"></div></article>
+    <section id="products" class="page"><div class="grid"><form id="productForm"><h2 id="pFormTitle">Add product / service</h2><label>Type<select id="pType"><option>Product</option><option>Service</option><option>Digital product</option></select></label><label>Name<input id="pName" required></label><label>Price<input id="pPrice" type="number" min="0" required></label><label>Discount price <span class="meta">(optional - leave blank for no discount)</span><input id="pDiscountPrice" type="number" min="0" placeholder="e.g. 4500"></label><label>Stock / slots / licenses<input id="pStock" type="number" min="0" required></label><label>Weight (kg) <span class="meta">(optional - used to calculate shipping cost for SellersPoint Logistics)</span><input id="pWeight" type="number" min="0" step="0.01" placeholder="e.g. 0.5"></label><label>Category<input id="pCat"></label><label>Barcode <span class="meta">(optional - scan with a USB barcode scanner or type manually)</span><input id="pBarcode" placeholder="e.g. 6009123456789"></label><label>Extra details for AI <span class="meta">(optional - material, key features, who it's for, size/variants - helps AI write a stronger description)</span><textarea id="pAiContext" rows="2" placeholder="e.g. 100% cotton, hand-stitched, made for humid weather, comes in 3 colors"></textarea></label><label>Description <span class="meta">(shows on your storefront)</span><textarea id="pDescription" rows="3" placeholder="What is this, who is it for, what makes it good"></textarea></label><p class="actions"><button type="button" id="pGenDescription">Write with AI</button></p><label>Product photos <span class="meta">(up to 5, shown on your storefront)</span><input id="pImage" type="file" accept="image/*" multiple></label><div id="pImagePreview" class="product-photo-preview"></div><div id="pDeliveryLinkField" style="display:none"><label>Digital delivery link<input id="pDelivery" placeholder="https://drive.google.com/... or download page"></label></div><div id="pNoteField" style="display:none"><label><span id="pNoteLabel">Delivery note</span><textarea id="pNote" rows="3" placeholder="Access instructions, license key note, support contact"></textarea></label></div><label><input type="checkbox" id="pShowInStorefront" checked> Show in storefront <span class="meta">(uncheck to keep this item in inventory/POS/orders without listing it publicly)</span></label><p class="actions"><button id="pSubmitBtn">Save Item</button><button type="button" id="pCancelEdit" style="display:none">Cancel Edit</button></p></form><article><h2>Products & Services <small id="pCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="pImportCsv" type="file" accept=".csv" style="display:none"></label><button id="pExportPdf">Export PDF</button><button id="pExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, price, stock, category, type</p><div id="pList" class="list"></div></article>
       <form id="batchForm"><h2>Batch / lot tracking <small class="meta">(optional - doesn't yet affect stock automatically)</small></h2><label>Product<select id="bProduct"></select></label><label>Batch number<input id="bNumber" placeholder="e.g. LOT-2026-07"></label><label>Quantity<input id="bQty" type="number" min="0" value="0"></label><label>Expiry date (optional)<input id="bExpiry" type="date"></label><label>Cost price (optional)<input id="bCost" type="number" min="0" step="0.01"></label><button>Add Batch</button></form>
       <article><h2>Batches <small id="bCount"></small></h2><div id="bList" class="list"></div></article>
       </div></section>
@@ -97,7 +97,6 @@
     <section id="docs" class="page">
       <div class="docs-subnav">
         <button class="docs-tab active" data-view="overview">Overview</button>
-        <button class="docs-tab" data-view="registration">Business Registration</button>
         <button class="docs-tab" data-view="calendar">Compliance Calendar</button>
         <button class="docs-tab" data-view="tax">Tax Tools</button>
         <button class="docs-tab" data-view="trackers">Trackers</button>
@@ -105,16 +104,20 @@
       </div>
 
       <div id="docs-gate" class="docs-subpage">
-        <div class="view-header"><h1>Let's get your business verified</h1><p>SellersPoint helps every seller run as a fully registered, bank-ready business. Choose how you'd like to get started - Business Registration, the Compliance Calendar, and Tax Tools unlock once you do. Trackers and your Document Vault are always open.</p></div>
+        <div class="view-header"><h1>Let's get your business registered</h1><p>SellersPoint helps every seller run as a fully registered, bank-ready business - filed for you end to end. Choose a package to get started; the Compliance Calendar and Tax Tools unlock once you do.</p></div>
         <div class="grid grid-2">
           <div class="card">
-            <h3>I already have a registration</h3>
-            <p class="meta">Already incorporated with CAC? Give us your registration number and our team will verify it.</p>
-            <form id="docsExistingRegForm">
-              <label>Registration type<select id="docsExistingRegType" required><option value="">Choose...</option><option value="business_name">Business Name</option><option value="llc">Limited Liability Company</option><option value="partnership">Partnership</option></select></label>
-              <label>Registration number<input id="docsExistingRegNumber" placeholder="RC1234567" required></label>
-              <button type="submit" class="btn btn-primary">Submit for verification</button>
-            </form>
+            <h3>BUSINESS NAME REGISTRATION ✍️</h3>
+            <p class="meta">Business Name Registration, filed for you end to end.</p>
+            <ul class="gate-doc-list">
+              <li>Certificate of Registration</li>
+              <li>Status Report</li>
+              <li>Congratulatory Letter</li>
+              <li>FIRS TIN Certificate</li>
+              <li>3 months of the Growth plan, on us</li>
+            </ul>
+            <div class="gate-price">₦40,000<small>SCUML price not included</small></div>
+            <button type="button" class="btn btn-primary" id="docsBuyBnPackage">Subscribe &amp; Get Started</button>
           </div>
           <div class="card" style="border-color:var(--primary);background:#f0faf6">
             <h3>COMPANY REGISTRATION ✍️</h3>
@@ -425,6 +428,12 @@
 
       <div id="docs-trackers" class="docs-subpage">
         <div class="view-header"><h1>Trackers</h1><p>Anything with a due or renewal date - we'll remind you. Licences &amp; Documents can be filed straight from here; everything else is just a nudge.</p></div>
+        <div class="card docs-locked-prompt" id="docsTrackersLocked" style="display:none">
+          <b>🔒 Unlock Trackers</b>
+          <p class="meta" style="margin-top:6px">Track anything with a due or renewal date - rent, insurance, licences - available on the Growth plan and above.</p>
+          <p class="actions" style="margin-top:14px"><a class="btn btn-primary" href="upgrade.html">Upgrade to Growth →</a></p>
+        </div>
+        <div id="docsTrackersBody">
         <article>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <h3>Your trackers</h3>
@@ -439,6 +448,7 @@
           </form>
         </article>
         <div id="docsTrackerList" style="margin-top:16px"></div>
+        </div>
       </div>
 
       <div id="docs-templates" class="docs-subpage">
@@ -475,6 +485,12 @@
 
       <div id="docs-vault" class="docs-subpage">
         <div class="view-header"><h1>Document Vault</h1><p>Everything from Business Registration, Tax, Templates, and your invoices/receipts - searchable in one place.</p></div>
+        <div class="card docs-locked-prompt" id="docsVaultLocked" style="display:none">
+          <b>🔒 Unlock the Document Vault</b>
+          <p class="meta" style="margin-top:6px">Every document from Registration, Tax, Templates, and your invoices/receipts, searchable in one place - available on the Growth plan and above.</p>
+          <p class="actions" style="margin-top:14px"><a class="btn btn-primary" href="upgrade.html">Upgrade to Growth →</a></p>
+        </div>
+        <div id="docsVaultBody">
         <div class="card bundle-card" style="margin-bottom:16px">
           <div class="info"><b>🧾 Need a contract, tenancy agreement, or proposal?</b><small>Create a basic document instantly, no status tracking.</small></div>
           <button type="button" class="btn btn-ghost btn-sm" onclick="showDocsView('templates')">Create a document</button>
@@ -500,6 +516,7 @@
           </div>
           <div id="docsVaultList"></div>
         </article>
+        </div>
       </div>
     </section>
 

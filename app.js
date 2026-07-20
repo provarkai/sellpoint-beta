@@ -913,15 +913,12 @@ function renderActivationChecklist(){
   const el=$("activationChecklist");if(!el)return;
   const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"],["Use your store AI",localStorage.getItem("sp_used_store_ai")==="1","ai"],["Register your business",!!state.regType,"docs"]];
   const done=items.filter(x=>x[1]).length;
-  const regDone=!!state.regType;
-  // Registration is mandatory-enough that it can't be dismissed away - the
-  // checklist stays on the dashboard until it's actually done, even if
-  // every other item is finished and even past a prior "Dismiss" click.
-  if(done===items.length||(regDone&&localStorage.getItem("sp_checklist_dismissed"))){el.style.display="none";return}
+  // No manual dismiss - the checklist only goes away once every item is
+  // actually done.
+  if(done===items.length){el.style.display="none";return}
   el.style.display="block";
   $("activationChecklistCount").textContent=`${done}/${items.length} done`;
-  $("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("")+(regDone?`<p class="actions"><button id="dismissChecklist" class="wizard-skip">Dismiss</button></p>`:"");
-  if($("dismissChecklist"))$("dismissChecklist").onclick=()=>{localStorage.setItem("sp_checklist_dismissed","1");render()};
+  $("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("");
 }
 // Every paid order still awaiting delivery, any method (self/rider/
 // SellersPoint Logistics) - the one place to see everything that still
@@ -1047,23 +1044,30 @@ const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - await
 const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",filed:"pill-success"};
 const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-// Trackers, the Document Vault, and Templates are self-serve utilities,
-// open to everyone; Overview and Registration assume a registered (or
-// registering) business, so those fully redirect to the onboarding gate
-// until that's true. Calendar/Tax sit in between - locked, but still show
-// their own description instead of vanishing into the generic gate.
+// Templates is a self-serve utility, open to everyone; Overview and
+// Registration assume a registered (or registering) business, so those
+// fully redirect to the onboarding gate until that's true. Calendar/Tax
+// sit in between - locked until registered, but still show their own
+// description instead of vanishing into the generic gate. Trackers/Vault
+// are locked instead by plan (Starter excluded) - a separate axis from
+// the registration gate, so both checks run independently per view.
 const DOCS_GATED_VIEWS=["overview","registration"];
-const DOCS_PREVIEW_LOCK={calendar:["docsCalendarBody","docsCalendarLocked"],tax:["docsTaxBody","docsTaxLocked"]};
+const DOCS_PREVIEW_LOCK={
+  calendar:{body:"docsCalendarBody",lock:"docsCalendarLocked",locked:()=>docsIsFirstTimer()},
+  tax:{body:"docsTaxBody",lock:"docsTaxLocked",locked:()=>docsIsFirstTimer()},
+  trackers:{body:"docsTrackersBody",lock:"docsTrackersLocked",locked:()=>state.plan==="starter"},
+  vault:{body:"docsVaultBody",lock:"docsVaultLocked",locked:()=>state.plan==="starter"},
+};
 function docsIsFirstTimer(){const b=docsData?.business;return !!b&&!b.regType&&!b.regExistingNumber&&!b.hasPurchasedPackage}
 function showDocsView(view){
   const firstTimer=docsIsFirstTimer();
   const gated=firstTimer&&DOCS_GATED_VIEWS.includes(view);
   document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",gated?p.id==="docs-gate":p.id==="docs-"+view));
-  Object.entries(DOCS_PREVIEW_LOCK).forEach(([v,[bodyId,lockId]])=>{
-    const locked=v===view&&firstTimer;
-    if($(bodyId))$(bodyId).style.display=locked?"none":"";
-    if($(lockId))$(lockId).style.display=locked?"block":"none";
+  Object.entries(DOCS_PREVIEW_LOCK).forEach(([v,{body,lock,locked}])=>{
+    const isLocked=v===view&&locked();
+    if($(body))$(body).style.display=isLocked?"none":"";
+    if($(lock))$(lock).style.display=isLocked?"block":"none";
   });
 }
 async function loadAllDocsData(){
@@ -1078,10 +1082,6 @@ async function loadAllDocsData(){
 }
 function renderAllDocs(){
   if(!docsData)return;
-  // Once a business is actually registered there's nothing left to do on
-  // this tab - registration status still shows on Overview's Health Score.
-  const regTab=document.querySelector('.docs-tab[data-view="registration"]');
-  if(regTab)regTab.style.display=docsData.business.regStatus==="approved"?"none":"";
   renderDocs();
   renderDocsOverview();
   renderDocsHealthScore();
@@ -1125,24 +1125,18 @@ async function deleteDocsAffiliate(id){try{await api("DELETE","/api/docs/registr
 if($("docsPscForm"))$("docsPscForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/registration/psc",{affiliateId:$("docsPscAffiliate").value,sharePercent:+$("docsPscSharePercent").value,ownsDirectShares:$("docsPscOwnsDirectShares").checked,hasSignificantControl:$("docsPscHasControl").checked,isPep:$("docsPscIsPep").checked});e.target.reset();await loadDocsRegistration();toast("PSC entry added")}catch(err){toast(err.message)}};
 if($("docsSubmitRegistration"))$("docsSubmitRegistration").onclick=async()=>{try{docsData=await api("POST","/api/docs/registration/submit");renderDocs();showDocsView("overview");toast("Registration submitted - our team will review it shortly")}catch(err){toast(err.message)}};
 
-// --- Docs onboarding gate: existing CAC number vs the paid registration package
-if($("docsExistingRegForm"))$("docsExistingRegForm").onsubmit=async e=>{
-  e.preventDefault();
-  try{
-    docsData=await api("POST","/api/docs/registration/existing",{regType:$("docsExistingRegType").value,existingRegNumber:$("docsExistingRegNumber").value.trim()});
-    renderAllDocs();
-    toast("Registration number submitted - our team will verify it shortly");
-  }catch(err){toast(err.message)}
-};
+// --- Docs onboarding gate: Business Name or Company (LLC) registration package
 let docsGateBusy=false;
-if($("docsBuyRegPackage"))$("docsBuyRegPackage").onclick=async()=>{
+async function docsBuyPackage(type){
   if(docsGateBusy)return;
   docsGateBusy=true;
   try{
-    const r=await api("POST","/api/addons/purchase",{type:"registration_package"});
+    const r=await api("POST","/api/addons/purchase",{type});
     location.href=r.authorizationUrl;
   }catch(err){toast(err.message);docsGateBusy=false}
-};
+}
+if($("docsBuyBnPackage"))$("docsBuyBnPackage").onclick=()=>docsBuyPackage("bn_registration_package");
+if($("docsBuyRegPackage"))$("docsBuyRegPackage").onclick=()=>docsBuyPackage("registration_package");
 async function checkDocsPaymentReturn(){
   const params=new URLSearchParams(location.search);
   const reference=params.get("docsPaymentRef");
@@ -1150,8 +1144,8 @@ async function checkDocsPaymentReturn(){
   history.replaceState(null,"",location.pathname);
   try{
     const result=await api("GET","/api/payments/verify/"+encodeURIComponent(reference));
-    if(result.status==="success"&&result.addonType==="registration_package"){
-      toast("Payment confirmed - your Company Registration package is active. Fill in your details below to get started.");
+    if(result.status==="success"&&["registration_package","bn_registration_package"].includes(result.addonType)){
+      toast("Payment confirmed - your registration package is active. Fill in your details below to get started.");
     }else if(result.status!=="success"){
       toast("Payment status: "+result.status+". If you were charged, contact support with reference "+reference+".");
     }

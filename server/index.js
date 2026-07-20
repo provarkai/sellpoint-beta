@@ -197,7 +197,7 @@ async function finalizeIfSuccessful(txData) {
       await db.recordAddonPurchase(businessId, metadata.addonType);
       // The registration package bundles 3 months of Growth - see
       // db.grantBonusGrowthMonths for why it only applies on Starter.
-      if (metadata.addonType === "registration_package") await db.grantBonusGrowthMonths(businessId, 3);
+      if (REGISTRATION_ADDON_TYPES.includes(metadata.addonType)) await db.grantBonusGrowthMonths(businessId, 3);
     }
     return isNew;
   }
@@ -1419,12 +1419,6 @@ app.post(
   requirePermission("docs.manage"),
   handle(async (req, res) => res.json(await db.submitBusinessRegistration(req.businessId)))
 );
-app.post(
-  "/api/docs/registration/existing",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.submitExistingRegistration(req.businessId, req.body || {})))
-);
 
 app.get(
   "/api/docs/trackers",
@@ -1577,7 +1571,8 @@ app.delete(
 
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
-const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch", "registration_package"];
+const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch", "registration_package", "bn_registration_package"];
+const REGISTRATION_ADDON_TYPES = ["registration_package", "bn_registration_package"];
 
 app.post(
   "/api/addons/purchase",
@@ -1589,10 +1584,10 @@ app.post(
       return res.status(400).json({ error: "Paystack is not configured on this server" });
     }
     const reference = `spaddon_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
-    // The registration package is bought from inside My Docs, so it returns
-    // there instead of the standalone upgrade page.
+    // Either registration package is bought from inside My Docs, so it
+    // returns there instead of the standalone upgrade page.
     const callbackUrl =
-      type === "registration_package"
+      REGISTRATION_ADDON_TYPES.includes(type)
         ? `${req.protocol}://${req.get("host")}/app.html?docsPaymentRef=${reference}`
         : `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
     const result = await payments.initializeAddonTransaction({
@@ -1603,6 +1598,17 @@ app.post(
       businessId: req.businessId,
     });
     res.json({ authorizationUrl: result.authorizationUrl, amount: result.amount, reference });
+  })
+);
+
+// --- Founder promo (50% off for life, redeemable until FOUNDER_PROMO_DEADLINE) --
+
+app.post(
+  "/api/founder-code/redeem",
+  requireAuth,
+  handle(async (req, res) => {
+    const business = await db.redeemFounderCode(req.businessId, (req.body || {}).code);
+    res.json({ founderDiscount: business.founderDiscount });
   })
 );
 
@@ -1621,10 +1627,12 @@ app.post(
     if (!payments.isConfigured()) {
       return res.status(400).json({ error: "Paystack is not configured on this server" });
     }
+    const business = await db.getBusiness(req.businessId);
     const reference = `sp_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
     const callbackUrl = `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
     const cycle = billingCycle === "yearly" ? "yearly" : "monthly";
-    const amountNaira = cycle === "yearly" ? tiers[plan].yearly : tiers[plan].monthly;
+    const baseAmount = cycle === "yearly" ? tiers[plan].yearly : tiers[plan].monthly;
+    const amountNaira = business.founderDiscount ? Math.round(baseAmount * pricing.FOUNDER_DISCOUNT_RATE) : baseAmount;
     const result = await payments.initializeTransaction({
       email,
       plan,

@@ -4,6 +4,7 @@ let cycle = "monthly";
 let authToken = null;
 let busy = false;
 let currentPlan = null;
+let founderDiscount = false;
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const unlimited = (v) => v === Infinity || v === null || v === undefined;
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
@@ -42,9 +43,13 @@ function planCardsHtml() {
     const isEnterprise = t.monthly == null;
     const isCurrent = key === currentPlan;
     const featured = key === "pro" && !isCurrent;
+    const fullPrice = cycle === "yearly" ? t.yearly : t.monthly;
+    const showFounderPrice = founderDiscount && !isEnterprise && fullPrice > 0;
     const priceHtml = isEnterprise
       ? '<p class="premium-price">Custom<span> pricing</span></p>'
-      : '<p class="premium-price">' + money(cycle === "yearly" ? t.yearly : t.monthly) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p>';
+      : showFounderPrice
+      ? '<p class="premium-price"><s style="font-size:16px;color:#8fa89b;font-weight:600">' + money(fullPrice) + '</s> ' + money(Math.round(fullPrice * 0.5)) + '<span>/' + (cycle === "yearly" ? "year" : "month") + ' - founder price</span></p>'
+      : '<p class="premium-price">' + money(fullPrice) + '<span>/' + (cycle === "yearly" ? "year" : "month") + '</span></p>';
     const cta = isCurrent
       ? '<button disabled>Current Plan</button>'
       : isEnterprise
@@ -101,6 +106,11 @@ function render() {
   if ($("currentPlanNote") && currentPlan) {
     $("currentPlanNote").textContent = "You're currently on the " + (pricing[currentPlan]?.name || currentPlan) + " plan.";
     $("currentPlanNote").style.display = "block";
+  }
+  if (founderDiscount && $("founderCode")) {
+    $("founderCode").style.display = "none";
+    $("founderCodeApply").style.display = "none";
+    $("founderCodeStatus").textContent = "Founder pricing applied - 50% off for life.";
   }
 }
 
@@ -165,7 +175,29 @@ async function loadAll() {
   ]);
   pricing = pricingRes;
   currentPlan = meRes?.business?.plan || null;
+  founderDiscount = !!meRes?.business?.founderDiscount;
 }
+
+async function redeemFounderCode() {
+  const code = $("founderCode").value.trim();
+  if (!code) return;
+  const btn = $("founderCodeApply");
+  btn.disabled = true;
+  try {
+    await api("POST", "/api/founder-code/redeem", { code });
+    founderDiscount = true;
+    $("founderCode").value = "";
+    $("founderCode").style.display = "none";
+    btn.style.display = "none";
+    $("founderCodeStatus").textContent = "Founder pricing applied - 50% off for life.";
+    render();
+  } catch (err) {
+    toast(err.message);
+  }
+  btn.disabled = false;
+}
+if ($("founderCodeApply")) $("founderCodeApply").onclick = redeemFounderCode;
+if ($("founderCode")) $("founderCode").addEventListener("keydown", (e) => { if (e.key === "Enter") redeemFounderCode(); });
 
 (async () => {
   const ctx = await window.Auth.requireSession();

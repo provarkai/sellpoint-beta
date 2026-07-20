@@ -305,6 +305,12 @@ alter table products add column if not exists weight numeric;
 -- the public storefront (e.g. wholesale-only or not-yet-ready items).
 alter table products add column if not exists show_in_storefront boolean not null default true;
 
+-- Set for life once a business redeems the founder promo code (see
+-- pricing.js's FOUNDER_PROMO_CODE) - every future plan payment for this
+-- business is charged at 50% off, regardless of when the code itself
+-- stops being redeemable by new businesses.
+alter table businesses add column if not exists founder_discount boolean not null default false;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying
