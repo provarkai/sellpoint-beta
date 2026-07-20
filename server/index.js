@@ -1034,7 +1034,7 @@ app.post(
   "/api/ai/generate",
   requireAuth,
   handle(async (req, res) => {
-    const { tool, productId, customerId, detail } = req.body || {};
+    const { tool, productId, customerId, detail, templateType, fields, mode, extraClauses } = req.body || {};
     const state = await db.getState(req.businessId);
     const product = state.products.find((p) => p.id === productId);
     const customer = state.customers.find((c) => c.id === customerId);
@@ -1176,6 +1176,16 @@ app.post(
       lines.push(openPurchaseOrders.length ? `${openPurchaseOrders.length} purchase order${openPurchaseOrders.length === 1 ? "" : "s"} still open with suppliers.` : vipCustomers.length ? `Keep your ${vipCustomers.length} VIP customer${vipCustomers.length === 1 ? "" : "s"} happy - they're your biggest spenders.` : "Add a purchase order once you're low on stock to track restocking.");
       return lines.map((l) => `- ${l}`).join("\n");
     }
+    // Docs > Templates: drafts a real document from the fields the seller
+    // filled in, instead of the placeholder text this used to ship with.
+    const DOC_TEMPLATE_LABELS = { business: "Business Agreement", tenancy: "Tenancy Agreement", freelance: "Freelance / Service Contract", loan: "Loan Agreement", sales: "Sales / Supplier Agreement", proposal: "Proposal / Quote" };
+    const docTemplateLabel = DOC_TEMPLATE_LABELS[templateType] || "Business Agreement";
+    const docFields = Array.isArray(fields) ? fields.filter((f) => f && f.label) : [];
+    const docFieldsText = docFields.map((f) => `${f.label}: ${(f.value || "").trim() || "[not provided]"}`).join("\n");
+    const docExtraClauses = Array.isArray(extraClauses) ? extraClauses.filter(Boolean) : [];
+    const docIsImproved = mode === "improved";
+    const docDetail = (detail || "").trim();
+
     // Fallback templates - used when OPENROUTER_API_KEY isn't configured, or
     // if the OpenRouter call itself fails, so the feature degrades instead
     // of breaking outright.
@@ -1188,6 +1198,18 @@ app.post(
       reminder: `Hello ${customer?.name || "there"}, this is a friendly reminder about your pending order.\n\nPlease complete payment so we can process delivery. Thank you for choosing us.`,
       summary: `Sales summary:\n\nTotal orders: ${state.orders.length}\nTotal recorded revenue: ${money(revenue)}\nBest-selling item: ${bestSeller || "Not enough sales yet"}\nPending payments: ${state.orders.filter((o) => o.status === "Pending payment").length}\n\nSuggested action: follow up pending payments and restock fast-moving products.`,
       description: `${draftName}${draftCategory ? ` - ${draftCategory}` : ""}. A quality ${draftType.toLowerCase()} priced at ${money(draftPrice)}${draftExtra ? `. ${draftExtra}` : ""}, with fast delivery and great value for the price.`,
+      doc_template: [
+        `${docTemplateLabel}${docIsImproved ? " (Improved)" : ""}`,
+        "",
+        `Prepared for: ${state.business.businessName}`,
+        `Date: ${new Date().toLocaleDateString("en-NG")}`,
+        "",
+        docFieldsText || "[No details provided yet]",
+        docExtraClauses.length ? `\nAdditional terms:\n${docExtraClauses.map((c) => `- ${c}`).join("\n")}` : "",
+        docDetail ? `\nNotes: ${docDetail}` : "",
+        "",
+        "This is a template for common situations, not a substitute for personalized legal advice.",
+      ].filter(Boolean).join("\n"),
     };
     const prompts = {
       ask: `You are a helpful AI business assistant for a Nigerian small business called "${state.business.businessName}". Answer the owner's question using ONLY this real data - never invent numbers or names: total orders ${state.orders.length}, paid revenue ${money(revenue)}, best-selling item "${bestSeller || "none yet"}", customers who owe money: ${Object.entries(owedByCustomer).map(([n, a]) => `${n} owes ${money(a)}`).join("; ") || "none"}, low stock items: ${lowStock.map((p) => `${p.name} (${p.stock} left)`).join(", ") || "none"}, this month's profit: ${profitLoss ? `${money(profitLoss.revenue)} revenue minus ${money(profitLoss.expensesTotal)} expenses = ${money(profitLoss.netProfit)} net` : "no expenses logged yet"}, VIP customers: ${vipCustomers.map((c) => c.name).join(", ") || "none yet"}, at-risk (gone quiet) customers: ${atRiskCustomers.map((c) => c.name).join(", ") || "none"}, open purchase orders: ${openPurchaseOrders.map((po) => `${po.supplierName} (${po.status})`).join(", ") || "none"}, overdue credit sales: ${overdueCredit.length || "none"}. Question: "${question || "How is my business doing?"}". Answer in 2-3 sentences, plain text, specific and direct - if the data doesn't cover the question, say so honestly instead of guessing.`,
@@ -1198,6 +1220,7 @@ app.post(
       reminder: `Write a polite, brief WhatsApp payment reminder from a Nigerian small business to a customer named ${customer?.name || "a customer"} about a pending order. 2-3 sentences, not pushy.`,
       summary: `Write a short sales summary for a Nigerian small business owner based on this data: ${state.orders.length} total orders, ${money(revenue)} paid revenue, best-selling item "${bestSeller || "none yet"}", ${state.orders.filter((o) => o.status === "Pending payment").length} orders still pending payment. End with one concrete suggested action. 4-5 sentences.`,
       description: `Write a short storefront product description (2-3 sentences, plain text, no markdown, no hashtags, no emojis) for a Nigerian small business selling "${draftName}"${draftCategory ? ` (category: ${draftCategory})` : ""}, a ${draftType.toLowerCase()} priced at ${money(draftPrice)}.${draftExtra ? ` Extra details to weave in naturally: ${draftExtra}.` : ""} Describe what it is, who it's for, and why it's worth buying.`,
+      doc_template: `Draft a complete, ready-to-use "${docTemplateLabel}" for a Nigerian small business called "${state.business.businessName}". Use these details exactly as given, and only fill a sensible standard default where a detail is marked [not provided]: ${docFieldsText || "no fields provided"}.${docExtraClauses.length ? ` Include these additional clauses: ${docExtraClauses.join("; ")}.` : ""}${docDetail ? ` Extra context from the business owner: ${docDetail}.` : ""} Write it with a proper document structure - a title, numbered clauses, and a signature block for each party. Plain text only, no markdown formatting. End with this exact disclaimer on its own line: "This is a template for common situations, not a substitute for personalized legal advice."`,
     };
     if (!templates[tool]) return res.status(400).json({ error: "Unknown AI tool" });
     let used = await db.getAiUsage(req.businessId);
@@ -1391,6 +1414,12 @@ app.post(
   requirePermission("docs.manage"),
   handle(async (req, res) => res.json(await db.submitBusinessRegistration(req.businessId)))
 );
+app.post(
+  "/api/docs/registration/existing",
+  requireAuth,
+  requirePermission("docs.manage"),
+  handle(async (req, res) => res.json(await db.submitExistingRegistration(req.businessId, req.body || {})))
+);
 
 app.get(
   "/api/docs/trackers",
@@ -1469,19 +1498,6 @@ app.post(
 );
 
 app.get(
-  "/api/docs/verifications",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.json(await db.listVerifications(req.businessId)))
-);
-app.post(
-  "/api/docs/verifications",
-  requireAuth,
-  requirePermission("docs.manage"),
-  handle(async (req, res) => res.status(201).json(await db.createVerification(req.businessId, req.body || {})))
-);
-
-app.get(
   "/api/docs/filings",
   requireAuth,
   requirePermission("docs.manage"),
@@ -1556,7 +1572,7 @@ app.delete(
 
 // --- Add-on purchases (a-la-carte, on top of any plan) ----------------------
 
-const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch"];
+const ADDON_TYPES = ["ai_credits", "whatsapp_credits", "staff", "branch", "registration_package"];
 
 app.post(
   "/api/addons/purchase",
@@ -1568,7 +1584,12 @@ app.post(
       return res.status(400).json({ error: "Paystack is not configured on this server" });
     }
     const reference = `spaddon_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
-    const callbackUrl = `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
+    // The registration package is bought from inside My Docs, so it returns
+    // there instead of the standalone upgrade page.
+    const callbackUrl =
+      type === "registration_package"
+        ? `${req.protocol}://${req.get("host")}/app.html?docsPaymentRef=${reference}`
+        : `${req.protocol}://${req.get("host")}/upgrade.html?reference=${reference}`;
     const result = await payments.initializeAddonTransaction({
       email: req.user.email,
       addonType: type,
@@ -1705,19 +1726,6 @@ app.put(
   "/api/admin/registration-queue/:id",
   requirePlatformAdmin,
   handle(async (req, res) => res.json(await db.advanceBusinessRegistration(req.params.id, req.body || {})))
-);
-
-// Manual resolution for Verification requests until a KYC vendor (QoreID
-// or similar) is wired in - see db.js#createVerification.
-app.get(
-  "/api/admin/verification-queue",
-  requirePlatformAdmin,
-  handle(async (req, res) => res.json(await db.listVerificationQueue()))
-);
-app.put(
-  "/api/admin/verification-queue/:id",
-  requirePlatformAdmin,
-  handle(async (req, res) => res.json(await db.resolveVerification(req.params.id, req.body || {})))
 );
 
 app.get(

@@ -569,6 +569,10 @@ alter table businesses add column if not exists reg_nature_of_business text not 
 alter table businesses add column if not exists reg_objects jsonb not null default '[]'::jsonb;
 alter table businesses add column if not exists reg_address jsonb not null default '{}'::jsonb;
 alter table businesses add column if not exists reg_certificate text not null default '';
+-- Set when a seller self-declares an existing CAC registration instead of
+-- buying the registration package - staff verify the number (e.g. via
+-- CAC's public search) and approve through the same Registration Queue.
+alter table businesses add column if not exists reg_existing_number text not null default '';
 alter table businesses add column if not exists tin text not null default '';
 alter table businesses add column if not exists scuml_status text not null default 'not_started';
 

@@ -7,7 +7,7 @@ const YEARLY_MULTIPLIER = 10; // 2 months free when billed yearly
 // extra seat/branch permanently. Prices differ per type (WhatsApp costs the
 // platform real money per send, priced lower to stay a genuine top-up
 // rather than a second subscription) - see ADDON_PRICES.
-const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, branch: 2000 };
+const ADDON_PRICES = { ai_credits: 2000, whatsapp_credits: 1500, staff: 2000, branch: 2000, registration_package: 80000 };
 const ADDON_AI_CREDITS = 500;
 const ADDON_WHATSAPP_CREDITS = 100;
 

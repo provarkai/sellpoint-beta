@@ -21,7 +21,7 @@ const orderLimit=()=>{const raw=pricing[state.plan]?.orderLimit;return raw===und
 // permission gates those). Reports has its own plan-tier visibility rule
 // elsewhere (render()) which also checks can("reports.read") now, so it's
 // deliberately left out of this map to avoid the two fighting each other.
-const TAB_PERMISSIONS={products:"products.write",customers:"customers.write",orders:"orders.write",invoice:"invoices.use",pos:"pos.use",expenses:"expenses.write",suppliers:"suppliers.write",settings:"settings.write",docs:"docs.manage"};
+const TAB_PERMISSIONS={products:"products.write",customers:"customers.write",orders:"orders.write",pos:"pos.use",expenses:"expenses.write",suppliers:"suppliers.write",settings:"settings.write",docs:"docs.manage"};
 function applyRoleVisibility(){
   document.querySelectorAll(".tab[data-tab]").forEach(btn=>{
     const perm=TAB_PERMISSIONS[btn.dataset.tab];
@@ -37,7 +37,7 @@ const orderItemsText=o=>(o.items&&o.items.length?o.items.map(i=>`${i.productName
 const date=d=>{const x=new Date(d);return `${String(x.getDate()).padStart(2,"0")}-${String(x.getMonth()+1).padStart(2,"0")}-${x.getFullYear()}`};
 const dateTime=d=>{const x=new Date(d);return `${date(d)} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>show(b.dataset.tab));
-function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",invoice:"Invoice",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings",docs:"My Docs"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos();if(tab==="docs")loadAllDocsData()}
+function show(tab){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===tab));$("title").textContent={dash:"Dashboard",products:"Products",customers:"Customers",orders:"Orders",pos:"POS",ai:"AI Assistant",reports:"Reports",expenses:"Expenses",suppliers:"Suppliers",feedback:"Feedback",settings:"Settings",docs:"My Docs"}[tab];if(tab==="reports")loadReports();if(tab==="ai")refreshAiUsage();if(tab==="expenses")loadExpensesTab();if(tab==="customers"){loadCustomerSegments();if(can("campaigns.send"))loadRecurringCampaigns()}if(tab==="suppliers")loadSuppliersTab();if(tab==="feedback")loadFeedbackTab();if(tab==="products")loadBatches();if(tab==="pos")enterPos();if(tab==="docs")loadAllDocsData()}
 function opts(el,items,label,empty){el.innerHTML="";if(!items.length){el.innerHTML=`<option value="">${empty}</option>`;return}items.forEach(x=>el.add(new Option(label(x),x.id)))}
 function bestProduct(){const t={};state.orders.forEach(o=>{if(o.status==="Quote"||o.status==="Refunded")return;(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).forEach(i=>{if(i.productName)t[i.productName]=(t[i.productName]||0)+i.qty})});return Object.entries(t).sort((a,b)=>b[1]-a[1])[0]?.[0]}
 function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.style.display==="none"?"block":"none"}
@@ -48,7 +48,7 @@ function render(){
   const visibleCustomers=customerSegmentFilter?state.customers.filter(c=>(customerSegments[c.id]?.segment)===customerSegmentFilter):state.customers;
   $("cList").innerHTML=visibleCustomers.map(c=>{const seg=customerSegments[c.id]?.segment;return `<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}${c.email?` - ${clean(c.email)}`:""}${seg?` - ${segmentLabel(seg)}`:""}</div><div class="item-actions"><button onclick="openCustomerTimeline('${c.id}')">Timeline</button><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`}).join("");
   renderSegmentFilter();
-  $("oList").innerHTML=state.orders.map(o=>{const c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;const isSellerspoint=o.deliveryMethod==="sellerspoint";const shipButton=!isSellerspoint?"":o.shipbubbleOrderId?`<a class="button-link" href="${o.shipbubbleTrackingUrl}" target="_blank" rel="noopener">Track Shipment</a><button onclick="refreshShipbubbleTracking('${o.id}')">Refresh Tracking</button>`:o.status==="Paid"?`<button onclick="bookShipbubbleShipment('${o.id}')">Book Shipment</button>`:"";const deliveryFeeLabel=o.deliveryFee?` - Delivery fee: ${money(o.deliveryFee)}${isSellerspoint&&!o.shipbubbleOrderId?" (courier not yet booked)":""}`:"";const trackingLabel=!o.shipbubbleOrderId?"":o.shipbubbleTrackingCode?` - Tracking code: ${clean(o.shipbubbleTrackingCode)}`:" - Tracking code: pending (courier hasn't assigned one yet)";return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}${deliveryFeeLabel}${trackingLabel}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">Receipt</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>${shipButton}<button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
+  $("oList").innerHTML=state.orders.map(o=>{const c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;const isSellerspoint=o.deliveryMethod==="sellerspoint";const shipButton=!isSellerspoint?"":o.shipbubbleOrderId?`<a class="button-link" href="${o.shipbubbleTrackingUrl}" target="_blank" rel="noopener">Track Shipment</a><button onclick="refreshShipbubbleTracking('${o.id}')">Refresh Tracking</button>`:o.status==="Paid"?`<button onclick="bookShipbubbleShipment('${o.id}')">Book Shipment</button>`:"";const deliveryFeeLabel=o.deliveryFee?` - Delivery fee: ${money(o.deliveryFee)}${isSellerspoint&&!o.shipbubbleOrderId?" (courier not yet booked)":""}`:"";const trackingLabel=!o.shipbubbleOrderId?"":o.shipbubbleTrackingCode?` - Tracking code: ${clean(o.shipbubbleTrackingCode)}`:" - Tracking code: pending (courier hasn't assigned one yet)";return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}${deliveryFeeLabel}${trackingLabel}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">${o.status==="Pending payment"?"Invoice":"Receipt"}</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>${shipButton}<button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
   const pLimRaw=pricing[state.plan]?.productLimit,pLim=pLimRaw===null||pLimRaw===undefined?Infinity:pLimRaw;
   $("pCount").textContent=`${state.products.length}/${pLim===Infinity?"unlimited":pLim} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;if($("used"))$("used").textContent=state.orders.length;
   if($("planName"))$("planName").textContent=pricing[state.plan]?.name||state.plan;
@@ -57,10 +57,10 @@ function render(){
   if($("pricingPlans"))$("pricingPlans").innerHTML=Object.entries(pricing).map(([key,t])=>`<div class="${key===state.plan?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
   if($("downgradeBtn"))$("downgradeBtn").style.display=state.plan!=="starter"&&can("plan.manage")?"block":"none";
   if($("paywallPlans"))$("paywallPlans").innerHTML=Object.entries(pricing).filter(([key,t])=>key!=="starter"&&t.monthly!=null).map(([key,t],i)=>`<div class="${i===0?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
-  const rev=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).reduce((s,o)=>s+total(o),0), low=state.products.filter(p=>p.stock<5), pending=state.orders.filter(o=>o.status==="Pending payment").length;
-  $("rev").textContent=money(rev);$("ordMetric").textContent=state.orders.filter(o=>["Paid","Delivered"].includes(o.status)).length;$("custMetric").textContent=state.customers.length;$("lowMetric").textContent=low.length;if($("abandonedMetric"))$("abandonedMetric").textContent=pending;
+  const low=state.products.filter(p=>p.stock<5), pending=state.orders.filter(o=>o.status==="Pending payment").length;
   $("summary").innerHTML=`Best seller: <b>${clean(bestProduct()||"Not enough sales yet")}</b>.<br><b>${pending}</b> orders need payment follow-up.`;
   const isToday=iso=>{const d=new Date(iso),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
+  const isThisMonth=iso=>{const d=new Date(iso),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()};
   const todayOrders=state.orders.filter(o=>isToday(o.createdAt));
   const todayPaid=todayOrders.filter(o=>["Paid","Delivered"].includes(o.status));
   const todayRevenue=todayPaid.reduce((s,o)=>s+total(o),0);
@@ -71,6 +71,11 @@ function render(){
   if($("todayCustomers"))$("todayCustomers").textContent=todayCustomers;
   if($("todayAvgOrder"))$("todayAvgOrder").textContent=money(avgOrder);
   $("restock").innerHTML=low.map(p=>`<div class="item"><strong>${clean(p.name)}</strong><span class="meta">${p.stock} left - restock soon</span></div>`).join("");
+  if($("restockHighlight")){$("restockHighlight").classList.toggle("has-alerts",low.length>0);$("restockCount").textContent=low.length?`(${low.length})`:""}
+  if($("msmOrders"))$("msmOrders").textContent=state.orders.filter(o=>isThisMonth(o.createdAt)&&["Paid","Delivered"].includes(o.status)).length;
+  if($("msmCustomers"))$("msmCustomers").textContent=state.customers.filter(c=>c.createdAt&&isThisMonth(c.createdAt)).length;
+  if($("msmLowStock"))$("msmLowStock").textContent=low.length;
+  if($("msmAbandoned"))$("msmAbandoned").textContent=pending;
   renderActivationChecklist();
   if($("followUp")){const stale=state.orders.filter(o=>o.status==="Pending payment"&&Date.now()-new Date(o.createdAt).getTime()>24*60*60*1000);$("followUpCount").textContent=stale.length?`(${stale.length})`:"";if($("followUpRemindAllWrap"))$("followUpRemindAllWrap").style.display=stale.length>1?"block":"none";$("followUp").innerHTML=stale.map(o=>{const c=customer(o.customerId);return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - pending since ${date(o.createdAt)}</div><div class="item-actions"><button onclick="sendReminderWhatsApp('${o.id}','${c?.phone||""}')">Remind via WhatsApp</button></div></div>`}).join("")}
   renderDeliveries();
@@ -241,7 +246,7 @@ function updateDeliveryFeeEstimate(){
 }
 function clearShipbubbleQuoteAndUpdate(){shipbubbleChosenQuote=null;updateDeliveryFeeEstimate()}
 async function convertOrder(id){try{const updated=await api("POST",`/api/orders/${id}/convert`,{});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;(updated.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock-=item.qty});render();toast("Quote converted to order")}catch(err){toast(err.message)}}
-async function refundOrder(id){const restock=confirm("Restock the item(s) from this order?");try{const updated=await api("PATCH",`/api/orders/${id}`,{refund:true,restock});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;if(restock){(updated.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock+=item.qty})}render();toast("Order refunded")}catch(err){toast(err.message)}}
+async function refundOrder(id){const restock=confirm("Restock the item(s) from this order?");try{const updated=await api("PATCH",`/api/orders/${id}`,{refund:true,restock});const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;if(restock){(updated.items||[]).forEach(item=>{const p=product(item.productId);if(p)p.stock+=item.qty})}render();loadMonthlyPL();toast("Order refunded")}catch(err){toast(err.message)}}
 function numberToWords(num){
   if(num===0)return "Zero";
   const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
@@ -493,8 +498,9 @@ async function refreshShipbubbleTracking(orderId){
 }
 function wa(msg,phone=""){open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,"_blank","noopener")}function copy(t){navigator.clipboard.writeText(t);toast("Copied")}
 function copyProductLink(id){copy(`${location.origin}/store/${state.slug||""}?product=${id}`)}
-function openInvoice(id){show("invoice");$("invSelect").value=id;renderInvoice()}
-async function setOrderStatus(id,status){try{const changes=status==="Paid"?{markPaid:true}:status==="Delivered"?{status:"Delivered",delivered:true}:{status};const updated=await api("PATCH",`/api/orders/${id}`,changes);const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;render();toast("Order updated");if(status==="Paid")showReceipt(id)}catch(err){toast(err.message)}}
+function openInvoice(id){$("invSelect").value=id;renderInvoice();if($("invoiceModal")?.showModal)$("invoiceModal").showModal()}
+if($("closeInvoiceModal"))$("closeInvoiceModal").onclick=()=>$("invoiceModal").close();
+async function setOrderStatus(id,status){try{const changes=status==="Paid"?{markPaid:true}:status==="Delivered"?{status:"Delivered",delivered:true}:{status};const updated=await api("PATCH",`/api/orders/${id}`,changes);const idx=state.orders.findIndex(x=>x.id===id);if(idx>-1)state.orders[idx]=updated;render();loadMonthlyPL();toast("Order updated");if(status==="Paid")openInvoice(id)}catch(err){toast(err.message)}}
 async function delProduct(id){await api("DELETE",`/api/products/${id}`);state.products=state.products.filter(x=>x.id!==id);render()}
 async function delCustomer(id){await api("DELETE",`/api/customers/${id}`);state.customers=state.customers.filter(x=>x.id!==id);render()}
 async function delOrder(id){await api("DELETE",`/api/orders/${id}`);state.orders=state.orders.filter(x=>x.id!==id);render()}
@@ -522,10 +528,18 @@ async function renderInvoiceCanvas(){
   try{return await html2canvas(clone,{backgroundColor:"#ffffff",scale:2})}
   finally{document.body.removeChild(clone)}
 }
-if($("downloadInvoiceImage"))$("downloadInvoiceImage").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{const canvas=await renderInvoiceCanvas();const link=document.createElement("a");link.download=o.id+".png";link.href=canvas.toDataURL("image/png");link.click()}catch(err){toast(err.message)}};
-if($("downloadInvoicePdf"))$("downloadInvoicePdf").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{if(!window.jspdf)throw new Error("PDF export isn't available right now - try again in a moment.");const canvas=await renderInvoiceCanvas();const{jsPDF}=window.jspdf;const pdf=new jsPDF({unit:"px",format:[canvas.width,canvas.height],hotfixes:["px_scaling"]});pdf.addImage(canvas.toDataURL("image/png"),"PNG",0,0,canvas.width,canvas.height);pdf.save(o.id+".pdf")}catch(err){toast(err.message)}};
+// Best-effort - saves a copy to the Docs Vault whenever an invoice/receipt
+// image is generated. Silently skipped for roles without docs.manage (e.g.
+// Sales Staff) rather than surfacing an error on what is otherwise a
+// successful download/share.
+function docsSaveReceiptToVault(o,canvas){
+  const docType=["Paid","Delivered"].includes(o.status)?"Receipt":"Invoice";
+  api("POST","/api/docs/vault",{name:`${docType} - ${o.id}`,docType,file:canvas.toDataURL("image/png")}).catch(()=>{});
+}
+if($("downloadInvoiceImage"))$("downloadInvoiceImage").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{const canvas=await renderInvoiceCanvas();const link=document.createElement("a");link.download=o.id+".png";link.href=canvas.toDataURL("image/png");link.click();docsSaveReceiptToVault(o,canvas)}catch(err){toast(err.message)}};
+if($("downloadInvoicePdf"))$("downloadInvoicePdf").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{if(!window.jspdf)throw new Error("PDF export isn't available right now - try again in a moment.");const canvas=await renderInvoiceCanvas();const{jsPDF}=window.jspdf;const pdf=new jsPDF({unit:"px",format:[canvas.width,canvas.height],hotfixes:["px_scaling"]});pdf.addImage(canvas.toDataURL("image/png"),"PNG",0,0,canvas.width,canvas.height);pdf.save(o.id+".pdf");docsSaveReceiptToVault(o,canvas)}catch(err){toast(err.message)}};
 async function shareImageViaWhatsApp(canvas,filename){const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));const file=new File([blob],filename,{type:"image/png"});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});return}const link=document.createElement("a");link.download=filename;link.href=canvas.toDataURL("image/png");link.click();toast("Image downloaded - attach it in WhatsApp (your browser doesn't support direct file sharing)")}
-if($("shareInvoiceImage"))$("shareInvoiceImage").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{const canvas=await renderInvoiceCanvas();await shareImageViaWhatsApp(canvas,o.id+".png")}catch(err){if(err.name!=="AbortError")toast(err.message)}};
+if($("shareInvoiceImage"))$("shareInvoiceImage").onclick=async()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];if(!o)return toast("Create an order first");try{const canvas=await renderInvoiceCanvas();await shareImageViaWhatsApp(canvas,o.id+".png");docsSaveReceiptToVault(o,canvas)}catch(err){if(err.name!=="AbortError")toast(err.message)}};
 
 function showPaywall(){const d=$("paywall");if(d?.showModal)d.showModal();else toast("Upgrade to continue taking orders")}
 function salesPitch(){const paid=Object.values(pricing).find(t=>t.monthly>0);return "Hi, SellersPoint Beta helps sellers and service businesses manage products, services, customers, orders, invoices, stock or slots, payment links, WhatsApp messages, and AI captions in one simple app."+(paid?` ${paid.name} plan is ${money(paid.monthly)}/month.`:"")}
@@ -768,6 +782,19 @@ if($("repExportExcel"))$("repExportExcel").onclick=()=>{
   XLSX.writeFile(wb,"sellerspoint-reports.xlsx");
 };
 
+// Dashboard's Monthly Profit & Loss card and the Expenses tab's own P&L
+// summary read the same /api/profit-loss response - applyMonthlyPL fills
+// in whichever of the two sets of elements is present on the page.
+function applyMonthlyPL(pl){
+  if($("mplRevenue"))$("mplRevenue").textContent=money(pl.revenue);
+  if($("mplExpenses"))$("mplExpenses").textContent=money(pl.expensesTotal);
+  if($("mplNetProfit"))$("mplNetProfit").textContent=money(pl.netProfit);
+}
+async function loadMonthlyPL(){
+  if(!can("reports.read"))return;
+  try{applyMonthlyPL(await api("GET","/api/profit-loss"))}catch(err){}
+}
+
 let expenseCategories=[];
 async function loadExpensesTab(){
   if(!$("eList"))return;
@@ -780,6 +807,7 @@ async function loadExpensesTab(){
     $("eCount").textContent=`(${expRes.expenses.length})`;
     $("eList").innerHTML=expRes.expenses.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.description)}</strong><span>${money(e.amount)}</span></div><div class="meta">${clean(e.category)} - ${date(e.date)}</div><div class="item-actions"><button onclick="delExpense('${e.id}')">Delete</button></div></div>`).join("")||`<div class="item"><span class="meta">No expenses logged yet</span></div>`;
     $("plSummary").innerHTML=`<div class="item"><strong>Revenue</strong><span>${money(pl.revenue)}</span></div><div class="item"><strong>Expenses</strong><span>${money(pl.expensesTotal)}</span></div><div class="item"><strong>Net profit</strong><span>${money(pl.netProfit)}</span></div>`;
+    applyMonthlyPL(pl);
     $("plByCategory").innerHTML=pl.expensesByCategory.map(c=>`<div class="item"><strong>${clean(c.category)}</strong><span>${money(c.total)}</span></div>`).join("")||`<div class="item"><span class="meta">No expenses this month</span></div>`;
     $("cashbookSummary").innerHTML=`<div class="item"><strong>Cash in</strong><span>${money(cb.totalIn)}</span></div><div class="item"><strong>Cash out</strong><span>${money(cb.totalOut)}</span></div><div class="item"><strong>Net</strong><span>${money(cb.totalIn-cb.totalOut)}</span></div>`;
     $("cashbookList").innerHTML=cb.entries.map(e=>`<div class="item"><div class="item-top"><strong>${clean(e.description)}</strong><span>${e.type==="in"?"+":"-"}${money(e.amount)}</span></div><div class="meta">${date(e.date)} - Balance: ${money(e.balance)}</div></div>`).join("")||`<div class="item"><span class="meta">No cash movements in this period</span></div>`;
@@ -877,9 +905,21 @@ if($("branchForm"))$("branchForm").onsubmit=async e=>{e.preventDefault();try{awa
 if($("sLogo"))$("sLogo").onchange=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{const updated=await api("PUT","/api/business",{businessLogo:reader.result});Object.assign(state,updated);render();toast("Logo saved")};reader.readAsDataURL(file)};
 
 function digitalDeliveryHtml(o){const items=(o.items&&o.items.length?o.items:[{productId:o.productId,productName:o.productName,productType:o.productType}]);const digitalItems=items.filter(i=>i.productType==="Digital product");if(!digitalItems.length)return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return '<div class="delivery-box"><b>Digital delivery locked</b><br><span class="meta">Mark order as paid to reveal download/access details.</span></div>';return digitalItems.map(i=>{const p=product(i.productId);const link=p?.deliveryLink?'<a href="'+p.deliveryLink+'" target="_blank" rel="noopener">Open download / access link</a><br>':'';return '<div class="delivery-box"><b>'+clean(i.productName)+' - Digital delivery</b><br>'+link+'<span>'+clean(p?.deliveryNote||'No delivery note added.')+'</span></div>'}).join("")}
-function digitalDeliveryText(o){const items=(o.items&&o.items.length?o.items:[{productId:o.productId,productName:o.productName,productType:o.productType}]);const digitalItems=items.filter(i=>i.productType==="Digital product");if(!digitalItems.length)return "";if(!["Paid","Delivered"].includes(o.status)&&!o.delivered)return "\nDigital delivery: Access details will be sent after payment.";return digitalItems.map(i=>{const p=product(i.productId);return "\n"+i.productName+" - Digital delivery link: "+(p?.deliveryLink||"No link added")+"\nDelivery note: "+(p?.deliveryNote||"No delivery note added")}).join("")}
 function setupScore(){const checks=[state.businessName&&state.businessName!=="Your Business",state.businessPhone,state.paymentDetails||state.paymentLink,state.products.length,state.customers.length,state.orders.length,state.businessLogo];return Math.round(checks.filter(Boolean).length/checks.length*100)}
-function renderActivationChecklist(){const el=$("activationChecklist");if(!el)return;const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"]];const done=items.filter(x=>x[1]).length;if(done===items.length||localStorage.getItem("sp_checklist_dismissed")){el.style.display="none";return}el.style.display="block";$("activationChecklistCount").textContent=`${done}/${items.length} done`;$("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("")+`<p class="actions"><button id="dismissChecklist" class="wizard-skip">Dismiss</button></p>`;$("dismissChecklist").onclick=()=>{localStorage.setItem("sp_checklist_dismissed","1");render()}}
+function renderActivationChecklist(){
+  const el=$("activationChecklist");if(!el)return;
+  const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"],["Register your business",!!state.regType,"docs"]];
+  const done=items.filter(x=>x[1]).length;
+  const regDone=!!state.regType;
+  // Registration is mandatory-enough that it can't be dismissed away - the
+  // checklist stays on the dashboard until it's actually done, even if
+  // every other item is finished and even past a prior "Dismiss" click.
+  if(done===items.length||(regDone&&localStorage.getItem("sp_checklist_dismissed"))){el.style.display="none";return}
+  el.style.display="block";
+  $("activationChecklistCount").textContent=`${done}/${items.length} done`;
+  $("activationChecklistItems").innerHTML=items.map(x=>`<div class="item activation-item ${x[1]?"done":""}"><span class="activation-check">${x[1]?"✓":""}</span><span>${x[0]}</span>${x[1]?"":`<button onclick="show('${x[2]}')">Go</button>`}</div>`).join("")+(regDone?`<p class="actions"><button id="dismissChecklist" class="wizard-skip">Dismiss</button></p>`:"");
+  if($("dismissChecklist"))$("dismissChecklist").onclick=()=>{localStorage.setItem("sp_checklist_dismissed","1");render()};
+}
 // Every paid order still awaiting delivery, any method (self/rider/
 // SellersPoint Logistics) - the one place to see everything that still
 // needs to go out, since the standalone Delivery tab was removed.
@@ -925,11 +965,6 @@ if($("copyReport"))$("copyReport").onclick=()=>copy(backendReport());if($("expor
 const renderForBackend=render;render=function(){renderForBackend();renderBackend()};
 
 if($("openUpgrade"))$("openUpgrade").onclick=()=>open("upgrade.html","_blank","noopener");
-function receiptText(o){if(!o)return "";const c=customer(o.customerId);const itemLines=(o.items&&o.items.length?o.items:[{productName:o.productName,qty:o.qty}]).map(i=>`  ${i.productName} x ${i.qty}`).join("\n");return "Receipt from "+state.businessName+"\nDate: "+date(new Date().toISOString())+"\nCustomer: "+(c?.name||"")+"\nItems:\n"+itemLines+"\nAmount paid: "+money(total(o))+" ("+amountInWords(total(o))+")\nPayment status: Paid"+digitalDeliveryText(o)+"\nThank you for your payment."}
-function showReceipt(id){const o=state.orders.find(x=>x.id===id);if(!o)return;const c=customer(o.customerId);if($("receiptBox"))$("receiptBox").innerHTML=(state.businessLogo?"<img class=\"invoice-logo\" src=\""+state.businessLogo+"\" alt=\"Business logo\">":"")+"<h2>Receipt</h2><div class=\"row\"><span>Business</span><b>"+clean(state.businessName)+"</b></div><div class=\"row\"><span>Customer</span><b>"+clean(c?.name||"")+"</b></div><div class=\"row\"><span>Items</span><b>"+clean(orderItemsText(o))+"</b></div><div class=\"row\"><span>Amount paid</span><b>"+money(total(o))+"</b></div><div class=\"row\"><span>Amount in words</span><b>"+amountInWords(total(o))+"</b></div><div class=\"row\"><span>Status</span><b>Paid</b></div>"+digitalDeliveryHtml(o)+"<div class=\"receipt-signature\">Signed by "+clean(state.businessName)+"</div>";window.currentReceiptOrderId=id;if($("receiptModal")?.showModal)$("receiptModal").showModal()}
-if($("closeReceipt"))$("closeReceipt").onclick=()=>$("receiptModal").close();
-if($("copyReceipt"))$("copyReceipt").onclick=()=>copy(receiptText(state.orders.find(x=>x.id===window.currentReceiptOrderId)));
-if($("waReceipt"))$("waReceipt").onclick=()=>{const o=state.orders.find(x=>x.id===window.currentReceiptOrderId);wa(receiptText(o),customer(o?.customerId)?.phone||"")}
 
 function parseCsv(text){if(!window.Papa)throw new Error("CSV import isn't available right now - try again in a moment.");return Papa.parse(text.trim(),{header:true,skipEmptyLines:true}).data}
 async function importCsv(file,endpoint,mapRow,list){const text=await file.text();const rows=parseCsv(text);let ok=0,fail=0;for(const row of rows){try{const created=await api("POST",endpoint,mapRow(row));state[list].unshift(created);ok++}catch{fail++}}render();toast(`Imported ${ok} record(s)${fail?`, ${fail} failed`:""}`)}
@@ -988,20 +1023,29 @@ if($("aiInsightRefresh"))$("aiInsightRefresh").onclick=()=>loadInsight(true);
 // advanceBusinessRegistration comment) - this UI captures the same data
 // the CAC API itself needs, so nothing here changes once accreditation
 // lets us automate the actual filing.
-let docsData=null,docsTrackers=[],docsVaultItems=[],docsEmployees=[],docsInvoices=[],docsVerifications=[],docsFilings=[];
-let docsSelectedTpl=null,docsActiveCheck=null,docsActiveVaultFilter="all",docsCacWizardStep=1;
-const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved",verified:"Verified",failed:"Failed",filed:"Filed"};
-const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",verified:"pill-success",failed:"pill-alert",filed:"pill-success"};
+let docsData=null,docsTrackers=[],docsVaultItems=[],docsEmployees=[],docsInvoices=[],docsFilings=[];
+let docsSelectedTpl=null,docsActiveVaultFilter="all",docsCacWizardStep=1;
+const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - awaiting review",in_review:"In review",action_needed:"Action needed",approved:"Approved",filed:"Filed"};
+const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",filed:"pill-success"};
 const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-function showDocsView(view){document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",p.id==="docs-"+view))}
+// Trackers and the Document Vault are self-serve utilities, open to everyone;
+// the rest of My Docs assumes a registered (or registering) business, so it
+// stays behind the onboarding gate until that's true.
+const DOCS_GATED_VIEWS=["overview","registration","calendar","tax","templates"];
+function docsIsFirstTimer(){const b=docsData?.business;return !!b&&!b.regType&&!b.regExistingNumber&&!b.hasPurchasedPackage}
+function showDocsView(view){
+  const gated=docsIsFirstTimer()&&DOCS_GATED_VIEWS.includes(view);
+  document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",gated?p.id==="docs-gate":p.id==="docs-"+view));
+}
 async function loadAllDocsData(){
   try{
-    const [reg,trackers,vault,employees,invoices,verifications,filings]=await Promise.all([
+    const [reg,trackers,vault,employees,invoices,filings]=await Promise.all([
       api("GET","/api/docs/registration"),api("GET","/api/docs/trackers"),api("GET","/api/docs/vault"),
-      api("GET","/api/docs/employees"),api("GET","/api/docs/invoices"),api("GET","/api/docs/verifications"),api("GET","/api/docs/filings"),
+      api("GET","/api/docs/employees"),api("GET","/api/docs/invoices"),api("GET","/api/docs/filings"),
     ]);
-    docsData=reg;docsTrackers=trackers;docsVaultItems=vault;docsEmployees=employees;docsInvoices=invoices;docsVerifications=verifications;docsFilings=filings;
+    docsData=reg;docsTrackers=trackers;docsVaultItems=vault;docsEmployees=employees;docsInvoices=invoices;docsFilings=filings;
     renderAllDocs();
   }catch(err){toast(err.message)}
 }
@@ -1013,13 +1057,12 @@ function renderAllDocs(){
   renderDocsTrackers();
   renderDocsCalendar();
   renderDocsVault();
-  renderDocsVerifyList();
-  renderDocsLookupHistory();
   renderDocsPayroll();
   renderDocsFilingHistory();
   renderDocsInvoices();
   renderDocsCertificate();
   if($("docsVatFigure"))$("docsVatFigure").textContent=naira(docsEstimateVat());
+  showDocsView(document.querySelector(".docs-tab.active")?.dataset.view||"overview");
 }
 async function loadDocsRegistration(){try{docsData=await api("GET","/api/docs/registration");renderDocs();renderDocsOverview();renderDocsHealthScore()}catch(err){toast(err.message)}}
 function docsRegCardHtml(name,status,note){
@@ -1051,6 +1094,42 @@ async function deleteDocsAffiliate(id){try{await api("DELETE","/api/docs/registr
 if($("docsPscForm"))$("docsPscForm").onsubmit=async e=>{e.preventDefault();try{await api("POST","/api/docs/registration/psc",{affiliateId:$("docsPscAffiliate").value,sharePercent:+$("docsPscSharePercent").value,ownsDirectShares:$("docsPscOwnsDirectShares").checked,hasSignificantControl:$("docsPscHasControl").checked,isPep:$("docsPscIsPep").checked});e.target.reset();await loadDocsRegistration();toast("PSC entry added")}catch(err){toast(err.message)}};
 if($("docsSubmitRegistration"))$("docsSubmitRegistration").onclick=async()=>{try{docsData=await api("POST","/api/docs/registration/submit");renderDocs();showDocsView("overview");toast("Registration submitted - our team will review it shortly")}catch(err){toast(err.message)}};
 
+// --- Docs onboarding gate: existing CAC number vs the paid registration package
+if($("docsExistingRegForm"))$("docsExistingRegForm").onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    docsData=await api("POST","/api/docs/registration/existing",{regType:$("docsExistingRegType").value,existingRegNumber:$("docsExistingRegNumber").value.trim()});
+    renderAllDocs();
+    toast("Registration number submitted - our team will verify it shortly");
+  }catch(err){toast(err.message)}
+};
+let docsGateBusy=false;
+if($("docsBuyRegPackage"))$("docsBuyRegPackage").onclick=async()=>{
+  if(docsGateBusy)return;
+  docsGateBusy=true;
+  try{
+    const r=await api("POST","/api/addons/purchase",{type:"registration_package"});
+    location.href=r.authorizationUrl;
+  }catch(err){toast(err.message);docsGateBusy=false}
+};
+async function checkDocsPaymentReturn(){
+  const params=new URLSearchParams(location.search);
+  const reference=params.get("docsPaymentRef");
+  if(!reference)return;
+  history.replaceState(null,"",location.pathname);
+  try{
+    const result=await api("GET","/api/payments/verify/"+encodeURIComponent(reference));
+    if(result.status==="success"&&result.addonType==="registration_package"){
+      toast("Payment confirmed - your Company Registration package is active. Fill in your details below to get started.");
+    }else if(result.status!=="success"){
+      toast("Payment status: "+result.status+". If you were charged, contact support with reference "+reference+".");
+    }
+  }catch(err){toast("Could not confirm payment automatically: "+err.message)}
+  show("docs");
+  await loadAllDocsData();
+  showDocsView("registration");
+}
+
 // --- Docs Overview: setup progress, congrats banner, health score, alerts, vault-mini
 function docsStepLabel(name,status){const suffix=status==="approved"?" ✓":status==="submitted"||status==="in_review"?" (in review)":status==="action_needed"?" (action needed)":" —";return name+suffix}
 function docsIsOnboardingComplete(){const b=docsData?.business;return !!b&&b.regStatus==="approved"&&b.scumlStatus==="approved"}
@@ -1077,7 +1156,7 @@ function renderDocsOverview(){
   if(overdueTracker)alerts.push({title:"Overdue",text:overdueTracker.name+" is overdue",action:"View",view:"trackers"});
   $("docsOverviewAlerts").innerHTML=alerts.length?alerts.map(a=>`<div class="alert-row"><div class="txt"><b>${clean(a.title)}</b>${clean(a.text)}</div><button type="button" class="btn btn-ghost btn-sm" onclick="showDocsView('${a.view}')">${a.action}</button></div>`).join(""):'<p class="meta" style="padding:14px 0">Nothing needs your attention right now.</p>';
   const recent=docsVaultItems.slice(0,3);
-  const typeIcon={Registration:"\u{1F4C4}",Tax:"\u{1F4B0}",Verification:"\u{1F50D}",Template:"\u{1F9FE}",Tracker:"\u{1F4CC}",Other:"\u{1F4C4}"};
+  const typeIcon={Registration:"\u{1F4C4}",Tax:"\u{1F4B0}",Template:"\u{1F9FE}",Tracker:"\u{1F4CC}",Invoice:"\u{1F9FE}",Receipt:"\u{1F9FE}",Other:"\u{1F4C4}"};
   $("docsOverviewVaultMini").innerHTML=recent.length?recent.map(i=>`<div class="vault-mini-row"><span>${typeIcon[i.docType]||"\u{1F4C4}"} ${clean(i.name)}</span><span class="tag">${clean(i.docType)} · ${date(i.createdAt)}</span></div>`).join(""):'<p class="meta" style="padding:8px 0">Nothing here yet.</p>';
 }
 if($("docsCongratsDismiss"))$("docsCongratsDismiss").onclick=()=>{localStorage.setItem("sp_docs_congrats_dismissed","1");$("docsCongratsBanner").classList.add("hide")};
@@ -1086,7 +1165,7 @@ function docsComputeHealthChecks(){
   return [
     {label:"Registration approved",pass:b.regStatus==="approved",view:"registration"},
     {label:"SCUML certificate (bank-ready)",pass:b.scumlStatus==="approved",view:"registration"},
-    {label:"TIN verified",pass:!!b.tin,view:"verification"},
+    {label:"TIN on file",pass:!!b.tin,view:"registration"},
     {label:"No overdue trackers",pass:!docsTrackers.some(t=>t.status!=="done"&&daysUntil(t.dueDate)<0),view:"trackers"},
     {label:"VAT filings up to date",pass:docsFilings.some(f=>f.filingType==="vat"),view:"tax"},
   ];
@@ -1199,52 +1278,6 @@ function renderDocsCalendar(){
   $("docsCalendarList").innerHTML=merged.map(item=>{
     const idx=docsCalActionRefs.push(item.onAction)-1;
     return `<div class="deadline-row"><div class="info"><b>${item.source==="statutory"?"\u{1F3DB}️ ":"\u{1F4CC} "}${clean(item.name)}</b><small>${clean(item.note)}</small></div><div class="action-col"><span class="days ${docsDaysBadgeClass(item.days)}">${daysLabel(item.days)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="docsCalActionRefs[${idx}]()">${item.action}</button></div></div>`;
-  }).join("");
-}
-
-// --- Docs Verification (manual until a KYC vendor is wired in) -------------
-const DOCS_CHECKS=[
-  {id:"tin",label:"TIN Verification",price:"NGN 1,000",placeholder:"e.g. 12345678-0001"},
-  {id:"bvn",label:"BVN Verification",price:"NGN 1,000",placeholder:"11-digit BVN"},
-  {id:"nin",label:"NIN Verification",price:"NGN 1,000",placeholder:"11-digit NIN"},
-  {id:"cac_name",label:"Business Name Availability",price:"NGN 1,000",placeholder:"e.g. Amina Fashion Hub"},
-  {id:"cac_status",label:"Business Status Check",price:"NGN 1,000",placeholder:"CAC/RC number"},
-  {id:"authenticity",label:"Document Authenticity Check",price:"NGN 2,000",placeholder:"Certificate/reference number"},
-];
-function renderDocsVerifyList(){
-  $("docsVerifyList").innerHTML=DOCS_CHECKS.map(c=>`<div class="verify-item ${docsActiveCheck===c.id?"active":""}"><div class="info"><b>\u{1F50D} ${clean(c.label)}</b></div><div style="display:flex;align-items:center;gap:14px"><span class="price">${c.price}</span><button type="button" class="btn btn-primary btn-sm" onclick="selectDocsCheck('${c.id}')">Verify →</button></div></div>`).join("");
-}
-function selectDocsCheck(id){
-  docsActiveCheck=id;
-  renderDocsVerifyList();
-  const c=DOCS_CHECKS.find(x=>x.id===id);
-  $("docsVerifyLabel").textContent=`Enter the ${c.label.replace(" Verification","").replace(" Check","").replace(" Availability","")} to check`;
-  $("docsVerifyInput").placeholder=c.placeholder;
-  $("docsVerifyInput").value="";
-  $("docsVerifyResult").classList.remove("show");
-  $("docsVerifyPanel").classList.add("show");
-  $("docsVerifyPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
-}
-if($("docsVerifyRun"))$("docsVerifyRun").onclick=async()=>{
-  const c=DOCS_CHECKS.find(x=>x.id===docsActiveCheck);
-  if(!c)return;
-  const val=$("docsVerifyInput").value.trim();
-  if(!val)return toast("Enter a number first");
-  try{
-    await api("POST","/api/docs/verifications",{checkType:c.id,inputValue:val});
-    $("docsVerifyResult").textContent="Submitted - we'll confirm this within 24 hours";
-    $("docsVerifyResult").classList.add("show");
-    docsVerifications=await api("GET","/api/docs/verifications");
-    renderDocsLookupHistory();
-    docsVaultItems=await api("GET","/api/docs/vault");
-    renderDocsVault();renderDocsOverview();
-    toast("Verification submitted");
-  }catch(err){toast(err.message)}
-};
-function renderDocsLookupHistory(){
-  $("docsLookupHistory").innerHTML=docsVerifications.map(v=>{
-    const c=DOCS_CHECKS.find(x=>x.id===v.checkType);
-    return `<div class="lookup-row"><span>${clean(c?c.label:v.checkType)} - ${docsPill(v.status,DOCS_STATUS_LABELS[v.status]||v.status)}</span><small>${dateTime(v.createdAt)}</small></div>`;
   }).join("");
 }
 
@@ -1364,16 +1397,16 @@ document.querySelectorAll(".tpl-btn").forEach(b=>b.addEventListener("click",()=>
   docsSelectedTpl=b.dataset.tpl;
   $("docsBasicDocLabel").textContent="Standard "+DOCS_TPL_LABELS[docsSelectedTpl];
   $("docsBasicDocFields").innerHTML=(DOCS_BASIC_FIELDS[docsSelectedTpl]||DOCS_BASIC_FIELDS.business).map(f=>{
-    if(/TIN/i.test(f)){
-      const tin=docsData?.business?.tin;
-      return tin?`<div>☐ ${f} <span style="color:var(--primary)">— auto-filled: ${clean(tin)}</span></div>`:`<div>☐ ${f} <span class="meta">— verify your TIN to auto-fill this</span></div>`;
-    }
-    return `<div>☐ ${f}</div>`;
+    const tin=/TIN/i.test(f)?docsData?.business?.tin:"";
+    return `<label>${clean(f)}${tin?` <span style="color:var(--primary);font-weight:700">(auto-filled from your TIN on file)</span>`:""}<input data-field="${clean(f)}" value="${clean(tin||"")}" placeholder="${clean(f)}"></label>`;
   }).join("");
   $("docsBasicDoc").style.display="block";
   $("docsSuggestList").classList.remove("show");
   $("docsAiInput").value="";
 }));
+function docsCollectFieldValues(){
+  return [...document.querySelectorAll("#docsBasicDocFields input")].map(el=>({label:el.dataset.field,value:el.value.trim()}));
+}
 function docsDownloadTextFile(filename,text){
   const blob=new Blob([text],{type:"text/plain"});
   const url=URL.createObjectURL(blob);
@@ -1393,28 +1426,36 @@ if($("docsDownloadBasic"))$("docsDownloadBasic").onclick=async()=>{
   if(!docsSelectedTpl)return;
   const label=DOCS_TPL_LABELS[docsSelectedTpl];
   const name=`${label} - draft ${new Date().toLocaleDateString()}`;
-  const text=`SellersPoint Docs - ${label} (Standard)\n\nFill in the blanks and it's ready to use.\nThis is a template for common situations, not a substitute for personalized legal advice.`;
-  docsDownloadTextFile(`${docsSelectedTpl}.txt`,text);
-  await docsSaveTemplateToVault(name,text,docsSelectedTpl==="loan");
-  toast("Standard document downloaded - saved to your Vault");
+  const btn=$("docsDownloadBasic");btn.disabled=true;btn.textContent="Drafting with AI...";
+  try{
+    const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"standard",fields:docsCollectFieldValues()});
+    docsDownloadTextFile(`${docsSelectedTpl}.txt`,result.text);
+    await docsSaveTemplateToVault(name,result.text,docsSelectedTpl==="loan");
+    toast("Document drafted - saved to your Vault");
+  }catch(err){toast(err.message)}
+  finally{btn.disabled=false;btn.textContent="Fill in & download"}
 };
 if($("docsSuggestFields"))$("docsSuggestFields").onclick=()=>{
   if(!docsSelectedTpl)return;
   const input=$("docsAiInput").value.trim();
   if(!input)return toast("Tell us what's specific about your situation first");
   const fields=DOCS_TPL_SUGGESTIONS[docsSelectedTpl]||DOCS_TPL_SUGGESTIONS.business;
-  $("docsSuggestList").innerHTML=fields.map(f=>`<label class="suggest-item"><input type="checkbox" checked> ${clean(f)}</label>`).join("")+'<p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" id="docsGenerateImproved">Generate improved document →</button></p>';
+  $("docsSuggestList").innerHTML=fields.map(f=>`<label class="suggest-item"><input type="checkbox" checked value="${clean(f)}"> ${clean(f)}</label>`).join("")+'<p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" id="docsGenerateImproved">Generate improved document →</button></p>';
   $("docsSuggestList").classList.add("show");
   $("docsGenerateImproved").onclick=async()=>{
     const label=DOCS_TPL_LABELS[docsSelectedTpl];
     const isHighValue=docsSelectedTpl==="loan";
     const name=`${label} (Improved) - draft ${new Date().toLocaleDateString()}`;
-    const text=`SellersPoint Docs - ${label} (Improved)\n\nStandard document, adjusted for what you told us.\nThis is a template for common situations, not a substitute for personalized legal advice.`;
-    docsDownloadTextFile(`${docsSelectedTpl}-improved.txt`,text);
-    await docsSaveTemplateToVault(name,text,isHighValue);
-    toast("Improved document generated - saved to your Vault");
+    const extraClauses=[...document.querySelectorAll("#docsSuggestList input:checked")].map(el=>el.value);
+    const btn=$("docsGenerateImproved");btn.disabled=true;btn.textContent="Drafting with AI...";
+    try{
+      const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"improved",fields:docsCollectFieldValues(),extraClauses,detail:input});
+      docsDownloadTextFile(`${docsSelectedTpl}-improved.txt`,result.text);
+      await docsSaveTemplateToVault(name,result.text,isHighValue);
+      toast("Improved document drafted - saved to your Vault");
+    }catch(err){toast(err.message)}
+    finally{btn.disabled=false;btn.textContent="Generate improved document →"}
   };
-  toast("Matched to clauses from the vetted template library (demo)");
 };
 function renderDocsTemplateList(){
   const docs=docsVaultItems.filter(v=>v.docType==="Template");
@@ -1430,7 +1471,7 @@ document.querySelectorAll(".filter-btn").forEach(b=>b.addEventListener("click",(
 }));
 if($("docsVaultSearch"))$("docsVaultSearch").oninput=renderDocsVault;
 async function loadDocsVault(){try{docsVaultItems=await api("GET","/api/docs/vault");renderDocsVault();renderDocsTemplateList()}catch(err){toast(err.message)}}
-const DOCS_VAULT_TYPE_CLASS={Registration:"vt-registration",Tax:"vt-tax",Verification:"vt-verification",Template:"vt-template",Tracker:"vt-tracker"};
+const DOCS_VAULT_TYPE_CLASS={Registration:"vt-registration",Tax:"vt-tax",Template:"vt-template",Tracker:"vt-tracker",Invoice:"vt-invoice",Receipt:"vt-receipt"};
 function renderDocsVault(){
   const q=($("docsVaultSearch")?.value||"").toLowerCase();
   const items=docsVaultItems.filter(v=>(docsActiveVaultFilter==="all"||v.docType===docsActiveVaultFilter)&&v.name.toLowerCase().includes(q));
@@ -1453,8 +1494,8 @@ function renderDocsCacWizard(){
     body=`<p class="meta">Step 1 of 3 - confirm your business details. We've pre-filled what we already have on file.</p>
       <div class="docs-modal-review-row"><span>Business name</span><b>${clean(state.businessName||"")}</b></div>
       <div class="docs-modal-review-row"><span>Registration type</span><b>${clean(b.regType?b.regType.replace(/_/g," "):"Not chosen yet")}</b></div>
-      <div class="docs-modal-review-row"><span>TIN</span><b>${b.tin?clean(b.tin):"⚠ Not verified yet"}</b></div>
-      ${!b.tin?`<p style="font-size:12px;color:var(--accent);font-weight:700;margin-top:10px">Verifying your TIN first makes this faster - <a href="#" onclick="closeDocsCacWizard();showDocsView('verification');return false" style="color:var(--accent)">do that now</a>, or continue anyway.</p>`:""}
+      <div class="docs-modal-review-row"><span>TIN</span><b>${b.tin?clean(b.tin):"⚠ Not on file yet"}</b></div>
+      ${!b.tin?`<p style="font-size:12px;color:var(--accent);font-weight:700;margin-top:10px">Your TIN isn't on file yet - continuing anyway is fine, we'll confirm it before filing.</p>`:""}
       <div class="docs-modal-actions"><span></span><button type="button" class="btn btn-primary" onclick="docsCacWizardGo(2)">Continue →</button></div>`;
   }else if(docsCacWizardStep===2){
     body=`<p class="meta">Step 2 of 3 - has anything changed since your last filing?</p>
@@ -1482,4 +1523,4 @@ function renderDocsCacWizard(){
   };
 }
 
-(async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight)})().catch(err=>toast(err.message||"Something went wrong loading this page."));
+(async()=>{const ctx=await window.Auth.requireSession();if(!ctx)return;authToken=ctx.session.access_token;userEmail=ctx.session.user.email;loadState().then(render).then(loadInsight).then(loadMonthlyPL).then(checkDocsPaymentReturn)})().catch(err=>toast(err.message||"Something went wrong loading this page."));

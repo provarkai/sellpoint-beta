@@ -1178,6 +1178,14 @@ async function getAddonBranchBonus(businessId) {
   return rows[0].n;
 }
 
+async function hasPurchasedRegistrationPackage(businessId) {
+  const { rows } = await query(
+    "SELECT COUNT(*)::int AS n FROM addon_purchases WHERE business_id = $1 AND type = 'registration_package'",
+    [businessId]
+  );
+  return rows[0].n > 0;
+}
+
 // --- Staff seats --------------------------------------------------------
 
 function toStaffJson(m) {
@@ -2436,11 +2444,12 @@ function toPscJson(p) {
 }
 
 async function getDocsRegistration(businessId) {
-  const [bizRows, sharesRows, affiliateRows, pscRows] = await Promise.all([
+  const [bizRows, sharesRows, affiliateRows, pscRows, hasPurchasedPackage] = await Promise.all([
     query("SELECT * FROM businesses WHERE id = $1", [businessId]),
     query("SELECT * FROM business_registration_shares WHERE business_id = $1", [businessId]),
     query("SELECT * FROM business_registration_affiliates WHERE business_id = $1 ORDER BY created_at", [businessId]),
     query("SELECT * FROM business_registration_psc WHERE business_id = $1 ORDER BY created_at", [businessId]),
+    hasPurchasedRegistrationPackage(businessId),
   ]);
   const b = bizRows.rows[0];
   if (!b) throw new OrderError("Business not found");
@@ -2454,6 +2463,8 @@ async function getDocsRegistration(businessId) {
       regObjects: b.reg_objects || [],
       regAddress: b.reg_address || {},
       hasRegCertificate: !!b.reg_certificate,
+      regExistingNumber: b.reg_existing_number || "",
+      hasPurchasedPackage,
     },
     shares: toSharesJson(sharesRows.rows[0]),
     affiliates: affiliateRows.rows.map(toAffiliateJson),
@@ -2539,6 +2550,23 @@ async function submitBusinessRegistration(businessId) {
   const { rows: affiliateRows } = await query("SELECT id FROM business_registration_affiliates WHERE business_id=$1", [businessId]);
   if (!affiliateRows.length) throw new OrderError("Add at least one affiliate (director/shareholder/etc.) before submitting");
   await query("UPDATE businesses SET reg_status='submitted' WHERE id=$1", [businessId]);
+  return getDocsRegistration(businessId);
+}
+
+// A seller who is already incorporated elsewhere self-declares their CAC
+// number instead of buying the registration package - skips the
+// affiliates/shares requirement submitBusinessRegistration enforces since
+// this business isn't being incorporated from scratch. Staff verify the
+// number (e.g. via CAC's public search) and approve through the same
+// Registration Queue as a from-scratch filing.
+async function submitExistingRegistration(businessId, { regType, existingRegNumber }) {
+  const type = requireString(regType, "Registration type");
+  if (!["business_name", "llc", "partnership"].includes(type)) throw new OrderError("Invalid registration type");
+  const number = requireString(existingRegNumber, "Registration number");
+  await query(
+    "UPDATE businesses SET reg_type=$1, reg_existing_number=$2, reg_status='submitted' WHERE id=$3",
+    [type, number, businessId]
+  );
   return getDocsRegistration(businessId);
 }
 
@@ -2630,16 +2658,15 @@ function toVaultItemJson(v) {
 }
 
 // Aggregates real uploads with documents already produced elsewhere in
-// Docs (registration certificate, tracker proof-of-completion, filings,
-// verification results) into one list, same concept as the mockup's
-// vaultItems() but over real data.
+// Docs (registration certificate, tracker proof-of-completion, filings)
+// into one list, same concept as the mockup's vaultItems() but over real
+// data.
 async function listVaultItems(businessId) {
-  const [uploadRows, bizRows, trackerRows, filingRows, verificationRows] = await Promise.all([
+  const [uploadRows, bizRows, trackerRows, filingRows] = await Promise.all([
     query("SELECT * FROM docs_vault_items WHERE business_id=$1 ORDER BY created_at DESC", [businessId]),
     query("SELECT reg_certificate, created_at FROM businesses WHERE id=$1", [businessId]),
     query("SELECT id, name, proof_document, created_at FROM docs_trackers WHERE business_id=$1 AND proof_document != ''", [businessId]),
     query("SELECT id, filing_type, period, status, created_at FROM docs_filings WHERE business_id=$1", [businessId]),
-    query("SELECT id, check_type, status, created_at FROM docs_verifications WHERE business_id=$1", [businessId]),
   ]);
   const items = uploadRows.rows.map(toVaultItemJson);
   const biz = bizRows.rows[0];
@@ -2651,9 +2678,6 @@ async function listVaultItems(businessId) {
   });
   filingRows.rows.forEach((f) => {
     items.push({ id: "filing-" + f.id, name: `${f.filing_type} filing${f.period ? " - " + f.period : ""}`, docType: "Tax", file: "", status: f.status, createdAt: f.created_at, source: "filing" });
-  });
-  verificationRows.rows.forEach((v) => {
-    items.push({ id: "verification-" + v.id, name: `${v.check_type} verification`, docType: "Verification", file: "", status: v.status, createdAt: v.created_at, source: "verification" });
   });
   items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return items;
@@ -2718,40 +2742,6 @@ async function createInvoice(businessId, data) {
   return toInvoiceJson(rows[0]);
 }
 
-// --- SellersPoint Docs Phase 3: Verification (manual until a KYC vendor is wired in) --
-
-function toVerificationJson(v) {
-  return { id: v.id, checkType: v.check_type, inputValue: v.input_value, status: v.status, resultNote: v.result_note, createdAt: v.created_at };
-}
-async function listVerifications(businessId) {
-  const { rows } = await query("SELECT * FROM docs_verifications WHERE business_id=$1 ORDER BY created_at DESC", [businessId]);
-  return rows.map(toVerificationJson);
-}
-async function createVerification(businessId, data) {
-  const checkType = requireString(data.checkType, "Check type");
-  const inputValue = requireString(data.inputValue, "Value to check");
-  const { rows } = await query(
-    "INSERT INTO docs_verifications (business_id, check_type, input_value) VALUES ($1,$2,$3) RETURNING *",
-    [businessId, checkType, inputValue]
-  );
-  return toVerificationJson(rows[0]);
-}
-async function listVerificationQueue() {
-  const { rows } = await query(
-    `SELECT v.*, b.name AS business_name FROM docs_verifications v
-     JOIN businesses b ON b.id = v.business_id WHERE v.status = 'pending' ORDER BY v.created_at`
-  );
-  return rows.map((r) => ({ ...toVerificationJson(r), businessName: r.business_name }));
-}
-async function resolveVerification(id, { status, resultNote }) {
-  if (!["verified", "failed"].includes(status)) throw new OrderError("Invalid status");
-  const { rows } = await query(
-    "UPDATE docs_verifications SET status=$1, result_note=$2 WHERE id=$3 RETURNING *",
-    [status, resultNote || "", id]
-  );
-  if (!rows[0]) throw new OrderError("Verification not found");
-  return toVerificationJson(rows[0]);
-}
 
 // --- SellersPoint Docs Phase 3: Filings (VAT + CAC Annual Return) ----------
 
@@ -3441,6 +3431,8 @@ module.exports = {
   deleteRegistrationAffiliate,
   addRegistrationPsc,
   submitBusinessRegistration,
+  submitExistingRegistration,
+  hasPurchasedRegistrationPackage,
   listRegistrationQueue,
   advanceBusinessRegistration,
   listTrackers,
@@ -3454,10 +3446,6 @@ module.exports = {
   deleteEmployee,
   listInvoices,
   createInvoice,
-  listVerifications,
-  createVerification,
-  listVerificationQueue,
-  resolveVerification,
   listFilings,
   createFiling,
   isPlatformAdmin,

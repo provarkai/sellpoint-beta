@@ -10,7 +10,6 @@ let auditLog = [];
 let logisticsSettings = { enabled: false, flatFee: 0, percentFee: 0, apiBase: "", apiKeySet: false, apiKeyMasked: "" };
 let platformAdmins = [];
 let registrationQueue = [];
-let verificationQueue = [];
 let authToken = null;
 let myEmail = null;
 let confirmDeleteId = null;
@@ -28,7 +27,7 @@ async function api(method, url, body) { const res = await fetch(url, { method, h
 function downloadCsv(columns, rows, filename) { const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }; const csv = [columns, ...rows].map((r) => r.map(esc).join(",")).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = filename; a.click(); }
 
 async function loadAll() {
-  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, platformAdminsRes, registrationQueueRes, verificationQueueRes] = await Promise.all([
+  const [ownerRes, businessesRes, paymentsRes, pricingRes, settingsRes, analyticsRes, waitlistRes, auditRes, logisticsRes, platformAdminsRes, registrationQueueRes] = await Promise.all([
     api("GET", "/api/owner"),
     api("GET", "/api/admin/businesses"),
     api("GET", "/api/admin/payments"),
@@ -40,7 +39,6 @@ async function loadAll() {
     api("GET", "/api/admin/logistics-settings"),
     api("GET", "/api/admin/platform-admins"),
     api("GET", "/api/admin/registration-queue"),
-    api("GET", "/api/admin/verification-queue"),
   ]);
   owner = ownerRes;
   businesses = businessesRes;
@@ -53,7 +51,6 @@ async function loadAll() {
   logisticsSettings = logisticsRes;
   platformAdmins = platformAdminsRes;
   registrationQueue = registrationQueueRes;
-  verificationQueue = verificationQueueRes;
 }
 
 // Comprehensive per-business panel shown under "View Details" - business
@@ -149,18 +146,6 @@ async function saveRegistrationStatus(id) {
   }
 }
 
-async function resolveVerification(id, status) {
-  try {
-    const noteInput = $("verifyNote_" + id);
-    await api("PUT", "/api/admin/verification-queue/" + id, { status, resultNote: noteInput ? noteInput.value.trim() : "" });
-    verificationQueue = await api("GET", "/api/admin/verification-queue");
-    render();
-    toast("Verification " + status);
-  } catch (err) {
-    toast(err.message);
-  }
-}
-
 function render() {
   $("totalBusinesses").textContent = businesses.length;
   $("businessCount").textContent = `(${businesses.length})`;
@@ -208,11 +193,6 @@ function render() {
       (expanded ? registrationDetailHtml(r.id) : '') +
       '<div class="item-actions"><button onclick="toggleRegistrationDetail(\'' + r.id + '\')">' + (expanded ? 'Hide' : 'Manage') + '</button></div></div>';
   }).join("") || '<div class="item"><span class="meta">Nothing in the queue right now</span></div>';
-  $("verificationQueueCount").textContent = `(${verificationQueue.length})`;
-  $("verificationQueueList").innerHTML = verificationQueue.map((v) => {
-    return '<div class="item"><div class="item-top"><strong>' + clean(v.businessName) + '</strong><span>' + clean(v.checkType) + '</span></div><div class="meta">Value: ' + clean(v.inputValue) + ' - ' + dateTime(v.createdAt) + '</div>' +
-      '<div class="item-actions"><input id="verifyNote_' + v.id + '" placeholder="Result note (optional)"><button onclick="resolveVerification(\'' + v.id + '\',\'verified\')">Mark Verified</button><button class="danger" onclick="resolveVerification(\'' + v.id + '\',\'failed\')">Mark Failed</button></div></div>';
-  }).join("") || '<div class="item"><span class="meta">Nothing in the queue right now</span></div>';
   $("platformAdminCount").textContent = `(${platformAdmins.length})`;
   $("platformAdminList").innerHTML = platformAdmins.map((a) => {
     const isMe = myEmail && a.email === myEmail;
@@ -225,7 +205,7 @@ function render() {
 function show(tab) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === tab));
-  $("title").textContent = { overview: "Overview", businesses: "Businesses & Payments", growth: "Growth", auditlog: "Audit Log", settings: "Platform Settings", registrations: "Registration Queue", verifications: "Verification Queue", admins: "Platform Admins" }[tab];
+  $("title").textContent = { overview: "Overview", businesses: "Businesses & Payments", growth: "Growth", auditlog: "Audit Log", settings: "Platform Settings", registrations: "Registration Queue", admins: "Platform Admins" }[tab];
 }
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => show(b.dataset.tab)));
 
