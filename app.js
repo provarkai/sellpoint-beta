@@ -12,6 +12,10 @@ let logisticsInfo={enabled:false,flatFee:0,percentFee:0};
 const $=id=>document.getElementById(id), money=n=>`${state.currency||"NGN"} ${Number(n||0).toLocaleString(CURRENCIES[state.currency]?.locale||"en-NG")}`;
 const clean=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)};
+// Marks the "Use your store AI" activation checklist item done - only on
+// AI the seller actively asked for (caption/reply/reminder/summary/ask/
+// description/doc drafting), not the passive auto-shown daily briefing.
+const markStoreAiUsed=()=>localStorage.setItem("sp_used_store_ai","1");
 async function api(method,url,body){const res=await fetch(url,{method,headers:{...(body?{"Content-Type":"application/json"}:{}),Authorization:`Bearer ${authToken}`},body:body?JSON.stringify(body):undefined});if(!res.ok){const err=await res.json().catch(()=>({error:"Request failed"}));throw new Error(err.error||"Request failed")}return res.status===204?null:res.json()}
 function applyState(s){Object.assign(state,s.business,{products:s.products,customers:s.customers,orders:s.orders,events:s.events})}
 async function loadState(){const [s,p,me,log]=await Promise.all([api("GET","/api/state"),api("GET","/api/pricing"),api("GET","/api/me"),api("GET","/api/logistics-settings").catch(()=>logisticsInfo)]);applyState(s);pricing=p;myRole=me.role;myPermissions=me.permissions||[];logisticsInfo=log;updateDeliveryMethodOptions();applyRoleVisibility()}
@@ -44,7 +48,7 @@ function toggleItem(id){const el=$("details-"+id);if(el)el.style.display=el.styl
 function productDetailsHtml(p){if(p.type==="Digital product")return `<div class="delivery-box"><b>Digital delivery</b><br>${p.deliveryLink?`<a href="${p.deliveryLink}" target="_blank" rel="noopener">Download / access link</a><br>`:"No delivery link set.<br>"}<span>${clean(p.deliveryNote||"No delivery note added.")}</span></div>`;if(p.type==="Service")return `<div class="delivery-box"><b>Service details</b><br><span>${clean(p.deliveryNote||"No booking instructions added.")}</span></div>`;return `<div class="delivery-box"><b>Product details</b><br><span>Category: ${clean(p.category||"General")}</span></div>`}
 function render(){
   const storeLive=!!state.storefrontEligible&&!!state.storefrontEnabled&&!!state.slug;
-  $("pList").innerHTML=state.products.map(p=>`<div class="item"><div class="item-clickable" style="cursor:pointer;display:flex;gap:10px;align-items:center" onclick="toggleItem('${p.id}')">${p.image?`<img src="${p.image}" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0">`:""}<div style="flex:1"><div class="item-top"><strong>${clean(p.name)}</strong><span>${p.discountPrice?`<s class="meta">${money(p.price)}</s> ${money(p.discountPrice)}`:money(p.price)}</span></div><div class="meta">${clean(p.type||"Product")} - ${clean(p.category||"General")} - ${p.stock} ${p.type==="Service"?"slots":p.type==="Digital product"?"licenses":"in stock"}</div></div></div><div id="details-${p.id}" style="display:none">${productDetailsHtml(p)}</div><div class="item-actions"><button onclick="editProduct('${p.id}')">Edit</button>${storeLive?`<button onclick="copyProductLink('${p.id}')">Copy Link</button>`:""}<button onclick="caption('${p.id}')">Caption</button><button onclick="delProduct('${p.id}')">Delete</button></div></div>`).join("");
+  $("pList").innerHTML=state.products.map(p=>`<div class="item"><div class="item-clickable" style="cursor:pointer;display:flex;gap:10px;align-items:center" onclick="toggleItem('${p.id}')">${p.image?`<img src="${p.image}" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0">`:""}<div style="flex:1"><div class="item-top"><strong>${clean(p.name)}</strong><span>${p.discountPrice?`<s class="meta">${money(p.price)}</s> ${money(p.discountPrice)}`:money(p.price)}</span></div><div class="meta">${clean(p.type||"Product")} - ${clean(p.category||"General")} - ${p.stock} ${p.type==="Service"?"slots":p.type==="Digital product"?"licenses":"in stock"}${p.showInStorefront===false?' - <span style="color:var(--accent);font-weight:700">Hidden from storefront</span>':""}</div></div></div><div id="details-${p.id}" style="display:none">${productDetailsHtml(p)}</div><div class="item-actions"><button onclick="editProduct('${p.id}')">Edit</button>${storeLive?`<button onclick="copyProductLink('${p.id}')">Copy Link</button>`:""}<button onclick="caption('${p.id}')">Caption</button><button onclick="delProduct('${p.id}')">Delete</button></div></div>`).join("");
   const visibleCustomers=customerSegmentFilter?state.customers.filter(c=>(customerSegments[c.id]?.segment)===customerSegmentFilter):state.customers;
   $("cList").innerHTML=visibleCustomers.map(c=>{const seg=customerSegments[c.id]?.segment;return `<div class="item"><div class="item-top"><strong>${clean(c.name)}</strong><span>${clean(c.location||"No location")}</span></div><div class="meta">${clean(c.phone)}${c.email?` - ${clean(c.email)}`:""}${seg?` - ${segmentLabel(seg)}`:""}</div><div class="item-actions"><button onclick="openCustomerTimeline('${c.id}')">Timeline</button><button onclick="wa('Hello, thank you for shopping with us. How can we help you today?','${c.phone}')">Message</button><button onclick="delCustomer('${c.id}')">Delete</button></div></div>`}).join("");
   renderSegmentFilter();
@@ -89,7 +93,7 @@ let pendingImages=[];
 function renderImagePreview(){if($("pImagePreview"))$("pImagePreview").innerHTML=pendingImages.map((src,i)=>`<div class="product-photo-thumb"><img src="${src}" alt=""><button type="button" onclick="removePendingImage(${i})">&times;</button></div>`).join("")}
 function removePendingImage(i){pendingImages.splice(i,1);renderImagePreview()}
 if($("pImage"))$("pImage").onchange=async e=>{const files=[...e.target.files].slice(0,Math.max(0,5-pendingImages.length));for(const f of files){pendingImages.push(await readFileAsDataUrl(f))}renderImagePreview();e.target.value=""};
-function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;if($("pWeight"))$("pWeight").value=p.weight??"";$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
+function editProduct(id){const p=product(id);if(!p)return;editingProductId=id;$("pName").value=p.name;$("pPrice").value=p.price;if($("pDiscountPrice"))$("pDiscountPrice").value=p.discountPrice||"";$("pStock").value=p.stock;if($("pWeight"))$("pWeight").value=p.weight??"";$("pCat").value=p.category||"";if($("pBarcode"))$("pBarcode").value=p.barcode||"";if($("pShowInStorefront"))$("pShowInStorefront").checked=p.showInStorefront!==false;$("pType").value=p.type||"Product";updateProductFields();$("pDelivery").value=p.deliveryLink||"";$("pNote").value=p.deliveryNote||"";if($("pDescription"))$("pDescription").value=p.description||"";pendingImages=(p.images&&p.images.length?p.images:(p.image?[p.image]:[])).slice();renderImagePreview();$("pFormTitle").textContent="Edit product / service";$("pSubmitBtn").textContent="Update Item";$("pCancelEdit").style.display="inline-grid";show("products")}
 function cancelEditProduct(){editingProductId=null;pendingImages=[];renderImagePreview();$("productForm").reset();updateProductFields();$("pFormTitle").textContent="Add product / service";$("pSubmitBtn").textContent="Save Item";$("pCancelEdit").style.display="none"}
 if($("pCancelEdit"))$("pCancelEdit").onclick=cancelEditProduct;
 async function loadBatches(){
@@ -152,11 +156,12 @@ if($("pGenDescription"))$("pGenDescription").onclick=async()=>{
   try{
     const result=await api("POST","/api/ai/generate",{tool:"description",name,price:+$("pPrice").value||0,category:$("pCat").value.trim(),type:$("pType")?.value||"Product",detail:$("pAiContext")?.value.trim()||""});
     $("pDescription").value=result.text;
+    markStoreAiUsed();
     toast("Description drafted - review and edit before saving")
   }catch(err){toast(err.message)}
   finally{btn.disabled=false;btn.textContent="Write with AI"}
 };
-$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const weightRaw=$("pWeight")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,weight:weightRaw?+weightRaw:null,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages};
+$("productForm").onsubmit=async e=>{e.preventDefault();try{const discountRaw=$("pDiscountPrice")?.value.trim();const weightRaw=$("pWeight")?.value.trim();const payload={name:$("pName").value.trim(),price:+$("pPrice").value,discountPrice:discountRaw?+discountRaw:null,stock:+$("pStock").value,weight:weightRaw?+weightRaw:null,category:$("pCat").value.trim(),barcode:$("pBarcode")?.value.trim()||"",type:$("pType")?.value||"Product",deliveryLink:$("pDelivery")?.value.trim()||"",deliveryNote:$("pNote")?.value.trim()||"",description:$("pDescription")?.value.trim()||"",images:pendingImages,showInStorefront:$("pShowInStorefront")?.checked!==false};
   if(editingProductId){const updated=await api("PUT",`/api/products/${editingProductId}`,payload);const idx=state.products.findIndex(x=>x.id===editingProductId);if(idx>-1)state.products[idx]=updated;cancelEditProduct();render();toast("Item updated")}
   else{const created=await api("POST","/api/products",payload);state.products.unshift(created);e.target.reset();pendingImages=[];renderImagePreview();updateProductFields();render();toast("Item saved")}
 }catch(err){toast(err.message)}};
@@ -506,10 +511,10 @@ function caption(id){show("ai");$("aiTool").value="caption";$("aiProduct").value
 function updateAiUsageDisplay(used,limit){const unlimited=limit===null||limit===Infinity;$("aiUsage").textContent=`${used}/${unlimited?"unlimited":limit} AI generations used this month`;if($("aiUpgradeCta"))$("aiUpgradeCta").style.display=!unlimited&&used>=limit?"flex":"none"}
 async function refreshAiUsage(){try{const u=await api("GET","/api/ai/usage");updateAiUsageDisplay(u.used,u.limit)}catch{}}
 function addChatBubble(text,isUser){const div=document.createElement("div");div.className="landing-ai-bubble "+(isUser?"landing-ai-bubble-user":"landing-ai-bubble-ai");div.textContent=text;$("aiChatLog").appendChild(div);$("aiChatLog").scrollTop=$("aiChatLog").scrollHeight}
-async function askAi(question){if(!question)return;addChatBubble(question,true);try{const result=await api("POST","/api/ai/generate",{tool:"ask",question});addChatBubble(result.text,false);updateAiUsageDisplay(result.used,result.limit)}catch(err){addChatBubble(err.message,false);refreshAiUsage()}}
+async function askAi(question){if(!question)return;addChatBubble(question,true);try{const result=await api("POST","/api/ai/generate",{tool:"ask",question});addChatBubble(result.text,false);updateAiUsageDisplay(result.used,result.limit);markStoreAiUsed()}catch(err){addChatBubble(err.message,false);refreshAiUsage()}}
 if($("aiAskForm"))$("aiAskForm").onsubmit=e=>{e.preventDefault();const q=$("aiQuestion").value.trim();if(!q)return;$("aiQuestion").value="";askAi(q)};
 if($("aiSuggestions"))$("aiSuggestions").querySelectorAll("button[data-q]").forEach(b=>b.onclick=()=>askAi(b.dataset.q));
-async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;updateAiUsageDisplay(result.used,result.limit);toast("Message generated")}catch(err){toast(err.message);refreshAiUsage()}}
+async function generateAI(){try{const result=await api("POST","/api/ai/generate",{tool:$("aiTool").value,productId:$("aiProduct").value,customerId:$("aiCustomer").value,detail:$("aiDetail").value.trim()});$("aiOut").value=result.text;updateAiUsageDisplay(result.used,result.limit);markStoreAiUsed();toast("Message generated")}catch(err){toast(err.message);refreshAiUsage()}}
 if($("aiUpgradePlanBtn"))$("aiUpgradePlanBtn").onclick=()=>open("upgrade.html","_blank","noopener");
 if($("aiBuyCreditsBtn"))$("aiBuyCreditsBtn").onclick=()=>open("upgrade.html#addonCards","_blank","noopener");
 $("invSelect").onchange=renderInvoice;$("waInvoice").onclick=()=>{const o=state.orders.find(x=>x.id===$("invSelect").value)||state.orders[0];wa(invoiceText(),customer(o?.customerId)?.phone||"")};$("genAI").onclick=generateAI;$("copyAI").onclick=()=>copy($("aiOut").value);$("upgrade").onclick=()=>open("upgrade.html","_blank","noopener");$("export").onclick=()=>{downloadCsv(["Name","Price","Stock","Category","Type"],state.products.map(p=>[p.name,p.price,p.stock,p.category||"",p.type||""]),"products.csv");downloadCsv(["Name","Phone","Location"],state.customers.map(c=>[c.name,c.phone,c.location||""]),"customers.csv");downloadCsv(["Customer","Items","Qty","Status","Total","Date"],state.orders.map(o=>[customer(o.customerId)?.name||"",orderItemsText(o),(o.items&&o.items.length?o.items.reduce((s,i)=>s+i.qty,0):o.qty),o.status,total(o),o.createdAt]),"orders.csv")};$("demo").onclick=async()=>{applyState(await api("POST","/api/demo"));render();toast("Demo loaded")};
@@ -732,9 +737,9 @@ async function loadReports(){
     const r=await api("GET","/api/reports");
     lastReport=r;
     $("repRevenue").innerHTML=r.revenueByMonth.map(x=>`<div class="item"><strong>${clean(x.month)}</strong><span class="meta">${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No revenue yet</span></div>`;
-    const upgradeHint=`<div class="item"><span class="meta">Upgrade to Pro or above to see this</span></div>`;
-    $("repProducts").innerHTML=r.tier==="basic"?upgradeHint:r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
-    $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint:r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
+    const upgradeHint=feature=>`<div class="item" style="text-align:center;padding:22px 12px"><p class="meta">See ${feature} on the Pro plan and above.</p><p class="actions" style="justify-content:center;margin-top:10px"><a class="button-link" href="upgrade.html">Upgrade to Pro</a></p></div>`;
+    $("repProducts").innerHTML=r.tier==="basic"?upgradeHint("top products"):r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
+    $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint("top customers"):r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
   }catch(err){toast(err.message)}
   loadReportsChart(currentRepRange);
@@ -906,7 +911,7 @@ function digitalDeliveryHtml(o){const items=(o.items&&o.items.length?o.items:[{p
 function setupScore(){const checks=[state.businessName&&state.businessName!=="Your Business",state.businessPhone,state.paymentDetails||state.paymentLink,state.products.length,state.customers.length,state.orders.length,state.businessLogo];return Math.round(checks.filter(Boolean).length/checks.length*100)}
 function renderActivationChecklist(){
   const el=$("activationChecklist");if(!el)return;
-  const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"],["Register your business",!!state.regType,"docs"]];
+  const items=[["Add payment details",!!state.paymentDetails,"settings"],["Add your first product",state.products.length>0,"products"],["Add your first customer",state.customers.length>0,"customers"],["Create your first order",state.orders.length>0,"orders"],["Use your store AI",localStorage.getItem("sp_used_store_ai")==="1","ai"],["Register your business",!!state.regType,"docs"]];
   const done=items.filter(x=>x[1]).length;
   const regDone=!!state.regType;
   // Registration is mandatory-enough that it can't be dismissed away - the
@@ -1042,15 +1047,24 @@ const DOCS_STATUS_LABELS={not_started:"Not started",submitted:"Submitted - await
 const DOCS_STATUS_PILL={not_started:"pill-neutral",submitted:"pill-progress",in_review:"pill-progress",action_needed:"pill-alert",approved:"pill-success",filed:"pill-success"};
 const docsPill=(status,label)=>`<span class="pill ${DOCS_STATUS_PILL[status]||"pill-neutral"}">${clean(label)}</span>`;
 document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.dataset.view));
-// Trackers and the Document Vault are self-serve utilities, open to everyone;
-// the rest of My Docs assumes a registered (or registering) business, so it
-// stays behind the onboarding gate until that's true.
-const DOCS_GATED_VIEWS=["overview","registration","calendar","tax","templates"];
+// Trackers, the Document Vault, and Templates are self-serve utilities,
+// open to everyone; Overview and Registration assume a registered (or
+// registering) business, so those fully redirect to the onboarding gate
+// until that's true. Calendar/Tax sit in between - locked, but still show
+// their own description instead of vanishing into the generic gate.
+const DOCS_GATED_VIEWS=["overview","registration"];
+const DOCS_PREVIEW_LOCK={calendar:["docsCalendarBody","docsCalendarLocked"],tax:["docsTaxBody","docsTaxLocked"]};
 function docsIsFirstTimer(){const b=docsData?.business;return !!b&&!b.regType&&!b.regExistingNumber&&!b.hasPurchasedPackage}
 function showDocsView(view){
-  const gated=docsIsFirstTimer()&&DOCS_GATED_VIEWS.includes(view);
+  const firstTimer=docsIsFirstTimer();
+  const gated=firstTimer&&DOCS_GATED_VIEWS.includes(view);
   document.querySelectorAll(".docs-tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   document.querySelectorAll(".docs-subpage").forEach(p=>p.classList.toggle("active",gated?p.id==="docs-gate":p.id==="docs-"+view));
+  Object.entries(DOCS_PREVIEW_LOCK).forEach(([v,[bodyId,lockId]])=>{
+    const locked=v===view&&firstTimer;
+    if($(bodyId))$(bodyId).style.display=locked?"none":"";
+    if($(lockId))$(lockId).style.display=locked?"block":"none";
+  });
 }
 async function loadAllDocsData(){
   try{
@@ -1064,6 +1078,10 @@ async function loadAllDocsData(){
 }
 function renderAllDocs(){
   if(!docsData)return;
+  // Once a business is actually registered there's nothing left to do on
+  // this tab - registration status still shows on Overview's Health Score.
+  const regTab=document.querySelector('.docs-tab[data-view="registration"]');
+  if(regTab)regTab.style.display=docsData.business.regStatus==="approved"?"none":"";
   renderDocs();
   renderDocsOverview();
   renderDocsHealthScore();
@@ -1444,6 +1462,7 @@ if($("docsDownloadBasic"))$("docsDownloadBasic").onclick=async()=>{
     const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"standard",fields:docsCollectFieldValues()});
     docsDownloadTextFile(`${docsSelectedTpl}.txt`,result.text);
     await docsSaveTemplateToVault(name,result.text,docsSelectedTpl==="loan");
+    markStoreAiUsed();
     toast("Document drafted - saved to your Vault");
   }catch(err){toast(err.message)}
   finally{btn.disabled=false;btn.textContent="Fill in & download"}
@@ -1465,6 +1484,7 @@ if($("docsSuggestFields"))$("docsSuggestFields").onclick=()=>{
       const result=await api("POST","/api/ai/generate",{tool:"doc_template",templateType:docsSelectedTpl,mode:"improved",fields:docsCollectFieldValues(),extraClauses,detail:input});
       docsDownloadTextFile(`${docsSelectedTpl}-improved.txt`,result.text);
       await docsSaveTemplateToVault(name,result.text,isHighValue);
+      markStoreAiUsed();
       toast("Improved document drafted - saved to your Vault");
     }catch(err){toast(err.message)}
     finally{btn.disabled=false;btn.textContent="Generate improved document →"}

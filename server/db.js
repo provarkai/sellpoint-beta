@@ -129,6 +129,7 @@ function toProductJson(p) {
     description: p.description,
     barcode: p.barcode || "",
     weight: p.weight != null ? Number(p.weight) : null,
+    showInStorefront: p.show_in_storefront !== false,
   };
 }
 function toCustomerJson(c) {
@@ -700,6 +701,18 @@ async function activatePlan(businessId, plan, billingCycle) {
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
 }
 
+// The registration package bundles a few months of Growth as a bonus -
+// only applied if the business is still on Starter, so it can never
+// downgrade or shorten a plan that's already equal or better than Growth.
+async function grantBonusGrowthMonths(businessId, months) {
+  const business = await getBusiness(businessId);
+  if (!business || business.plan !== "starter") return;
+  const expires = new Date();
+  expires.setMonth(expires.getMonth() + months);
+  await setPlan(businessId, "growth", "monthly", expires.toISOString());
+  await logEvent(businessId, "plan_upgraded", `growth (${months}mo bonus - registration package)`);
+}
+
 // --- Referral program (real paying customers) -------------------------------
 
 // Generated lazily on first request rather than at signup, so businesses
@@ -815,7 +828,7 @@ async function getStorefront(slug) {
   const business = rows[0];
   if (!business || !business.storefront_enabled || !storefrontEnabledFor(effectivePlan(business))) return null;
   const { rows: products } = await query(
-    "SELECT * FROM products WHERE business_id = $1 ORDER BY created_at DESC",
+    "SELECT * FROM products WHERE business_id = $1 AND show_in_storefront ORDER BY created_at DESC",
     [business.id]
   );
   const { rows: completedRows } = await query(
@@ -1408,8 +1421,8 @@ async function createProduct(businessId, data) {
   const id = uid("p");
   const weight = data.weight !== undefined && data.weight !== "" && data.weight !== null ? requireNumber(data.weight, "Weight", { min: 0 }) : null;
   const { rows } = await query(
-    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode, weight)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    `INSERT INTO products (id, business_id, name, price, discount_price, stock, category, type, delivery_link, delivery_note, image, images, description, barcode, weight, show_in_storefront)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
     [
       id,
       businessId,
@@ -1426,6 +1439,7 @@ async function createProduct(businessId, data) {
       data.description || "",
       barcode,
       weight,
+      data.showInStorefront !== false,
     ]
   );
   await logEvent(businessId, "item_created", name);
@@ -1445,9 +1459,10 @@ async function updateProduct(businessId, id, data) {
   const barcode = data.barcode !== undefined ? normalizeBarcode(data.barcode) : current.barcode;
   if (data.barcode !== undefined) await assertBarcodeAvailable(businessId, barcode, id);
   const weight = data.weight !== undefined ? (data.weight === "" || data.weight === null ? null : requireNumber(data.weight, "Weight", { min: 0 })) : current.weight;
+  const showInStorefront = data.showInStorefront !== undefined ? data.showInStorefront !== false : current.show_in_storefront;
   const { rows: updated } = await query(
-    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12, weight=$13
-     WHERE id = $14 AND business_id = $15 RETURNING *`,
+    `UPDATE products SET name=$1, price=$2, discount_price=$3, stock=$4, category=$5, type=$6, delivery_link=$7, delivery_note=$8, image=$9, images=$10, description=$11, barcode=$12, weight=$13, show_in_storefront=$14
+     WHERE id = $15 AND business_id = $16 RETURNING *`,
     [
       name,
       price,
@@ -1462,6 +1477,7 @@ async function updateProduct(businessId, id, data) {
       data.description !== undefined ? data.description : current.description,
       barcode,
       weight,
+      showInStorefront,
       id,
       businessId,
     ]
@@ -3381,6 +3397,7 @@ module.exports = {
   getState,
   updateBusiness,
   activatePlan,
+  grantBonusGrowthMonths,
   getOrCreateReferralCode,
   rewardReferrerIfEligible,
   downgradeToStarter,

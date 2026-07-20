@@ -44,7 +44,7 @@
         <article><h2>Monthly Store Metrics</h2><div class="metrics"><div><small>Orders this month</small><b id="msmOrders">0</b></div><div><small>New customers this month</small><b id="msmCustomers">0</b></div><div><small>Abandoned checkouts</small><b id="msmAbandoned">0</b></div></div></article>
       </div>
     </section>
-    <section id="products" class="page"><div class="grid"><form id="productForm"><h2 id="pFormTitle">Add product / service</h2><label>Type<select id="pType"><option>Product</option><option>Service</option><option>Digital product</option></select></label><label>Name<input id="pName" required></label><label>Price<input id="pPrice" type="number" min="0" required></label><label>Discount price <span class="meta">(optional - leave blank for no discount)</span><input id="pDiscountPrice" type="number" min="0" placeholder="e.g. 4500"></label><label>Stock / slots / licenses<input id="pStock" type="number" min="0" required></label><label>Weight (kg) <span class="meta">(optional - used to calculate shipping cost for SellersPoint Logistics)</span><input id="pWeight" type="number" min="0" step="0.01" placeholder="e.g. 0.5"></label><label>Category<input id="pCat"></label><label>Barcode <span class="meta">(optional - scan with a USB barcode scanner or type manually)</span><input id="pBarcode" placeholder="e.g. 6009123456789"></label><label>Extra details for AI <span class="meta">(optional - material, key features, who it's for, size/variants - helps AI write a stronger description)</span><textarea id="pAiContext" rows="2" placeholder="e.g. 100% cotton, hand-stitched, made for humid weather, comes in 3 colors"></textarea></label><label>Description <span class="meta">(shows on your storefront)</span><textarea id="pDescription" rows="3" placeholder="What is this, who is it for, what makes it good"></textarea></label><p class="actions"><button type="button" id="pGenDescription">Write with AI</button></p><label>Product photos <span class="meta">(up to 5, shown on your storefront)</span><input id="pImage" type="file" accept="image/*" multiple></label><div id="pImagePreview" class="product-photo-preview"></div><div id="pDeliveryLinkField" style="display:none"><label>Digital delivery link<input id="pDelivery" placeholder="https://drive.google.com/... or download page"></label></div><div id="pNoteField" style="display:none"><label><span id="pNoteLabel">Delivery note</span><textarea id="pNote" rows="3" placeholder="Access instructions, license key note, support contact"></textarea></label></div><p class="actions"><button id="pSubmitBtn">Save Item</button><button type="button" id="pCancelEdit" style="display:none">Cancel Edit</button></p></form><article><h2>Products & Services <small id="pCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="pImportCsv" type="file" accept=".csv" style="display:none"></label><button id="pExportPdf">Export PDF</button><button id="pExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, price, stock, category, type</p><div id="pList" class="list"></div></article>
+    <section id="products" class="page"><div class="grid"><form id="productForm"><h2 id="pFormTitle">Add product / service</h2><label>Type<select id="pType"><option>Product</option><option>Service</option><option>Digital product</option></select></label><label>Name<input id="pName" required></label><label>Price<input id="pPrice" type="number" min="0" required></label><label>Discount price <span class="meta">(optional - leave blank for no discount)</span><input id="pDiscountPrice" type="number" min="0" placeholder="e.g. 4500"></label><label>Stock / slots / licenses<input id="pStock" type="number" min="0" required></label><label>Weight (kg) <span class="meta">(optional - used to calculate shipping cost for SellersPoint Logistics)</span><input id="pWeight" type="number" min="0" step="0.01" placeholder="e.g. 0.5"></label><label>Category<input id="pCat"></label><label><input type="checkbox" id="pShowInStorefront" checked> Show in storefront <span class="meta">(uncheck to keep this item in inventory/POS/orders without listing it publicly)</span></label><label>Barcode <span class="meta">(optional - scan with a USB barcode scanner or type manually)</span><input id="pBarcode" placeholder="e.g. 6009123456789"></label><label>Extra details for AI <span class="meta">(optional - material, key features, who it's for, size/variants - helps AI write a stronger description)</span><textarea id="pAiContext" rows="2" placeholder="e.g. 100% cotton, hand-stitched, made for humid weather, comes in 3 colors"></textarea></label><label>Description <span class="meta">(shows on your storefront)</span><textarea id="pDescription" rows="3" placeholder="What is this, who is it for, what makes it good"></textarea></label><p class="actions"><button type="button" id="pGenDescription">Write with AI</button></p><label>Product photos <span class="meta">(up to 5, shown on your storefront)</span><input id="pImage" type="file" accept="image/*" multiple></label><div id="pImagePreview" class="product-photo-preview"></div><div id="pDeliveryLinkField" style="display:none"><label>Digital delivery link<input id="pDelivery" placeholder="https://drive.google.com/... or download page"></label></div><div id="pNoteField" style="display:none"><label><span id="pNoteLabel">Delivery note</span><textarea id="pNote" rows="3" placeholder="Access instructions, license key note, support contact"></textarea></label></div><p class="actions"><button id="pSubmitBtn">Save Item</button><button type="button" id="pCancelEdit" style="display:none">Cancel Edit</button></p></form><article><h2>Products & Services <small id="pCount"></small></h2><p class="actions"><label class="button-link" style="cursor:pointer">Import CSV<input id="pImportCsv" type="file" accept=".csv" style="display:none"></label><button id="pExportPdf">Export PDF</button><button id="pExportExcel">Export Excel</button></p><p class="meta">CSV columns: name, price, stock, category, type</p><div id="pList" class="list"></div></article>
       <form id="batchForm"><h2>Batch / lot tracking <small class="meta">(optional - doesn't yet affect stock automatically)</small></h2><label>Product<select id="bProduct"></select></label><label>Batch number<input id="bNumber" placeholder="e.g. LOT-2026-07"></label><label>Quantity<input id="bQty" type="number" min="0" value="0"></label><label>Expiry date (optional)<input id="bExpiry" type="date"></label><label>Cost price (optional)<input id="bCost" type="number" min="0" step="0.01"></label><button>Add Batch</button></form>
       <article><h2>Batches <small id="bCount"></small></h2><div id="bList" class="list"></div></article>
       </div></section>
@@ -125,6 +125,7 @@
               <li>Congratulatory Letter</li>
               <li>FIRS TIN Certificate</li>
               <li>MEMART</li>
+              <li>3 months of the Growth plan, on us</li>
             </ul>
             <div class="gate-price">₦80,000<small>SCUML price not included</small></div>
             <button type="button" class="btn btn-accent" id="docsBuyRegPackage">Subscribe &amp; Get Started</button>
@@ -275,7 +276,12 @@
 
       <div id="docs-calendar" class="docs-subpage">
         <div class="view-header"><h1>Compliance Calendar</h1><p>Every statutory tax deadline, plus your own Trackers, merged into one view - this month and next.</p></div>
-        <div class="cal-layout">
+        <div class="card docs-locked-prompt" id="docsCalendarLocked" style="display:none">
+          <b>🔒 Unlock the Compliance Calendar</b>
+          <p class="meta" style="margin-top:6px">See every statutory tax deadline plus your own Trackers, merged into one view - available once your business registration is underway.</p>
+          <p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" onclick="showDocsView('overview')">Register your business →</button></p>
+        </div>
+        <div class="cal-layout" id="docsCalendarBody">
           <div>
             <div class="card next-deadline">
               <div>
@@ -311,7 +317,12 @@
 
       <div id="docs-tax" class="docs-subpage">
         <div class="view-header"><h1>Tax Tools</h1><p>PAYE, payroll, payslips and FIRS/NRS e-invoicing - built on the Nigeria Tax Act 2025. Estimates only - not a filed position.</p></div>
-
+        <div class="card docs-locked-prompt" id="docsTaxLocked" style="display:none">
+          <b>🔒 Unlock Tax Tools</b>
+          <p class="meta" style="margin-top:6px">PAYE, VAT, payroll, payslips and FIRS/NRS e-invoicing - available once your business registration is underway.</p>
+          <p class="actions" style="margin-top:14px"><button type="button" class="btn btn-primary" onclick="showDocsView('overview')">Register your business →</button></p>
+        </div>
+        <div id="docsTaxBody">
         <div class="tax-subnav">
           <button type="button" class="tax-tab active" data-tax="calculator">🧮 Tax Calculator</button>
           <button type="button" class="tax-tab" data-tax="vat">🧾 VAT</button>
@@ -408,6 +419,7 @@
             </form>
             <div id="docsInvoiceHistory" style="margin-top:18px"></div>
           </article>
+        </div>
         </div>
       </div>
 

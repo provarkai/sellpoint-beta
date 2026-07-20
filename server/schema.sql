@@ -301,6 +301,10 @@ update orders set subtotal = price * qty where subtotal is null and price is not
 -- customer to type a weight manually at checkout time.
 alter table products add column if not exists weight numeric;
 
+-- Lets a seller keep a product in inventory/POS/orders but leave it off
+-- the public storefront (e.g. wholesale-only or not-yet-ready items).
+alter table products add column if not exists show_in_storefront boolean not null default true;
+
 -- Suppliers & purchase orders - extends the products table (restocking from
 -- a named supplier rather than editing stock counts directly). Receiving a
 -- PO is the only action that touches product stock, mirroring how paying

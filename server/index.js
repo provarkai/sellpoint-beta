@@ -193,7 +193,12 @@ async function finalizeIfSuccessful(txData) {
       status: "success",
       rawPayload: txData,
     });
-    if (isNew) await db.recordAddonPurchase(businessId, metadata.addonType);
+    if (isNew) {
+      await db.recordAddonPurchase(businessId, metadata.addonType);
+      // The registration package bundles 3 months of Growth - see
+      // db.grantBonusGrowthMonths for why it only applies on Starter.
+      if (metadata.addonType === "registration_package") await db.grantBonusGrowthMonths(businessId, 3);
+    }
     return isNew;
   }
 
