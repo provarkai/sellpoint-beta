@@ -11,6 +11,7 @@ const { permissionsFor, ROLE_LABELS, INVITABLE_ROLES } = require("./roles");
 const payments = require("./payments");
 const pricing = require("./pricing");
 const ai = require("./ai");
+const email = require("./email");
 const whatsapp = require("./whatsapp");
 const shipbubble = require("./shipbubble");
 const { renderReceiptPng } = require("./receiptImage");
@@ -309,6 +310,17 @@ app.post(
   requireAuthOnly,
   handle(async (req, res) => {
     const business = await db.createBusiness(req.user.id, req.body || {}, req.user.email);
+    // Best-effort - a Resend hiccup should never block signup itself.
+    if (email.isConfigured() && req.user.email) {
+      email
+        .sendEmail({
+          to: req.user.email,
+          subject: `Welcome to SellersPoint, ${business.businessName}!`,
+          html: email.welcomeEmailHtml(business.businessName),
+        })
+        .catch((err) => console.error("Welcome email failed:", err.message));
+      email.addToAudience({ email: req.user.email, firstName: business.businessName }).catch((err) => console.error("Resend audience add failed:", err.message));
+    }
     res.status(201).json(business);
   })
 );
