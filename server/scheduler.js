@@ -87,10 +87,35 @@ async function runDailyDigestScan() {
   }
 }
 
+// Warns a trial business a few days before it lapses into Starter, rather
+// than letting effectivePlan()'s silent revert (server/db.js) be the only
+// signal - see server/pricing.js's TRIAL_DAYS comment for why no separate
+// job is needed to actually end the trial, only to warn about it first.
+async function runTrialReminderScan() {
+  if (!email.isConfigured()) return;
+  const businesses = await db.listTrialsEndingSoon();
+  for (const b of businesses) {
+    try {
+      const claimed = await db.markTrialReminderSent(b.id);
+      if (!claimed) continue; // another scan already sent this one
+      const ownerEmail = await db.getBusinessOwnerEmail(b.id);
+      if (!ownerEmail) continue;
+      await email.sendEmail({
+        to: ownerEmail,
+        subject: `Your SellersPoint free trial ends soon - ${b.businessName}`,
+        html: email.trialEndingEmailHtml({ businessName: b.businessName }),
+      });
+    } catch (err) {
+      console.error(`[scheduler] trial reminder failed for business ${b.id}:`, err.message);
+    }
+  }
+}
+
 async function runScheduledJobs() {
   await runAutoReminderScan();
   await runRecurringCampaignScan();
   await runDailyDigestScan();
+  await runTrialReminderScan();
 }
 
 function startScheduler() {
@@ -99,4 +124,4 @@ function startScheduler() {
   setInterval(() => runScheduledJobs().catch((err) => console.error("[scheduler] scan failed:", err.message)), SCAN_INTERVAL_MS);
 }
 
-module.exports = { startScheduler, runAutoReminderScan, runRecurringCampaignScan, runDailyDigestScan };
+module.exports = { startScheduler, runAutoReminderScan, runRecurringCampaignScan, runDailyDigestScan, runTrialReminderScan };

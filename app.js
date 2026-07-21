@@ -1,5 +1,10 @@
 let state={businessName:"Your Business",businessPhone:"",businessLogo:"",paymentProvider:"Paystack",paymentLink:"",paymentDetails:"",plan:"starter",currency:"NGN",products:[],customers:[],orders:[],events:[]};
 let pricing={};
+// billingCycle stays "trial" in the DB forever after it lapses too (only
+// the computed plan reverts, via effectivePlan() server-side) - checking
+// planExpiresAt is still in the future is what distinguishes an active
+// trial from a business that already reverted to Starter.
+function trialDaysLeft(){if(state.billingCycle!=="trial"||!state.planExpiresAt)return null;const ms=new Date(state.planExpiresAt).getTime()-Date.now();return ms>0?Math.ceil(ms/86400000):null}
 let authToken=null;
 let userEmail=null;
 let myRole=null;
@@ -55,12 +60,12 @@ function render(){
   $("oList").innerHTML=state.orders.map(o=>{const c=customer(o.customerId);const statuses=["Pending payment","Paid","Packed","Delivered"];const isQuote=o.status==="Quote",isRefunded=o.status==="Refunded";const statusControl=isQuote?`<span class="meta">Quote</span><button onclick="convertOrder('${o.id}')">Convert to Order</button>`:isRefunded?`<span class="meta">Refunded</span>`:`<select onchange="setOrderStatus('${o.id}',this.value)">${statuses.map(s=>`<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select><button onclick="refundOrder('${o.id}')">Refund</button>`;const isSellerspoint=o.deliveryMethod==="sellerspoint";const shipButton=!isSellerspoint?"":o.shipbubbleOrderId?`<a class="button-link" href="${o.shipbubbleTrackingUrl}" target="_blank" rel="noopener">Track Shipment</a><button onclick="refreshShipbubbleTracking('${o.id}')">Refresh Tracking</button>`:o.status==="Paid"?`<button onclick="bookShipbubbleShipment('${o.id}')">Book Shipment</button>`:"";const deliveryFeeLabel=o.deliveryFee?` - Delivery fee: ${money(o.deliveryFee)}${isSellerspoint&&!o.shipbubbleOrderId?" (courier not yet booked)":""}`:"";const trackingLabel=!o.shipbubbleOrderId?"":o.shipbubbleTrackingCode?` - Tracking code: ${clean(o.shipbubbleTrackingCode)}`:" - Tracking code: pending (courier hasn't assigned one yet)";return `<div class="item"><div class="item-top"><strong>${clean(c?.name||"Deleted customer")}</strong><span>${money(total(o))}</span></div><div class="meta">${clean(orderItemsText(o))} - ${date(o.createdAt)}${o.dueDate?` - Due ${date(o.dueDate)}`:""}${deliveryFeeLabel}${trackingLabel}</div><div class="item-actions">${statusControl}<button onclick="openInvoice('${o.id}')">${o.status==="Pending payment"?"Invoice":"Receipt"}</button><button onclick="sendOrderWhatsApp('${o.id}','${c?.phone||""}')">WhatsApp</button>${shipButton}<button onclick="delOrder('${o.id}')">Delete</button></div></div>`}).join("");
   const pLimRaw=pricing[state.plan]?.productLimit,pLim=pLimRaw===null||pLimRaw===undefined?Infinity:pLimRaw;
   $("pCount").textContent=`${state.products.length}/${pLim===Infinity?"unlimited":pLim} items`;$("cCount").textContent=`${state.customers.length} people`;$("oCount").textContent=`${state.orders.length} orders`;if($("used"))$("used").textContent=state.orders.length;
-  if($("planName"))$("planName").textContent=pricing[state.plan]?.name||state.plan;
+  if($("planName")){const trialDays=trialDaysLeft();$("planName").textContent=(pricing[state.plan]?.name||state.plan)+(trialDays!==null?` (trial - ${trialDays}d left)`:"")}
   if($("orderLimit")){const lim=orderLimit();$("orderLimit").textContent=lim===Infinity?"unlimited":lim}
   const priceLabel=t=>t.monthly===0?"Free":t.monthly==null?"Custom Pricing":money(t.monthly)+"/month";
-  if($("pricingPlans"))$("pricingPlans").innerHTML=Object.entries(pricing).map(([key,t])=>`<div class="${key===state.plan?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
+  if($("pricingPlans"))$("pricingPlans").innerHTML=Object.entries(pricing).filter(([key])=>key!=="growth"||state.plan==="growth").map(([key,t])=>`<div class="${key===state.plan?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
   if($("downgradeBtn"))$("downgradeBtn").style.display=state.plan!=="starter"&&can("plan.manage")?"block":"none";
-  if($("paywallPlans"))$("paywallPlans").innerHTML=Object.entries(pricing).filter(([key,t])=>key!=="starter"&&t.monthly!=null).map(([key,t],i)=>`<div class="${i===0?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
+  if($("paywallPlans"))$("paywallPlans").innerHTML=Object.entries(pricing).filter(([key,t])=>key!=="starter"&&key!=="growth"&&t.monthly!=null).map(([key,t],i)=>`<div class="${i===0?"featured":""}" style="cursor:pointer" onclick="location.href='upgrade.html?plan=${key}'"><b>${clean(t.name)}</b><span>${priceLabel(t)}</span><small>${clean(t.tagline)}</small></div>`).join("");
   const low=state.products.filter(p=>p.stock<5), pending=state.orders.filter(o=>o.status==="Pending payment").length;
   $("summary").innerHTML=`Best seller: <b>${clean(bestProduct()||"Not enough sales yet")}</b>.<br><b>${pending}</b> orders need payment follow-up.`;
   const isToday=iso=>{const d=new Date(iso),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
@@ -724,7 +729,7 @@ function renderProfile(){
   if($("profileName"))$("profileName").textContent=state.businessName||"Your Business";
   if($("profilePhone"))$("profilePhone").textContent=state.businessPhone||"No phone set";
   if($("profileRole"))$("profileRole").textContent=myRole==="owner"?"Owner":ROLE_LABELS[myRole]||"";
-  if($("profilePlan"))$("profilePlan").textContent=(pricing[state.plan]?.name||state.plan)+" plan";
+  if($("profilePlan")){const trialDays=trialDaysLeft();$("profilePlan").textContent=(pricing[state.plan]?.name||state.plan)+" plan"+(trialDays!==null?` - free trial, ${trialDays} day${trialDays===1?"":"s"} left`:"")}
   if($("profileLogo")&&$("profileLogoFallback")){
     if(state.businessLogo){$("profileLogo").src=state.businessLogo;$("profileLogo").style.display="block";$("profileLogoFallback").style.display="none"}
     else{$("profileLogo").style.display="none";$("profileLogoFallback").style.display="flex"}

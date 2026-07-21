@@ -197,6 +197,24 @@ function staffInviteEmailHtml({ businessName }) {
 </div>`;
 }
 
+// Fires once, a few days before a signup's 14-day Pro trial lapses (see
+// db.listTrialsEndingSoon / server/scheduler.js#runTrialReminderScan).
+// Deliberately doesn't say exactly how many days are left - the 2-3 day
+// scan window this is sent from means "days left" would sometimes read 2
+// and sometimes 3 depending on when the scan happened to run, which reads
+// as sloppy - "in a few days" stays true either way.
+function trialEndingEmailHtml({ businessName }) {
+  const biz = String(businessName || "there").replace(/[<>&]/g, "");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#17211c">
+<p style="margin:0 0 4px">Hi ${biz},</p>
+<h1 style="color:#147d64;font-size:20px;margin:0 0 16px">Your free trial ends in a few days</h1>
+<p>You've been using SellersPoint's Pro plan free for the last two weeks - staff seats, POS mode, batch tracking, Compliance Calendar & Tax Tools, and more.</p>
+<p>If you don't subscribe before your trial ends, your account switches to the free Starter plan - you'll keep everything you've already entered, but Pro-only features and higher limits won't be available until you upgrade again.</p>
+<p style="margin-top:24px"><a href="https://sellerspoint.app/upgrade.html" style="display:inline-block;background:#147d64;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Keep Pro - Subscribe now →</a></p>
+<p style="margin-top:20px;color:#647067;font-size:13px">Questions about which plan fits your business? Just reply to this email.</p>
+</div>`;
+}
+
 module.exports = {
   isConfigured,
   sendEmail,
@@ -208,5 +226,6 @@ module.exports = {
   paymentReceivedEmailHtml,
   orderConfirmationEmailHtml,
   staffInviteEmailHtml,
+  trialEndingEmailHtml,
   FEEDBACK_NOTIFY_EMAIL,
 };

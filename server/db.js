@@ -3,7 +3,7 @@ const { Pool, types } = require("pg");
 const {
   orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
-  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT,
+  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT, TRIAL_DAYS,
 } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
@@ -258,9 +258,15 @@ async function createBusiness(userId, fields, email) {
       referredByBusinessId = refRows[0]?.id || null;
     }
     const currency = isValidCurrency(fields.currency) ? fields.currency : "NGN";
+    // Every fresh signup starts on a Pro trial rather than Starter -
+    // effectivePlan() already reverts to starter on its own once
+    // plan_expires_at passes (see server/pricing.js's TRIAL_DAYS comment),
+    // so no separate "activate the trial" step is needed beyond this row.
+    const trialExpiresAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
     const { rows } = await client.query(
-      `INSERT INTO businesses (name, phone, slug, referred_by_business_id, currency) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [businessName, fields.businessPhone || "", slug, referredByBusinessId, currency]
+      `INSERT INTO businesses (name, phone, slug, referred_by_business_id, currency, plan, billing_cycle, plan_expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pro', 'trial', $6) RETURNING *`,
+      [businessName, fields.businessPhone || "", slug, referredByBusinessId, currency, trialExpiresAt]
     );
     const business = rows[0];
     await client.query(
@@ -3295,6 +3301,30 @@ async function getBusinessOwnerEmail(businessId) {
   return rows[0]?.email || null;
 }
 
+// Trial-ending reminder (server/scheduler.js#runTrialReminderScan) - a
+// 2-3 day window (not "fewer than N days left") so a scheduler tick a few
+// hours late doesn't skip a business entirely; trial_reminder_sent is
+// what actually prevents a repeat send across scans, not the window itself.
+async function listTrialsEndingSoon() {
+  const { rows } = await query(
+    `SELECT id, name, plan_expires_at FROM businesses
+     WHERE billing_cycle = 'trial' AND trial_reminder_sent = false
+       AND plan_expires_at BETWEEN now() + interval '2 days' AND now() + interval '3 days'`
+  );
+  return rows.map((b) => ({ id: b.id, businessName: b.name, planExpiresAt: b.plan_expires_at }));
+}
+
+// Atomic claim, same "UPDATE ... WHERE flag = false RETURNING id" pattern
+// as orders.paid_email_sent - only the first scan to see a given business
+// as due can ever send its reminder.
+async function markTrialReminderSent(businessId) {
+  const { rows } = await query(
+    "UPDATE businesses SET trial_reminder_sent = true WHERE id = $1 AND trial_reminder_sent = false RETURNING id",
+    [businessId]
+  );
+  return !!rows.length;
+}
+
 // Gathers everything the daily digest email needs in one call - today's
 // sales/orders/new customers (same "today" definition as the dashboard's
 // Today card, just computed server-side here since this runs outside a
@@ -3507,6 +3537,8 @@ module.exports = {
   markDigestSent,
   unsubscribeDailyDigest,
   getBusinessOwnerEmail,
+  listTrialsEndingSoon,
+  markTrialReminderSent,
   getDailyDigestData,
   computeSegments,
   setShipbubbleSenderAddress,

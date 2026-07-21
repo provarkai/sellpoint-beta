@@ -4,7 +4,19 @@ let cycle = "monthly";
 let authToken = null;
 let busy = false;
 let currentPlan = null;
+let currentBillingCycle = null;
+let currentPlanExpiresAt = null;
 let founderDiscount = false;
+
+// Every new signup starts on a 14-day Pro trial (server/db.js#createBusiness) -
+// billingCycle stays "trial" in the DB even after it lapses (only the
+// computed `plan` field reverts, via effectivePlan()), so this also checks
+// the expiry is still in the future before treating it as an active trial.
+function trialDaysLeft() {
+  if (currentBillingCycle !== "trial" || !currentPlanExpiresAt) return null;
+  const ms = new Date(currentPlanExpiresAt).getTime() - Date.now();
+  return ms > 0 ? Math.ceil(ms / 86400000) : null;
+}
 const money = (n) => "NGN " + Number(n || 0).toLocaleString("en-NG");
 const unlimited = (v) => v === Infinity || v === null || v === undefined;
 const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); };
@@ -41,10 +53,12 @@ function featuresFor(key, t) {
 }
 
 function planCardsHtml() {
-  return Object.entries(pricing).filter(([key]) => key !== "starter").map(([key, t]) => {
+  const daysLeft = trialDaysLeft();
+  return Object.entries(pricing).filter(([key]) => key !== "starter" && key !== "growth").map(([key, t]) => {
     const isEnterprise = t.monthly == null;
-    const isCurrent = key === currentPlan;
-    const featured = key === "pro" && !isCurrent;
+    const isTrialingThis = daysLeft !== null && key === currentPlan;
+    const isCurrent = key === currentPlan && !isTrialingThis;
+    const featured = key === "pro" && !isCurrent && !isTrialingThis;
     const fullPrice = cycle === "yearly" ? t.yearly : t.monthly;
     const showFounderPrice = founderDiscount && !isEnterprise && fullPrice > 0;
     const priceHtml = isEnterprise
@@ -56,18 +70,24 @@ function planCardsHtml() {
       ? '<button disabled>Current Plan</button>'
       : isEnterprise
       ? '<a class="button-link" href="mailto:sales@sellerspoint.app?subject=Enterprise%20plan">Contact Sales</a>'
-      : '<button data-plan="' + key + '">Choose ' + t.name + '</button>';
+      : '<button data-plan="' + key + '">' + (isTrialingThis ? "Subscribe Now" : "Choose " + t.name) + '</button>';
     const body = isEnterprise
       ? '<p class="meta">' + t.tagline + '</p>'
       : '<p class="meta">' + t.tagline + '</p><ul class="premium-features">' + featuresFor(key, t).map((f) => "<li>" + f + "</li>").join("") + '</ul>';
-    const badge = isCurrent ? '<span class="landing-pricing-badge">Current Plan</span>' : featured ? '<span class="landing-pricing-badge">Most Popular</span>' : "";
-    const classes = "premium-card" + (isEnterprise ? " premium-card-enterprise" : "") + (featured || isCurrent ? " premium-card-featured" : "");
+    const badge = isCurrent
+      ? '<span class="landing-pricing-badge">Current Plan</span>'
+      : isTrialingThis
+      ? '<span class="landing-pricing-badge">Your Trial - ' + daysLeft + 'd left</span>'
+      : featured
+      ? '<span class="landing-pricing-badge">Most Popular</span>'
+      : "";
+    const classes = "premium-card" + (isEnterprise ? " premium-card-enterprise" : "") + (featured || isCurrent || isTrialingThis ? " premium-card-featured" : "");
     return '<article class="' + classes + '">' + badge + '<h2>' + t.name + '</h2>' + priceHtml + body + cta + '</article>';
   }).join("");
 }
 
 function comparisonTableHtml() {
-  const keys = Object.keys(pricing).filter((k) => k !== "enterprise");
+  const keys = Object.keys(pricing).filter((k) => k !== "enterprise" && k !== "growth");
   const rows = [
     ["Price", (t) => (t.monthly == null ? "Custom" : t.monthly === 0 ? "Free" : money(cycle === "yearly" ? t.yearly : t.monthly) + "/" + (cycle === "yearly" ? "yr" : "mo"))],
     ["Orders", (t) => (unlimited(t.orderLimit) ? "Unlimited" : t.orderLimit + "/month")],
@@ -109,7 +129,11 @@ function render() {
       : "Switch to yearly and get 2 months free on any plan.";
   }
   if ($("currentPlanNote") && currentPlan) {
-    $("currentPlanNote").textContent = "You're currently on the " + (pricing[currentPlan]?.name || currentPlan) + " plan.";
+    const daysLeft = trialDaysLeft();
+    const planName = pricing[currentPlan]?.name || currentPlan;
+    $("currentPlanNote").textContent = daysLeft !== null
+      ? "You're on a free trial of the " + planName + " plan - " + daysLeft + " day" + (daysLeft === 1 ? "" : "s") + " left. Subscribe any time to keep it after your trial ends."
+      : "You're currently on the " + planName + " plan.";
     $("currentPlanNote").style.display = "block";
   }
   if (founderDiscount && $("founderCode")) {
@@ -180,6 +204,8 @@ async function loadAll() {
   ]);
   pricing = pricingRes;
   currentPlan = meRes?.business?.plan || null;
+  currentBillingCycle = meRes?.business?.billingCycle || null;
+  currentPlanExpiresAt = meRes?.business?.planExpiresAt || null;
   founderDiscount = !!meRes?.business?.founderDiscount;
 }
 

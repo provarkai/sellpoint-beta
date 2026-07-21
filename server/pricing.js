@@ -23,6 +23,12 @@ const FOUNDER_DISCOUNT_RATE = 0.5;
 // See db.redeemFounderCode/countFounderRedemptions.
 const FOUNDER_PROMO_LIMIT = 1000;
 
+// Every new signup starts on a Pro trial (not Starter) for this many days -
+// see db.createBusiness. No new cron job needed to end it: effectivePlan()
+// already treats any plan whose plan_expires_at has passed as "starter" on
+// every read, so the trial just expires into the free tier on its own.
+const TRIAL_DAYS = 14;
+
 // staffLimit/aiLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
 // enforcement) - this is the fix for the gap flagged in CLAUDE.md's pricing
@@ -63,8 +69,14 @@ const TIERS = {
     reportsTier: "none", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 2, poLimit: 5,
     loyaltyAvailable: false, batchLimit: 0, posLimit: 0,
-    tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, unlimited free receipts, a public storefront with Facebook Pixel & Google Analytics tracking, and manual WhatsApp messaging",
+    tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, unlimited free receipts, a public storefront with Facebook Pixel & Google Analytics tracking, and manual WhatsApp messaging - or start a 14-day free trial of Pro",
   },
+  // Not self-serve any more (see SELF_SERVE_PLANS) - kept fully defined,
+  // never deleted, purely to keep existing pre-restructure subscribers'
+  // limits/pricing resolving correctly (effectivePlan/orderLimitFor/etc.
+  // all fall back to PRICING.starter for any plan key that doesn't exist,
+  // which would silently downgrade every grandfathered Growth business
+  // if this entry were removed instead of just hidden from new signups).
   growth: {
     name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 100,
     reportsTier: "basic", receiptLimit: Infinity, storefront: true,
@@ -72,12 +84,15 @@ const TIERS = {
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
     tagline: "Unlimited orders, 30 products, branded invoices, a public storefront with Pixel/GA tracking, loyalty & wallet, Trackers & Document Vault in My Docs, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
+  // ADDON_PRICES.staff. The one self-serve plan a new 14-day trial lands
+  // on (see db.createBusiness) - repriced down from 12000 as part of the
+  // 2-tier restructure; the feature set itself is unchanged.
   pro: {
-    name: "Pro", monthly: 12000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500,
+    name: "Pro", monthly: 10000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500,
     reportsTier: "standard", receiptLimit: Infinity, storefront: true,
     whatsappLimit: 500, expenseLimit: 500, plHistoryDays: 365, supplierLimit: 50, poLimit: 100,
     loyaltyAvailable: true, batchLimit: 100, posLimit: 500,
-    tagline: "Everything in Growth plus 2 staff seats with custom permissions, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, 500 automated WhatsApp sends/month, and more AI generations",
+    tagline: "Unlimited orders, 100 products, 2 staff seats with custom permissions, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, loyalty & wallet, 500 automated WhatsApp sends/month, and 500 AI generations - starts with a 14-day free trial",
   },
   business: {
     name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000,
@@ -104,11 +119,19 @@ const PRICING = Object.fromEntries(
   ])
 );
 
-// Growth/Pro/Business monthly prices are admin-editable (see backend.html's
+// The 2-tier restructure's self-serve lineup - what a new signup or the
+// upgrade page can actually choose. Growth is deliberately absent (closed
+// to new signups, grandfathered-only - see the TIERS.growth comment
+// above); Enterprise is handled separately everywhere already (contact
+// sales, never a self-serve Paystack checkout).
+const SELF_SERVE_PLANS = ["starter", "pro", "business"];
+
+// Pro/Business monthly prices are admin-editable (see backend.html's
 // Pricing Tiers form -> PUT /api/admin/pricing), stored as a small jsonb
-// map on platform_settings rather than hardcoded here. Starter stays free
-// and Enterprise stays "contact us" - only these three ever get overridden.
-const OVERRIDABLE_TIERS = ["growth", "pro", "business"];
+// map on platform_settings rather than hardcoded here. Starter stays free,
+// Enterprise stays "contact us", and Growth is a closed/legacy tier with
+// no live admin control any more - only Pro/Business ever get overridden.
+const OVERRIDABLE_TIERS = ["pro", "business"];
 
 function applyPricingOverrides(overrides = {}) {
   return Object.fromEntries(
@@ -188,6 +211,7 @@ function posLimitFor(plan) {
 
 module.exports = {
   PRICING,
+  SELF_SERVE_PLANS,
   priceFor,
   applyPricingOverrides,
   OVERRIDABLE_TIERS,
@@ -214,4 +238,5 @@ module.exports = {
   FOUNDER_PROMO_DEADLINE,
   FOUNDER_DISCOUNT_RATE,
   FOUNDER_PROMO_LIMIT,
+  TRIAL_DAYS,
 };

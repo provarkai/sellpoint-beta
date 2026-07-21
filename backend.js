@@ -171,7 +171,6 @@ function render() {
   $("auditLogList").innerHTML = auditLog.map((a) => '<div class="item"><div class="item-top"><strong>' + clean(a.method) + ' ' + clean(a.path) + '</strong><span>' + a.statusCode + '</span></div><div class="meta">' + clean(a.businessName || "Unknown business") + ' - ' + dateTime(a.createdAt) + '</div></div>').join("") || '<div class="item"><span class="meta">No activity yet</span></div>';
   $("ownerName").value = owner.name;
   $("ownerLink").value = owner.link;
-  if (pricing.growth) $("priceGrowth").value = pricing.growth.monthly;
   if (pricing.pro) $("pricePro").value = pricing.pro.monthly;
   if (pricing.business) $("priceBusiness").value = pricing.business.monthly;
   const sl = settings.socialLinks || {};
@@ -218,7 +217,7 @@ $("ownerPaymentForm").onsubmit = async (e) => {
 $("pricingForm").onsubmit = async (e) => {
   e.preventDefault();
   try {
-    pricing = await api("PUT", "/api/admin/pricing", { growth: +$("priceGrowth").value, pro: +$("pricePro").value, business: +$("priceBusiness").value });
+    pricing = await api("PUT", "/api/admin/pricing", { pro: +$("pricePro").value, business: +$("priceBusiness").value });
     toast("Pricing saved - now live on the upgrade page");
     render();
   } catch (err) {

@@ -482,6 +482,12 @@ alter table businesses add column if not exists why_buy_text text not null defau
 alter table businesses add column if not exists facebook_pixel_id text not null default '';
 alter table businesses add column if not exists google_analytics_id text not null default '';
 
+-- Dedupe flag for the trial-ending reminder email (server/scheduler.js's
+-- runTrialReminderScan) - same atomic-claim-before-send pattern as
+-- orders.paid_email_sent, so a business's trial never gets reminded twice
+-- even if the scheduler scan overlaps itself.
+alter table businesses add column if not exists trial_reminder_sent boolean not null default false;
+
 -- SellersPoint Logistics (item 7): platform-run delivery as a third
 -- deliveryMethod option alongside a seller's own self/rider arrangements.
 -- The actual courier API is still being evaluated, so apiBase/apiKey exist
