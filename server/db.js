@@ -897,11 +897,20 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
   // alone here (not wiped) - getStorefront is what actually stops them
   // from being exposed/injected while ineligible.
   const pixelEligible = pixelTrackingAvailableFor(effectivePlan(current));
-  if (!pixelEligible && ((facebookPixelId && facebookPixelId.trim()) || (googleAnalyticsId && googleAnalyticsId.trim()))) {
-    throw new OrderError("Facebook Pixel / Google Analytics tracking isn't available on the free plan - upgrade to Business Starter or above");
-  }
   const nextPixelId = facebookPixelId !== undefined ? String(facebookPixelId).trim().slice(0, 64) : current.facebook_pixel_id;
   const nextGaId = googleAnalyticsId !== undefined ? String(googleAnalyticsId).trim().slice(0, 64) : current.google_analytics_id;
+  // Only block a genuine attempt to SET a new/different value while
+  // ineligible - not a resubmission of the value already on file. The
+  // settings form always sends these two fields on every save (whatever
+  // it last loaded, which is the real stored value regardless of plan -
+  // only the public storefront hides it), so gating on "non-empty" alone
+  // would reject every storefront save for a downgraded business the
+  // moment they touched anything else on the form.
+  const changingPixelId = nextPixelId && nextPixelId !== (current.facebook_pixel_id || "");
+  const changingGaId = nextGaId && nextGaId !== (current.google_analytics_id || "");
+  if (!pixelEligible && (changingPixelId || changingGaId)) {
+    throw new OrderError("Facebook Pixel / Google Analytics tracking isn't available on the free plan - upgrade to Business Starter or above");
+  }
   const { rows: updated } = await query(
     "UPDATE businesses SET storefront_enabled=$1, slug=$2, storefront_banner=$3, social_links=$4, why_buy_text=$5, facebook_pixel_id=$6, google_analytics_id=$7 WHERE id = $8 RETURNING *",
     [nextEnabled, nextSlug, nextBanner, JSON.stringify(nextSocial), nextWhyBuy, nextPixelId, nextGaId, businessId]
