@@ -32,7 +32,7 @@ function featuresFor(key, t) {
     unlimited(t.orderLimit) ? "Unlimited orders" : t.orderLimit + " orders/month",
     unlimited(t.productLimit) ? "Unlimited products" : t.productLimit + " products",
   ];
-  if (t.storefront) list.push("Storefront with Facebook Pixel & Google Analytics tracking");
+  if (t.storefront) list.push(t.pixelTrackingAvailable ? "Storefront with Facebook Pixel & Google Analytics tracking" : "Public storefront");
   if (t.staffLimit > 0) list.push((unlimited(t.staffLimit) ? "Unlimited staff seats" : t.staffLimit + " staff seats") + " with custom permissions");
   list.push(unlimited(t.receiptLimit) ? "Unlimited free receipts" : t.receiptLimit + " free receipts/month");
   list.push(unlimited(t.aiLimit) ? "Unlimited AI generations" : t.aiLimit + " AI generations/month");
@@ -46,7 +46,7 @@ function featuresFor(key, t) {
   if (t.posLimit > 0 || unlimited(t.posLimit)) list.push("POS mode");
   if (t.loyaltyAvailable) list.push("Loyalty points & wallet");
   if (key !== "starter") list.push("Trackers & Document Vault (My Docs)");
-  if (["pro", "business", "enterprise"].includes(key)) list.push("Compliance Calendar & Tax Tools (My Docs)");
+  if (["business", "enterprise"].includes(key)) list.push("Compliance Calendar & Tax Tools (My Docs)");
   const reportLabel = REPORT_LABELS[t.reportsTier];
   if (reportLabel) list.push(reportLabel);
   return list;
@@ -92,7 +92,7 @@ function comparisonTableHtml() {
     ["Price", (t) => (t.monthly == null ? "Custom" : t.monthly === 0 ? "Free" : money(cycle === "yearly" ? t.yearly : t.monthly) + "/" + (cycle === "yearly" ? "yr" : "mo"))],
     ["Orders", (t) => (unlimited(t.orderLimit) ? "Unlimited" : t.orderLimit + "/month")],
     ["Products", (t) => (unlimited(t.productLimit) ? "Unlimited" : t.productLimit)],
-    ["Storefront Pixel/GA tracking", (t) => (t.storefront ? "Included" : "-")],
+    ["Storefront Pixel/GA tracking", (t) => (t.pixelTrackingAvailable ? "Included" : "-")],
     ["Staff seats", (t) => (t.staffLimit > 0 ? (unlimited(t.staffLimit) ? "Unlimited" : t.staffLimit) : "-")],
     ["Staff permissions", (t) => (t.staffLimit > 0 ? "Custom per-member" : "-")],
     ["AI generations", (t) => (unlimited(t.aiLimit) ? "Unlimited" : t.aiLimit + "/month")],
@@ -100,14 +100,14 @@ function comparisonTableHtml() {
     ["Free receipts", (t) => (unlimited(t.receiptLimit) ? "Unlimited" : t.receiptLimit + "/month")],
     ["Expense entries", (t) => (unlimited(t.expenseLimit) ? "Unlimited" : t.expenseLimit + "/month")],
     ["P&L / cashbook history", (t) => (unlimited(t.plHistoryDays) ? "Full history" : t.plHistoryDays + " days")],
-    ["Suppliers", (t) => (unlimited(t.supplierLimit) ? "Unlimited" : t.supplierLimit)],
-    ["Purchase orders", (t) => (unlimited(t.poLimit) ? "Unlimited" : t.poLimit + "/month")],
+    ["Suppliers", (t) => (unlimited(t.supplierLimit) ? "Unlimited" : t.supplierLimit > 0 ? t.supplierLimit : "-")],
+    ["Purchase orders", (t) => (unlimited(t.poLimit) ? "Unlimited" : t.poLimit > 0 ? t.poLimit + "/month" : "-")],
     ["Loyalty & wallet", (t) => (t.loyaltyAvailable ? "Included" : "-")],
     ["Batch/lot tracking", (t) => (unlimited(t.batchLimit) ? "Unlimited" : t.batchLimit > 0 ? t.batchLimit + "/month" : "-")],
     ["POS mode", (t) => (unlimited(t.posLimit) ? "Unlimited" : t.posLimit > 0 ? t.posLimit + " sales/month" : "-")],
     ["Reports", (t) => (REPORT_LABELS[t.reportsTier] || "-")],
     ["Trackers & Document Vault", (t, k) => (k !== "starter" ? "Included" : "-")],
-    ["Compliance Calendar & Tax Tools", (t, k) => (["pro", "business", "enterprise"].includes(k) ? "Included" : "-")],
+    ["Compliance Calendar & Tax Tools", (t, k) => (["business", "enterprise"].includes(k) ? "Included" : "-")],
   ];
   const head = "<tr><th>Feature</th>" + keys.map((k) => "<th>" + pricing[k].name + "</th>").join("") + "</tr>";
   const body = rows.map(([label, fn]) => "<tr><td>" + label + "</td>" + keys.map((k) => "<td>" + fn(pricing[k], k) + "</td>").join("") + "</tr>").join("");

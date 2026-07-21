@@ -23,10 +23,12 @@ const FOUNDER_DISCOUNT_RATE = 0.5;
 // See db.redeemFounderCode/countFounderRedemptions.
 const FOUNDER_PROMO_LIMIT = 1000;
 
-// Every new signup starts on a Pro trial (not Starter) for this many days -
-// see db.createBusiness. No new cron job needed to end it: effectivePlan()
-// already treats any plan whose plan_expires_at has passed as "starter" on
-// every read, so the trial just expires into the free tier on its own.
+// Every new signup starts on a trial of the "pro" tier (displayed as
+// "Business Starter" - see TIERS.pro) for this many days, not the free
+// plan - see db.createBusiness. No new cron job needed to end it:
+// effectivePlan() already treats any plan whose plan_expires_at has
+// passed as "starter" on every read, so the trial just expires into the
+// free tier on its own.
 const TRIAL_DAYS = 14;
 
 // staffLimit/aiLimit/productLimit/reportsTier are what actually
@@ -42,11 +44,14 @@ const TRIAL_DAYS = 14;
 // for what each level actually includes.
 // storefront: every tier gets a public catalog page (/store/<slug>) - see
 // server/index.js's /api/store/:slug and db.js#getStorefront. Opened up to
-// Starter too (previously Growth+ only) since a public storefront is what
-// lets a free-tier seller actually generate revenue and convert to a paid
-// plan, not something worth withholding as the paywall itself; the
-// productLimit each tier already carries is what naturally differentiates
-// how much of a catalog a free storefront can show.
+// the free plan too since a public storefront is what lets a free-tier
+// seller actually generate revenue and convert to a paid plan, not
+// something worth withholding as the paywall itself; the productLimit
+// each tier already carries is what naturally differentiates how much of
+// a catalog a free storefront can show. pixelTrackingAvailable is a
+// separate, narrower gate on top of storefront - the free plan gets the
+// storefront itself but not Facebook Pixel/Google Analytics tracking on
+// it (see db.js#updateStorefrontSettings/getStorefront).
 //
 // The fields below this line back the pricing-restructure pass: every
 // feature shipped without ever being allocated to a tier gets one here.
@@ -65,11 +70,11 @@ const TRIAL_DAYS = 14;
 // own CLAUDE.md framing as serving larger businesses first.
 const TIERS = {
   starter: {
-    name: "Starter", monthly: 0, orderLimit: 30, productLimit: 5, staffLimit: 0, aiLimit: 10,
-    reportsTier: "none", receiptLimit: Infinity, storefront: true,
-    whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 2, poLimit: 5,
+    name: "Free Plan", monthly: 0, orderLimit: 30, productLimit: 4, staffLimit: 0, aiLimit: 20,
+    reportsTier: "none", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: false,
+    whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 0, poLimit: 0,
     loyaltyAvailable: false, batchLimit: 0, posLimit: 0,
-    tagline: "Free - 30 orders/month, 5 products, basic invoices, AI samples, unlimited free receipts, a public storefront with Facebook Pixel & Google Analytics tracking, and manual WhatsApp messaging - or start a 14-day free trial of Pro",
+    tagline: "Free forever - 30 orders/month, 4 products, basic invoices, 20 AI generations, unlimited free receipts, a public storefront, and manual WhatsApp messaging - or start a 14-day free trial of Business Starter",
   },
   // Not self-serve any more (see SELF_SERVE_PLANS) - kept fully defined,
   // never deleted, purely to keep existing pre-restructure subscribers'
@@ -79,31 +84,32 @@ const TIERS = {
   // if this entry were removed instead of just hidden from new signups).
   growth: {
     name: "Growth", monthly: 5000, orderLimit: Infinity, productLimit: 30, staffLimit: 0, aiLimit: 100,
-    reportsTier: "basic", receiptLimit: Infinity, storefront: true,
+    reportsTier: "basic", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: true,
     whatsappLimit: 100, expenseLimit: 200, plHistoryDays: 180, supplierLimit: 10, poLimit: 25,
     loyaltyAvailable: true, batchLimit: 0, posLimit: 0,
     tagline: "Unlimited orders, 30 products, branded invoices, a public storefront with Pixel/GA tracking, loyalty & wallet, Trackers & Document Vault in My Docs, 100 AI generations, and 100 automated WhatsApp sends/month",
   },
   // ADDON_PRICES.staff. The one self-serve plan a new 14-day trial lands
-  // on (see db.createBusiness) - repriced down from 12000 as part of the
-  // 2-tier restructure; the feature set itself is unchanged.
+  // on (see db.createBusiness) - repriced as part of the 2-tier
+  // restructure; no Compliance Calendar/Tax Tools or Loyalty & wallet on
+  // this tier any more (see app.js's DOCS_PRO_PLANS for the Docs-side gate).
   pro: {
-    name: "Pro", monthly: 10000, orderLimit: Infinity, productLimit: 100, staffLimit: 2, aiLimit: 500,
-    reportsTier: "standard", receiptLimit: Infinity, storefront: true,
+    name: "Business Starter", monthly: 9999, orderLimit: Infinity, productLimit: 100, staffLimit: 5, aiLimit: 500,
+    reportsTier: "standard", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: true,
     whatsappLimit: 500, expenseLimit: 500, plHistoryDays: 365, supplierLimit: 50, poLimit: 100,
-    loyaltyAvailable: true, batchLimit: 100, posLimit: 500,
-    tagline: "Unlimited orders, 100 products, 2 staff seats with custom permissions, suppliers, batch tracking, POS mode, Compliance Calendar & Tax Tools in My Docs, loyalty & wallet, 500 automated WhatsApp sends/month, and 500 AI generations - starts with a 14-day free trial",
+    loyaltyAvailable: false, batchLimit: 100, posLimit: 500,
+    tagline: "Unlimited orders, 100 products, 5 staff seats with custom permissions, suppliers, batch tracking, POS mode, 500 automated WhatsApp sends/month, and 500 AI generations - starts with a 14-day free trial",
   },
   business: {
-    name: "Business", monthly: 20000, orderLimit: Infinity, productLimit: Infinity, staffLimit: 10, aiLimit: 2000,
-    reportsTier: "advanced", receiptLimit: Infinity, storefront: true,
+    name: "Business Pro", monthly: 19999, orderLimit: Infinity, productLimit: Infinity, staffLimit: 20, aiLimit: 2000,
+    reportsTier: "advanced", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: true,
     whatsappLimit: 1000, expenseLimit: Infinity, plHistoryDays: Infinity, supplierLimit: Infinity, poLimit: Infinity,
     loyaltyAvailable: true, batchLimit: Infinity, posLimit: Infinity,
-    tagline: "Everything in Pro plus up to 10 staff seats with custom permissions, 1,000 automated WhatsApp sends/month, and advanced reports",
+    tagline: "Everything in Business Starter plus 20 staff seats with custom permissions, Compliance Calendar & Tax Tools in My Docs, loyalty & wallet, 1,000 automated WhatsApp sends/month, and advanced reports",
   },
   enterprise: {
     name: "Enterprise", monthly: null, orderLimit: Infinity, productLimit: Infinity, staffLimit: Infinity, aiLimit: Infinity,
-    reportsTier: "advanced", receiptLimit: Infinity, storefront: true,
+    reportsTier: "advanced", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: true,
     whatsappLimit: Infinity, expenseLimit: Infinity, plHistoryDays: Infinity, supplierLimit: Infinity, poLimit: Infinity,
     loyaltyAvailable: true, batchLimit: Infinity, posLimit: Infinity,
     tagline: "Talk to sales for volume, SLAs, white-label, and dedicated support",
@@ -177,6 +183,10 @@ function storefrontEnabledFor(plan) {
   return !!(PRICING[plan]?.storefront ?? PRICING.starter.storefront);
 }
 
+function pixelTrackingAvailableFor(plan) {
+  return !!(PRICING[plan]?.pixelTrackingAvailable ?? PRICING.starter.pixelTrackingAvailable);
+}
+
 function whatsappLimitFor(plan) {
   return PRICING[plan]?.whatsappLimit ?? PRICING.starter.whatsappLimit;
 }
@@ -222,6 +232,7 @@ module.exports = {
   reportsTierFor,
   receiptLimitFor,
   storefrontEnabledFor,
+  pixelTrackingAvailableFor,
   whatsappLimitFor,
   expenseLimitFor,
   plHistoryDaysFor,

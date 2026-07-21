@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { Pool, types } = require("pg");
 const {
-  orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor,
+  orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor, pixelTrackingAvailableFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
   ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT, TRIAL_DAYS,
 } = require("./pricing");
@@ -666,7 +666,7 @@ async function updateBusiness(businessId, fields) {
   const current = rows[0];
   if (!current) throw new OrderError("Business not found");
   if (fields.loyaltyEnabled === true && !current.loyalty_enabled && !loyaltyAvailableFor(effectivePlan(current))) {
-    throw new OrderError("Loyalty & wallet is available on the Growth plan and above");
+    throw new OrderError("Loyalty & wallet isn't available on your current plan");
   }
   const merged = {
     name: fields.businessName ?? current.name,
@@ -727,18 +727,21 @@ async function activatePlan(businessId, plan, billingCycle) {
   await logEvent(businessId, "plan_upgraded", `${plan} (${billingCycle})`);
 }
 
-// The registration package bundles a few months of Pro as a bonus - Pro
-// (not just Growth) because Calendar/Tax Tools require Pro, and the whole
-// point is the business can actually use them right after registering.
-// Only applied if the business is on Starter or Growth, so it can never
-// downgrade or shorten a plan that's already equal or better than Pro.
+// The registration package bundles a few months of Business Pro as a
+// bonus - Business Pro specifically (not Business Starter, not just
+// Growth) because Compliance Calendar/Tax Tools moved to Business-Pro-
+// and-above in the 2-tier restructure, and the whole point of this bonus
+// is the business can actually use them right after registering. Only
+// applied if the business is on Starter, Growth, or Business Starter, so
+// it can never downgrade or shorten a plan that's already equal or
+// better than Business Pro.
 async function grantBonusProMonths(businessId, months) {
   const business = await getBusiness(businessId);
-  if (!business || !["starter", "growth"].includes(business.plan)) return;
+  if (!business || !["starter", "growth", "pro"].includes(business.plan)) return;
   const expires = new Date();
   expires.setMonth(expires.getMonth() + months);
-  await setPlan(businessId, "pro", "monthly", expires.toISOString());
-  await logEvent(businessId, "plan_upgraded", `pro (${months}mo bonus - registration package)`);
+  await setPlan(businessId, "business", "monthly", expires.toISOString());
+  await logEvent(businessId, "plan_upgraded", `business (${months}mo bonus - registration package)`);
 }
 
 // First 1000 businesses only (FOUNDER_PROMO_LIMIT) - counted by the
@@ -873,6 +876,16 @@ async function updateStorefrontSettings(businessId, { enabled, slug, banner, soc
     );
   }
   const nextWhyBuy = whyBuyText !== undefined ? String(whyBuyText).slice(0, 2000) : current.why_buy_text;
+  // Same "server-side plan check before allowing it on" shape as
+  // enabled/eligible above and updateBusiness's loyaltyEnabled gate -
+  // a tenant on the free plan flipping this on with dev tools shouldn't
+  // work. Existing saved IDs from a since-downgraded paid plan are left
+  // alone here (not wiped) - getStorefront is what actually stops them
+  // from being exposed/injected while ineligible.
+  const pixelEligible = pixelTrackingAvailableFor(effectivePlan(current));
+  if (!pixelEligible && ((facebookPixelId && facebookPixelId.trim()) || (googleAnalyticsId && googleAnalyticsId.trim()))) {
+    throw new OrderError("Facebook Pixel / Google Analytics tracking isn't available on the free plan - upgrade to Business Starter or above");
+  }
   const nextPixelId = facebookPixelId !== undefined ? String(facebookPixelId).trim().slice(0, 64) : current.facebook_pixel_id;
   const nextGaId = googleAnalyticsId !== undefined ? String(googleAnalyticsId).trim().slice(0, 64) : current.google_analytics_id;
   const { rows: updated } = await query(
@@ -923,8 +936,12 @@ async function getStorefront(slug) {
     memberSince: business.created_at,
     completedOrders: completedRows[0].n,
     whyBuyText: business.why_buy_text || "",
-    facebookPixelId: business.facebook_pixel_id || "",
-    googleAnalyticsId: business.google_analytics_id || "",
+    // Not exposed on the free plan even if a value was saved from a since-
+    // downgraded paid plan - updateStorefrontSettings leaves stored values
+    // alone on downgrade, this is the actual gate on whether they're ever
+    // used to inject tracking scripts on the live storefront.
+    facebookPixelId: pixelTrackingAvailableFor(effectivePlan(business)) ? business.facebook_pixel_id || "" : "",
+    googleAnalyticsId: pixelTrackingAvailableFor(effectivePlan(business)) ? business.google_analytics_id || "" : "",
     onlinePaymentEnabled: business.payment_mode === "paystack" && !!business.paystack_subaccount_code,
     shippingAvailable,
     shippingMarkup,

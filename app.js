@@ -555,7 +555,7 @@ if($("settingsForm")){$("settingsForm").onsubmit=async e=>{e.preventDefault();co
 if($("loyaltyForm"))$("loyaltyForm").onsubmit=async e=>{e.preventDefault();try{const updated=await api("PUT","/api/business",{loyaltyEnabled:$("loyEnabled").checked,loyaltyEarnRate:+$("loyEarnRate").value,loyaltyRedeemValue:+$("loyRedeemValue").value});Object.assign(state,updated);render();toast("Loyalty settings saved")}catch(err){toast(err.message)}};
 if($("closePaywall"))$("closePaywall").onclick=()=>$("paywall").close();
 if($("copyPitch"))$("copyPitch").onclick=()=>copy(salesPitch());
-if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to Starter now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to Starter")}catch(err){toast(err.message)}};
+if($("downgradeBtn"))$("downgradeBtn").onclick=async()=>{if(!confirm("Downgrade to the free plan now? This takes effect immediately and isn't refunded for unused time on your current plan."))return;try{const updated=await api("POST","/api/business/downgrade");Object.assign(state,updated);render();toast("Downgraded to the free plan")}catch(err){toast(err.message)}};
 const oldRender=render;render=function(){oldRender();if($("sBusiness")){$("sBusiness").value=state.businessName||"";$("sPhone").value=state.businessPhone||"";if($("sAddress"))$("sAddress").value=state.businessAddress||"";$("sPayment").value=state.paymentDetails||"";if($("sPaymentLink"))$("sPaymentLink").value=state.paymentLink||"";if($("sCurrency"))$("sCurrency").value=state.currency||"NGN";if($("sDailyDigest"))$("sDailyDigest").checked=state.dailyDigestEnabled!==false}if($("loyEnabled")){$("loyEnabled").checked=!!state.loyaltyEnabled;$("loyEarnRate").value=state.loyaltyEarnRate??1;$("loyRedeemValue").value=state.loyaltyRedeemValue??1}renderProfile();renderTeamVisibility();renderStorefrontSection();renderReferralSection();renderAuditLogSection()};
 
 function renderStorefrontSection(){
@@ -606,7 +606,7 @@ function renderOnlinePaymentSection(){
   loadBanksOnce();
   const totalCutPct=state.plan==="starter"?"4%":"3%";
   if($("platformCutNote")){
-    $("platformCutNote").textContent=`SellersPoint takes ${totalCutPct} + NGN 50 per order from online payments processing${state.plan==="starter"?" on the free Starter plan - upgrade to lower this to 3%":""}. Manual bank transfer orders are never charged.`;
+    $("platformCutNote").textContent=`SellersPoint takes ${totalCutPct} + NGN 50 per order from online payments processing${state.plan==="starter"?" on the free plan - upgrade to lower this to 3%":""}. Manual bank transfer orders are never charged.`;
   }
   if($("absorbFeesLabel"))$("absorbFeesLabel").textContent=`I'll absorb the ~${totalCutPct} +50 payment processing fee myself`;
   if(state.hasPaystackSubaccount){
@@ -744,7 +744,7 @@ async function loadReports(){
     const r=await api("GET","/api/reports");
     lastReport=r;
     $("repRevenue").innerHTML=r.revenueByMonth.map(x=>`<div class="item"><strong>${clean(x.month)}</strong><span class="meta">${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No revenue yet</span></div>`;
-    const upgradeHint=feature=>`<div class="item" style="text-align:center;padding:22px 12px"><p class="meta">See ${feature} on the Pro plan and above.</p><p class="actions" style="justify-content:center;margin-top:10px"><a class="button-link" href="upgrade.html">Upgrade to Pro</a></p></div>`;
+    const upgradeHint=feature=>`<div class="item" style="text-align:center;padding:22px 12px"><p class="meta">See ${feature} on Business Starter and above.</p><p class="actions" style="justify-content:center;margin-top:10px"><a class="button-link" href="upgrade.html">Upgrade to Business Starter</a></p></div>`;
     $("repProducts").innerHTML=r.tier==="basic"?upgradeHint("top products"):r.topProducts.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${x.units} sold - ${money(x.revenue)}</span></div>`).join("")||`<div class="item"><span class="meta">No sales yet</span></div>`;
     $("repCustomers").innerHTML=r.tier==="basic"?upgradeHint("top customers"):r.topCustomers.map(x=>`<div class="item"><strong>${clean(x.name)}</strong><span class="meta">${money(x.spend)} - ${x.orders} orders</span></div>`).join("")||`<div class="item"><span class="meta">No customers yet</span></div>`;
     $("repStatus").innerHTML=r.statusBreakdown.map(x=>`<div class="item"><strong>${clean(x.status)}</strong><span class="meta">${x.count}</span></div>`).join("")||`<div class="item"><span class="meta">No orders yet</span></div>`;
@@ -914,7 +914,7 @@ async function loadTeam(){
     const rawLimit=roster.limit===null||roster.limit===undefined?Infinity:roster.limit;
     const limit=rawLimit===Infinity?"unlimited":rawLimit;
     $("teamCount").textContent=`${roster.staff.length}/${limit} staff`;
-    $("teamLimitNote").innerHTML=rawLimit===0?`Your plan doesn't include staff seats. <a href="upgrade.html#addonCards">Buy a staff seat for ₦2,000</a> without upgrading your whole plan, or move to Pro for 3 included.`:`You can invite up to ${limit} staff member(s).`;
+    $("teamLimitNote").innerHTML=rawLimit===0?`Your plan doesn't include staff seats. <a href="upgrade.html#addonCards">Buy a staff seat for ₦2,000</a> without upgrading your whole plan, or move to Business Starter for 5 included.`:`You can invite up to ${limit} staff member(s).`;
     $("inviteForm").style.display=rawLimit===0?"none":"grid";
     const rows=[...roster.staff.map(s=>`<div class="item"><details class="staff-permission-summary"><summary><strong>${clean(s.email)}</strong> <span class="meta">${permissionSummary(s.permissions)}</span></summary>${presetButtonsHtml}<div class="checkbox-grid" data-member="${s.userId}">${permissionCheckboxesHtml(s.permissions)}</div><div class="item-actions"><button type="button" onclick="saveStaffPermissions('${s.userId}')">Save</button><button type="button" onclick="removeStaffMember('${s.userId}')">Remove</button></div></details></div>`),...roster.invites.map(i=>`<div class="item"><strong>${clean(i.email)}</strong><span class="meta">Invite pending - ${permissionSummary(i.permissions)}</span><div class="item-actions"><button onclick="revokeStaffInvite('${clean(i.email)}')">Revoke</button></div></div>`)];
     $("teamList").innerHTML=rows.join("")||`<div class="item"><span class="meta">No staff yet</span></div>`;
@@ -1068,10 +1068,10 @@ document.querySelectorAll(".docs-tab").forEach(b=>b.onclick=()=>showDocsView(b.d
 // Overview and Registration assume a registered (or registering)
 // business, so those fully redirect to the onboarding gate until that's
 // true. Trackers/Vault are locked by plan (Starter excluded); Calendar/
-// Tax Tools are locked by plan too, but to Pro and above - a separate
-// axis from registration, checked independently per view.
+// Tax Tools are locked by plan too, but to Business Pro and above - a
+// separate axis from registration, checked independently per view.
 const DOCS_GATED_VIEWS=["overview","registration"];
-const DOCS_PRO_PLANS=["pro","business","enterprise"];
+const DOCS_PRO_PLANS=["business","enterprise"];
 const DOCS_PREVIEW_LOCK={
   calendar:{body:"docsCalendarBody",lock:"docsCalendarLocked",locked:()=>!DOCS_PRO_PLANS.includes(state.plan)},
   tax:{body:"docsTaxBody",lock:"docsTaxLocked",locked:()=>!DOCS_PRO_PLANS.includes(state.plan)},
