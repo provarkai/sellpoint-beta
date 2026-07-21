@@ -488,6 +488,13 @@ alter table businesses add column if not exists google_analytics_id text not nul
 -- even if the scheduler scan overlaps itself.
 alter table businesses add column if not exists trial_reminder_sent boolean not null default false;
 
+-- Running count of this business's referred businesses that have converted
+-- (made their first paid-plan payment) - persisted so the referral reward
+-- can fire every REFERRAL_REWARD_EVERY conversions (see db.js's
+-- rewardReferrerIfEligible) instead of on every single one. Never reset,
+-- only ever incremented.
+alter table businesses add column if not exists referral_conversions integer not null default 0;
+
 -- SellersPoint Logistics (item 7): platform-run delivery as a third
 -- deliveryMethod option alongside a seller's own self/rider arrangements.
 -- The actual courier API is still being evaluated, so apiBase/apiKey exist

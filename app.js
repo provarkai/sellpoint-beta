@@ -660,11 +660,15 @@ async function renderReferralSection(){
   $("referralSection").style.display="block";
   if(referralLinkLoaded)return;
   try{
-    const {referralCode}=await api("GET","/api/business/referral");
+    const {referralCode,referralConversions}=await api("GET","/api/business/referral");
     referralLinkLoaded=true;
     const link=`${location.origin}/signup.html?ref=${referralCode}`;
     $("referralLinkDisplay").textContent=link;
     $("copyReferralLink").onclick=()=>copy(link);
+    if($("referralProgress")){
+      const progress=(referralConversions||0)%5;
+      $("referralProgress").textContent=`${progress} of 5 referrals toward your next free month.`;
+    }
   }catch(err){$("referralLinkDisplay").textContent="Could not load your referral link"}
 }
 let auditLogLoaded=false;

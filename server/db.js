@@ -3,7 +3,7 @@ const { Pool, types } = require("pg");
 const {
   orderLimitFor, productLimitFor, staffLimitFor, aiLimitFor, receiptLimitFor, storefrontEnabledFor, pixelTrackingAvailableFor,
   whatsappLimitFor, expenseLimitFor, plHistoryDaysFor, supplierLimitFor, poLimitFor, loyaltyAvailableFor, batchLimitFor, posLimitFor,
-  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT, TRIAL_DAYS,
+  ADDON_AI_CREDITS, ADDON_WHATSAPP_CREDITS, FOUNDER_PROMO_CODE, FOUNDER_PROMO_DEADLINE, FOUNDER_PROMO_LIMIT, TRIAL_DAYS, REFERRAL_REWARD_EVERY,
 } = require("./pricing");
 const { ValidationError, requireString, requireNumber } = require("./validate");
 const { isValidCurrency } = require("./currencies");
@@ -804,11 +804,19 @@ async function getOrCreateReferralCode(businessId) {
   throw new OrderError("Could not generate a referral code - try again");
 }
 
-// Reward: 1 free month, fired once, the moment a referred business makes its
-// first successful PAID-PLAN payment (never for addon purchases or
-// storefront orders, and never more than once per referred business even if
-// they later upgrade again). If the referrer is on Starter, this gives them
-// a month of Growth rather than "a free month of free" - otherwise it
+async function getReferralConversions(businessId) {
+  const { rows } = await query("SELECT referral_conversions FROM businesses WHERE id = $1", [businessId]);
+  return rows[0]?.referral_conversions || 0;
+}
+
+// Reward: 1 free month, fired once every REFERRAL_REWARD_EVERY conversions
+// (a "conversion" being a referred business's first successful PAID-PLAN
+// payment - never for addon purchases or storefront orders, and never
+// counted more than once per referred business even if they later upgrade
+// again). referral_conversions is a running, never-reset counter so this
+// correctly fires on the 5th, 10th, 15th... referral rather than every one.
+// If the referrer is on the free plan, the reward is a month of "pro"
+// (Business Starter) rather than "a free month of free" - otherwise it
 // extends whatever paid plan they're already on.
 async function rewardReferrerIfEligible(businessId) {
   const { rows } = await query("SELECT referred_by_business_id FROM businesses WHERE id = $1", [businessId]);
@@ -819,15 +827,21 @@ async function rewardReferrerIfEligible(businessId) {
     [businessId]
   );
   if (paymentCountRows[0].n !== 1) return; // not exactly their first paid-plan payment
+  const { rows: countedRows } = await query(
+    "UPDATE businesses SET referral_conversions = referral_conversions + 1 WHERE id = $1 RETURNING referral_conversions",
+    [referrerId]
+  );
+  const conversions = countedRows[0]?.referral_conversions;
+  if (!conversions || conversions % REFERRAL_REWARD_EVERY !== 0) return; // not at a reward milestone yet
   const { rows: referrerRows } = await query("SELECT * FROM businesses WHERE id = $1", [referrerId]);
   const referrer = referrerRows[0];
   if (!referrer) return;
-  const targetPlan = effectivePlan(referrer) === "starter" ? "growth" : referrer.plan;
+  const targetPlan = effectivePlan(referrer) === "starter" ? "pro" : referrer.plan;
   const now = new Date();
   const base = referrer.plan_expires_at && new Date(referrer.plan_expires_at) > now ? new Date(referrer.plan_expires_at) : now;
   base.setMonth(base.getMonth() + 1);
   await setPlan(referrerId, targetPlan, referrer.billing_cycle || "monthly", base.toISOString());
-  await logEvent(referrerId, "referral_reward", `1 free month of ${targetPlan} for a referred business's first payment`);
+  await logEvent(referrerId, "referral_reward", `1 free month of ${targetPlan} for reaching ${conversions} referred businesses`);
 }
 
 // Immediate downgrade to Starter, at the tenant's own request. Per the
@@ -3607,6 +3621,7 @@ module.exports = {
   redeemFounderCode,
   countFounderRedemptions,
   getOrCreateReferralCode,
+  getReferralConversions,
   rewardReferrerIfEligible,
   downgradeToStarter,
   updateStorefrontSettings,

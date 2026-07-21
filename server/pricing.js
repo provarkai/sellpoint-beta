@@ -31,6 +31,13 @@ const FOUNDER_PROMO_LIMIT = 1000;
 // free tier on its own.
 const TRIAL_DAYS = 14;
 
+// Refer-and-earn: every time this many of a business's referrals make
+// their first paid-plan payment, the referrer gets 1 free month - of the
+// "pro" tier (Business Starter) if they're on the free plan themselves,
+// or an extra free month of whatever paid plan they're already on
+// otherwise. See db.js#rewardReferrerIfEligible / businesses.referral_conversions.
+const REFERRAL_REWARD_EVERY = 5;
+
 // staffLimit/aiLimit/productLimit/reportsTier are what actually
 // differentiate the paid tiers now (see server/index.js and server/db.js for
 // enforcement) - this is the fix for the gap flagged in CLAUDE.md's pricing
@@ -70,11 +77,11 @@ const TRIAL_DAYS = 14;
 // own CLAUDE.md framing as serving larger businesses first.
 const TIERS = {
   starter: {
-    name: "Free Plan", monthly: 0, orderLimit: 30, productLimit: 4, staffLimit: 0, aiLimit: 20,
+    name: "Free Plan", monthly: 0, orderLimit: 20, productLimit: 4, staffLimit: 0, aiLimit: 20,
     reportsTier: "none", receiptLimit: Infinity, storefront: true, pixelTrackingAvailable: false,
     whatsappLimit: 0, expenseLimit: 20, plHistoryDays: 30, supplierLimit: 0, poLimit: 0,
     loyaltyAvailable: false, batchLimit: 0, posLimit: 0,
-    tagline: "Free forever - 30 orders/month, 4 products, basic invoices, 20 AI generations, unlimited free receipts, a public storefront, and manual WhatsApp messaging - or start a 14-day free trial of Business Starter",
+    tagline: "Free forever - 20 orders/month, 4 products, basic invoices, 20 AI generations, unlimited free receipts, a public storefront, and manual WhatsApp messaging - or start a 14-day free trial of Business Starter",
   },
   // Not self-serve any more (see SELF_SERVE_PLANS) - kept fully defined,
   // never deleted, purely to keep existing pre-restructure subscribers'
@@ -250,4 +257,5 @@ module.exports = {
   FOUNDER_DISCOUNT_RATE,
   FOUNDER_PROMO_LIMIT,
   TRIAL_DAYS,
+  REFERRAL_REWARD_EVERY,
 };

@@ -365,7 +365,13 @@ app.post(
 app.get(
   "/api/business/referral",
   requireAuth,
-  handle(async (req, res) => res.json({ referralCode: await db.getOrCreateReferralCode(req.businessId) }))
+  handle(async (req, res) => {
+    const [referralCode, referralConversions] = await Promise.all([
+      db.getOrCreateReferralCode(req.businessId),
+      db.getReferralConversions(req.businessId),
+    ]);
+    res.json({ referralCode, referralConversions });
+  })
 );
 
 // Owner-only - "who did what" for this business's own team, not visible to
