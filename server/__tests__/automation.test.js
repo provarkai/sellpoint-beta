@@ -8,11 +8,25 @@ test("isOrderDueForAutoReminder: false when order younger than daysAfter", () =>
   assert.equal(isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt: null, daysAfter: 2, now }), false);
 });
 
-test("isOrderDueForAutoReminder: false once a reminder was already sent (once-per-order)", () => {
+test("isOrderDueForAutoReminder: false immediately after stage 1 was sent, before stage 2's own delay", () => {
   const now = new Date("2026-07-13T00:00:00Z");
-  const orderCreatedAt = new Date("2026-07-01T00:00:00Z"); // well past daysAfter
-  const lastAutoReminderAt = new Date("2026-07-05T00:00:00Z");
-  assert.equal(isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, daysAfter: 2, now }), false);
+  const orderCreatedAt = new Date("2026-07-01T00:00:00Z");
+  const lastAutoReminderAt = new Date("2026-07-12T00:00:00Z"); // stage 1 sent yesterday, stage 2 needs 3 days
+  assert.equal(isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, sentCount: 1, daysAfter: 2, now }), false);
+});
+
+test("isOrderDueForAutoReminder: true for stage 2 once its own follow-up delay has passed", () => {
+  const now = new Date("2026-07-13T00:00:00Z");
+  const orderCreatedAt = new Date("2026-07-01T00:00:00Z");
+  const lastAutoReminderAt = new Date("2026-07-05T00:00:00Z"); // 8 days ago, stage 2 only needs 3
+  assert.equal(isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, sentCount: 1, daysAfter: 2, now }), true);
+});
+
+test("isOrderDueForAutoReminder: false once all 3 follow-up stages have already been sent", () => {
+  const now = new Date("2026-07-13T00:00:00Z");
+  const orderCreatedAt = new Date("2026-07-01T00:00:00Z");
+  const lastAutoReminderAt = new Date("2026-07-01T00:00:00Z");
+  assert.equal(isOrderDueForAutoReminder({ orderCreatedAt, lastAutoReminderAt, sentCount: 3, daysAfter: 2, now }), false);
 });
 
 test("isOrderDueForAutoReminder: true when order old enough and never reminded", () => {

@@ -2,9 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { PRICING, priceFor, orderLimitFor, YEARLY_MULTIPLIER } = require("../pricing");
 
-test("starter plan is free with a 30-order monthly limit", () => {
+test("starter plan is free with a 20-order monthly limit", () => {
   assert.equal(PRICING.starter.monthly, 0);
-  assert.equal(orderLimitFor("starter"), 30);
+  assert.equal(orderLimitFor("starter"), 20);
 });
 
 test("paid plans have no order limit", () => {
@@ -41,12 +41,12 @@ test("orderLimitFor falls back to the starter limit for an unknown plan", () => 
   assert.equal(orderLimitFor("nonexistent"), PRICING.starter.orderLimit);
 });
 
-test("applyPricingOverrides replaces monthly/yearly only for growth/pro/business", () => {
+test("applyPricingOverrides replaces monthly/yearly only for the self-serve paid tiers (pro/business)", () => {
   const { applyPricingOverrides } = require("../pricing");
   const overridden = applyPricingOverrides({ growth: 6000, pro: 15000 });
-  assert.equal(overridden.growth.monthly, 6000);
-  assert.equal(overridden.growth.yearly, 60000);
+  assert.equal(overridden.growth.monthly, PRICING.growth.monthly); // growth is a closed legacy tier, no longer overridable
   assert.equal(overridden.pro.monthly, 15000);
+  assert.equal(overridden.pro.yearly, 150000);
   assert.equal(overridden.business.monthly, PRICING.business.monthly); // untouched
   assert.equal(overridden.starter.monthly, 0); // never overridable
 });
