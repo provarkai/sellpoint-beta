@@ -1127,7 +1127,7 @@ function renderDocs(){
   if(!docsData)return;
   const b=docsData.business;
   $("docsRegStatusCard").innerHTML=
-    docsRegCardHtml(b.regType?clean(b.regType.replace(/_/g," "))+" Registration":"Business Registration",b.regStatus,b.regNote||(b.regType?"":"Choose a registration type below to get started"))+
+    docsRegCardHtml(b.regType?clean(b.regType.replace(/_/g," "))+" Registration":"Business Registration",b.regStatus,b.regNote||(b.regStatus==="approved"?"Registration complete":b.regType?"Typically completed within 7 working days":"Choose a registration type below to get started"))+
     docsRegCardHtml("SCUML Registration",b.scumlStatus,b.scumlStatus==="approved"?"Certificate ready":"Recommended right after your TIN - most banks require it to open a business account");
   $("docsRegType").value=b.regType||"";
   $("docsNobCategory").value=b.regNatureOfBusinessCategory||"";
